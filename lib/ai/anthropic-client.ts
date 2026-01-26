@@ -6,11 +6,13 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 
-// Initialize Anthropic client with 50-second timeout
-// (Less than 60s platform limit to allow graceful error handling)
+// Initialize Anthropic client with 180-second timeout
+// Large AI generation prompts (workout programs with 500+ exercises) need more time
+// The SDK will retry on failures, so we set a single long timeout instead
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
-  timeout: 50000, // 50 seconds
+  timeout: 180000, // 180 seconds (3 minutes) for complex generation tasks
+  maxRetries: 1, // Reduce retries since we have a longer timeout
 });
 
 // Default model - Claude Sonnet 4.5 (latest and smartest)

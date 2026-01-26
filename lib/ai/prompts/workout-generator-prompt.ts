@@ -134,7 +134,7 @@ You MUST respond with ONLY this exact JSON structure:
           "day_number": 1,
           "workout_name": "Upper Push A",
           "workout_focus": "Chest, Shoulders, Triceps",
-          "session_type": "hypertrophy",
+          "session_type": "hypertrophy",  // MUST be one of: strength, hypertrophy, conditioning, mobility, recovery, mixed
           "movement_patterns_covered": ["push_horizontal", "push_vertical", "core"],
           "planes_of_motion_covered": ["sagittal", "frontal"],
           "ai_rationale": "Starting with push focus to build upper body strength...",
@@ -162,12 +162,14 @@ You MUST respond with ONLY this exact JSON structure:
 ## VALIDATION RULES
 
 Before outputting JSON, verify:
-1. ✅ All exercise_id values exist in the provided exercise library
+1. ✅ **CRITICAL: All exercise_id values MUST be copied EXACTLY from the exercise library - DO NOT generate or modify UUIDs**
 2. ✅ No injury conflicts (check restrictions against exercise selection)
 3. ✅ Equipment matches client's available equipment
 4. ✅ Movement patterns are balanced per week
 5. ✅ Sets/reps/RPE match experience level
 6. ✅ Total session time fits within client's preferred duration
+
+**EXERCISE ID WARNING**: The system will reject any exercise_id that doesn't match exactly. Copy IDs character-for-character from the provided list.
 
 ## ERROR HANDLING
 
@@ -221,27 +223,29 @@ export function getUserPrompt(
     ? exercise_aversions.join(', ')
     : 'None';
 
-  // Create exercise library summary
+  // Create exercise library with clear ID formatting
+  // Group exercises by movement pattern for easier selection
+  const exercisesByPattern: Record<string, SupabaseExercise[]> = {};
+  availableExercises.forEach((ex) => {
+    const pattern = ex.movement_pattern || 'other';
+    if (!exercisesByPattern[pattern]) {
+      exercisesByPattern[pattern] = [];
+    }
+    exercisesByPattern[pattern].push(ex);
+  });
+
+  // Format exercises with explicit ID labels to prevent hallucination
   const exerciseLibrarySummary = `
-## AVAILABLE EXERCISES (${availableExercises.length} total)
+## EXERCISE LIBRARY
 
-${availableExercises.slice(0, 100).map((ex) => `
-- ID: ${ex.id}
-  Name: ${ex.name}
-  Movement: ${ex.movement_pattern || 'N/A'}
-  Plane: ${ex.plane_of_motion || 'N/A'}
-  Category: ${ex.anatomical_category}
-  Equipment: ${ex.equipment || 'bodyweight'}
-  Level: ${ex.level}
-  Unilateral: ${ex.is_unilateral ? 'Yes' : 'No'}
-  Bodyweight: ${ex.is_bodyweight ? 'Yes' : 'No'}
-  Tempo: ${ex.tempo_default || 'N/A'}
-  Primary Muscles: ${ex.primary_muscles?.join(', ') || 'N/A'}
-`).join('\n')}
+**⚠️ CRITICAL: You MUST use ONLY the exact exercise IDs listed below. Do NOT make up or modify any UUIDs.**
 
-${availableExercises.length > 100 ? `\n... and ${availableExercises.length - 100} more exercises available.` : ''}
+${Object.entries(exercisesByPattern).map(([pattern, exercises]) => `
+### ${pattern.toUpperCase()} EXERCISES (${exercises.length} available)
+${exercises.slice(0, 20).map((ex) => `• "${ex.name}" → ID: ${ex.id} [${ex.equipment || 'bodyweight'}, ${ex.level}]`).join('\n')}${exercises.length > 20 ? `\n  (${exercises.length - 20} more ${pattern} exercises available)` : ''}`).join('\n')}
 
-**NOTE**: The full exercise library contains ${availableExercises.length} exercises. Select from these based on client constraints.
+---
+**REMINDER**: Copy exercise IDs EXACTLY as shown above. Example valid ID format: e450c468-cb76-49f7-8087-b1f099f1830d
 `;
 
   return `# CLIENT PROFILE & PROGRAM REQUIREMENTS

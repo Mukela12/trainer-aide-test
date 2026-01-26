@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
 import { Bodoni_Moda, Lato, Montserrat } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { MobileNav } from "@/components/layout/MobileNav";
-import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { StoreInitializer } from "@/components/providers/StoreInitializer";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import { Toaster } from "@/components/ui/toaster";
-import { GlobalSessionTimer } from "@/components/session/GlobalSessionTimer";
 
 const bodoniModa = Bodoni_Moda({
   subsets: ["latin"],
@@ -30,8 +27,8 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Trainer Aide Demo | Wondrous",
-  description: "Standalone demo of the Trainer Aide feature for Wondrous fitness platform",
+  title: "Trainer Aide | Wondrous",
+  description: "Professional fitness training platform by Wondrous",
 };
 
 export default function RootLayout({
@@ -43,18 +40,13 @@ export default function RootLayout({
     <html lang="en" className="overflow-x-hidden">
       <body
         className={`${lato.variable} ${bodoniModa.variable} ${montserrat.variable} antialiased bg-gray-50 dark:bg-gray-900 font-sans overflow-x-hidden`}
+        suppressHydrationWarning
       >
-        <StoreInitializer />
-        <div className="min-h-screen overflow-x-hidden pb-20 lg:pb-0">
-          <Sidebar />
-          <MobileNav />
-          <main className="lg:ml-64 pt-14 lg:pt-0">
-            {children}
-          </main>
-          <MobileBottomNav />
-          <GlobalSessionTimer />
-        </div>
-        <Toaster />
+        <AuthProvider>
+          <StoreInitializer />
+          {children}
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

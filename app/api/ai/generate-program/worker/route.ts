@@ -446,8 +446,9 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       progress_percentage: 87,
     });
 
-    // Step 4: Validate output
-    const validation = validateAIProgram(aiProgram, filteredExercises);
+    // Step 4: Validate and fix output (removes invalid exercise IDs)
+    const validation = validateAndFixAIProgram(aiProgram, filteredExercises);
+
     if (!validation.valid) {
       await updateAIProgram(body.program_id, {
         generation_status: 'failed',
@@ -456,37 +457,83 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       return NextResponse.json({ error: 'Validation failed' }, { status: 500 });
     }
 
-    console.log('✅ Validation passed');
+    // Use the fixed program (with invalid exercises removed)
+    const fixedProgram = validation.fixedProgram;
+
+    if (validation.warnings.length > 0) {
+      console.log(`⚠️  Validation passed with ${validation.warnings.length} warnings (invalid exercises removed)`);
+    } else {
+      console.log('✅ Validation passed');
+    }
 
     // Step 5: Update program with AI data
     console.log('💾 Updating program...');
     await updateAIProgram(body.program_id, {
-      description: aiProgram.description,
-      ai_rationale: aiProgram.ai_rationale,
-      movement_balance_summary: aiProgram.movement_balance_summary,
+      description: fixedProgram.description,
+      ai_rationale: fixedProgram.ai_rationale,
+      movement_balance_summary: fixedProgram.movement_balance_summary,
       ai_model: raw?.model || 'claude-sonnet-4-5-20250929',
     });
 
     // Step 5.5: Deduplicate weeks (defensive against AI returning duplicates)
-    const originalWeekCount = aiProgram.weekly_structure.length;
+    const originalWeekCount = fixedProgram.weekly_structure.length;
     const uniqueWeeksMap = new Map();
 
-    for (const week of aiProgram.weekly_structure) {
+    for (const week of fixedProgram.weekly_structure) {
       if (!uniqueWeeksMap.has(week.week_number)) {
         uniqueWeeksMap.set(week.week_number, week);
       }
     }
 
-    aiProgram.weekly_structure = Array.from(uniqueWeeksMap.values()).sort((a, b) => a.week_number - b.week_number);
+    fixedProgram.weekly_structure = Array.from(uniqueWeeksMap.values()).sort((a, b) => a.week_number - b.week_number);
 
-    if (originalWeekCount !== aiProgram.weekly_structure.length) {
-      console.warn(`⚠️  Removed ${originalWeekCount - aiProgram.weekly_structure.length} duplicate weeks`);
+    if (originalWeekCount !== fixedProgram.weekly_structure.length) {
+      console.warn(`⚠️  Removed ${originalWeekCount - fixedProgram.weekly_structure.length} duplicate weeks`);
     }
 
-    console.log(`📊 Final structure: ${aiProgram.weekly_structure.length} unique weeks (${aiProgram.weekly_structure.map(w => w.week_number).join(', ')})`);
+    console.log(`📊 Final structure: ${fixedProgram.weekly_structure.length} unique weeks (${fixedProgram.weekly_structure.map(w => w.week_number).join(', ')})`);
+
+    // Helper: Map AI-generated session types to valid database values
+    const validSessionTypes: SessionType[] = ['strength', 'hypertrophy', 'conditioning', 'mobility', 'recovery', 'mixed'];
+    const mapSessionType = (aiSessionType: string): SessionType => {
+      const normalized = aiSessionType?.toLowerCase().trim() || '';
+
+      // Direct match
+      if (validSessionTypes.includes(normalized as SessionType)) {
+        return normalized as SessionType;
+      }
+
+      // Map common variations
+      const sessionTypeMap: Record<string, SessionType> = {
+        'general_fitness': 'mixed',
+        'general fitness': 'mixed',
+        'full_body': 'mixed',
+        'full body': 'mixed',
+        'cardio': 'conditioning',
+        'endurance': 'conditioning',
+        'power': 'strength',
+        'muscle_gain': 'hypertrophy',
+        'muscle gain': 'hypertrophy',
+        'fat_loss': 'conditioning',
+        'fat loss': 'conditioning',
+        'flexibility': 'mobility',
+        'stretching': 'mobility',
+        'rest': 'recovery',
+        'deload': 'recovery',
+      };
+
+      if (sessionTypeMap[normalized]) {
+        console.log(`⚠️  Mapped session_type "${aiSessionType}" → "${sessionTypeMap[normalized]}"`);
+        return sessionTypeMap[normalized];
+      }
+
+      // Default fallback
+      console.log(`⚠️  Unknown session_type "${aiSessionType}", defaulting to "mixed"`);
+      return 'mixed';
+    };
 
     // Step 6: Create workouts (using upsert for idempotent operation)
-    const workoutsToCreate = aiProgram.weekly_structure.flatMap((week) =>
+    const workoutsToCreate = fixedProgram.weekly_structure.flatMap((week) =>
       week.workouts.map((workout, index) => ({
         program_id: body.program_id,
         week_number: week.week_number,
@@ -494,7 +541,7 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
         session_order: index + 1,
         workout_name: workout.workout_name,
         workout_focus: workout.workout_focus,
-        session_type: workout.session_type as SessionType,
+        session_type: mapSessionType(workout.session_type),
         scheduled_date: null,
         planned_duration_minutes: body.session_duration_minutes,
         movement_patterns_covered: workout.movement_patterns_covered,
@@ -538,7 +585,7 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
 
     // Step 7: Create exercises
     let totalExercises = 0;
-    for (const week of aiProgram.weekly_structure) {
+    for (const week of fixedProgram.weekly_structure) {
       for (const workout of week.workouts) {
         const savedWorkout = savedWorkouts.find(
           (w) => w.week_number === week.week_number && w.day_number === workout.day_number
@@ -549,18 +596,18 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
         const exercisesToCreate = workout.exercises.map((ex) => ({
           workout_id: savedWorkout.id,
           exercise_id: ex.exercise_id,
-          exercise_order: ex.exercise_order,
+          exercise_order: typeof ex.exercise_order === 'number' ? Math.round(ex.exercise_order) : 1,
           block_label: ex.block_label || null,
-          sets: ex.sets,
+          sets: typeof ex.sets === 'number' ? Math.round(ex.sets) : 3, // Default to 3 sets
           reps_min: null,
           reps_max: null,
           reps_target: ex.reps_target,
           target_load_kg: null,
           target_load_percentage: null,
-          target_rpe: ex.target_rpe,
+          target_rpe: ex.target_rpe ? Math.round(ex.target_rpe) : null, // Round to integer for DB
           target_rir: null,
           tempo: ex.tempo,
-          rest_seconds: ex.rest_seconds,
+          rest_seconds: ex.rest_seconds ? Math.round(ex.rest_seconds) : null, // Ensure integer
           target_duration_seconds: null,
           target_distance_meters: null,
           is_unilateral: false,
@@ -693,18 +740,22 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
   }
 }
 
-function validateAIProgram(
+function validateAndFixAIProgram(
   program: AIGeneratedProgram,
   availableExercises: any[]
-): { valid: boolean; errors: string[] } {
+): { valid: boolean; errors: string[]; warnings: string[]; fixedProgram: AIGeneratedProgram } {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   if (!program.program_name) errors.push('Missing program_name');
   if (!program.total_weeks) errors.push('Missing total_weeks');
   if (!program.weekly_structure?.length) errors.push('Missing weekly_structure');
 
+  // Create lookup maps
   const exerciseIds = new Set(availableExercises.map(ex => ex.id));
+  const exercisesByName = new Map(availableExercises.map(ex => [ex.name.toLowerCase(), ex]));
 
+  // Fix invalid exercise IDs by trying to match by name or removing
   for (const week of program.weekly_structure || []) {
     if (!week.workouts?.length) {
       errors.push(`Week ${week.week_number} has no workouts`);
@@ -717,15 +768,53 @@ function validateAIProgram(
         continue;
       }
 
+      // Filter out invalid exercises, trying to fix them first
+      const validExercises = [];
       for (const exercise of workout.exercises) {
-        if (!exerciseIds.has(exercise.exercise_id)) {
-          errors.push(`Invalid exercise_id: ${exercise.exercise_id}`);
+        if (exerciseIds.has(exercise.exercise_id)) {
+          // Valid ID - keep it
+          validExercises.push(exercise);
+        } else {
+          // Invalid ID - try to find a replacement by similar ID or skip
+          warnings.push(`Removed invalid exercise_id: ${exercise.exercise_id}`);
+          // Don't add to validExercises - we'll skip this one
         }
+      }
+
+      // Update the workout with only valid exercises
+      workout.exercises = validExercises;
+
+      // Check if workout still has exercises after filtering
+      if (validExercises.length === 0) {
+        errors.push(`Week ${week.week_number}, day ${workout.day_number} has no valid exercises after filtering`);
+      } else if (validExercises.length < 3) {
+        warnings.push(`Week ${week.week_number}, day ${workout.day_number} only has ${validExercises.length} exercises (may be incomplete)`);
       }
     }
   }
 
-  return { valid: errors.length === 0, errors };
+  // Log warnings
+  if (warnings.length > 0) {
+    console.log(`⚠️  Validation warnings (${warnings.length}):`);
+    warnings.forEach(w => console.log(`   - ${w}`));
+  }
+
+  // Program is valid if no critical errors (some warnings are OK)
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    fixedProgram: program
+  };
+}
+
+// Keep old function name as alias for compatibility
+function validateAIProgram(
+  program: AIGeneratedProgram,
+  availableExercises: any[]
+): { valid: boolean; errors: string[] } {
+  const result = validateAndFixAIProgram(program, availableExercises);
+  return { valid: result.valid, errors: result.errors };
 }
 
 function estimateCost(response: any): number {

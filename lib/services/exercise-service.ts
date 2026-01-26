@@ -1,11 +1,11 @@
 /**
  * Exercise Service
  *
- * Provides functions to query exercises from Supabase ta_exercise_library_original table
- * Uses server-side Supabase client for API route compatibility
+ * Provides functions to query exercises from Supabase ta_exercise_library_original_original table
+ * Uses Trainer-Aide (images) database which has the complete exercise library with all required columns
  */
 
-import { supabaseServer as supabase } from '../supabase-server';
+import { imagesSupabase as supabase } from '../supabase/images-client';
 import type { SupabaseExercise, ExerciseLevel, MovementPattern, PlaneOfMotion, ExerciseType } from '../types';
 
 export interface ExerciseFilters {
@@ -300,7 +300,7 @@ export async function getAvailableEquipment(): Promise<string[]> {
 
   // Extract unique equipment types
   const equipmentSet = new Set<string>();
-  data?.forEach((row) => {
+  data?.forEach((row: { equipment?: string | null }) => {
     if (row.equipment) {
       equipmentSet.add(row.equipment);
     }
@@ -325,7 +325,7 @@ export async function getAvailableCategories(): Promise<string[]> {
 
   // Extract unique categories
   const categorySet = new Set<string>();
-  data?.forEach((row) => {
+  data?.forEach((row: { anatomical_category?: string | null }) => {
     if (row.anatomical_category) {
       categorySet.add(row.anatomical_category);
     }

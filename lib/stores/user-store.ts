@@ -1,15 +1,33 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User, UserRole } from '@/lib/types';
-import { DEFAULT_USER, MOCK_USERS } from '@/lib/mock-data/users';
+
+interface ProfileData {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  studioId?: string;
+}
+
+// Default empty user (unauthenticated state)
+const EMPTY_USER: User = {
+  id: '',
+  firstName: '',
+  lastName: '',
+  email: '',
+  role: 'solo_practitioner',
+};
 
 interface UserState {
   currentUser: User;
   currentRole: UserRole;
   isAuthenticated: boolean;
+  studioId: string | null;
   setUser: (user: User) => void;
   setRole: (role: UserRole) => void;
-  login: (email: string) => boolean;
+  setUserFromProfile: (profile: ProfileData) => void;
   logout: () => void;
   reset: () => void;
   // Permission methods
@@ -23,9 +41,10 @@ interface UserState {
 export const useUserStore = create<UserState>()(
   persist(
     (set) => ({
-      currentUser: DEFAULT_USER,
-      currentRole: DEFAULT_USER.role,
-      isAuthenticated: true, // Demo mode - auto authenticated
+      currentUser: EMPTY_USER,
+      currentRole: 'solo_practitioner',
+      isAuthenticated: false,
+      studioId: null,
 
       setUser: (user) => set({ currentUser: user, currentRole: user.role, isAuthenticated: true }),
 
@@ -34,15 +53,19 @@ export const useUserStore = create<UserState>()(
         currentUser: { ...state.currentUser, role },
       })),
 
-      // Demo login - finds user by email and logs them in
-      login: (email: string) => {
-        const user = MOCK_USERS.find(u => u.email === email);
-        if (user) {
-          set({ currentUser: user, currentRole: user.role, isAuthenticated: true });
-          return true;
-        }
-        return false;
-      },
+      // Set user from Supabase profile data
+      setUserFromProfile: (profile: ProfileData) => set({
+        currentUser: {
+          id: profile.id,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          email: profile.email,
+          role: profile.role as UserRole,
+        },
+        currentRole: profile.role as UserRole,
+        isAuthenticated: true,
+        studioId: profile.studioId || null,
+      }),
 
       // Logout - clears user data, sessions, and timer
       logout: () => {
@@ -56,16 +79,18 @@ export const useUserStore = create<UserState>()(
 
         // Clear user data
         set({
-          currentUser: DEFAULT_USER,
-          currentRole: DEFAULT_USER.role,
+          currentUser: EMPTY_USER,
+          currentRole: 'solo_practitioner',
           isAuthenticated: false,
+          studioId: null,
         });
       },
 
       reset: () => set({
-        currentUser: DEFAULT_USER,
-        currentRole: DEFAULT_USER.role,
-        isAuthenticated: true,
+        currentUser: EMPTY_USER,
+        currentRole: 'solo_practitioner',
+        isAuthenticated: false,
+        studioId: null,
       }),
 
       // Permission methods
@@ -91,7 +116,9 @@ export const useUserStore = create<UserState>()(
 
       canCreateAIPrograms: (): boolean => {
         const state = useUserStore.getState();
-        return state.currentRole === 'solo_practitioner';
+        return state.currentRole === 'solo_practitioner' ||
+               state.currentRole === 'studio_owner' ||
+               state.currentRole === 'super_admin';
       },
     }),
     {

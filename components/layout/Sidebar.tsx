@@ -13,6 +13,7 @@ import {
   Home,
   BookOpen,
   User,
+  Users,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -20,6 +21,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useUserStore } from '@/lib/stores/user-store';
+import { useAuth } from '@/components/providers/AuthProvider';
 import { cn } from '@/lib/utils/cn';
 
 interface NavLink {
@@ -30,6 +32,8 @@ interface NavLink {
 
 const studioOwnerLinks: NavLink[] = [
   { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+  { href: '/studio-owner/programs', label: 'AI Programs', icon: <Sparkles size={20} /> },
+  { href: '/studio-owner/trainers', label: 'Trainers', icon: <Users size={20} /> },
   { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
   { href: '/studio-owner/templates', label: 'Templates', icon: <FileText size={20} /> },
   { href: '/studio-owner/sessions', label: 'All Sessions', icon: <Dumbbell size={20} /> },
@@ -62,12 +66,13 @@ const soloPractitionerLinks: NavLink[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentRole, currentUser, logout } = useUserStore();
+  const { currentRole, currentUser } = useUserStore();
+  const { signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    router.push('/');
+  const handleLogout = async () => {
+    await signOut();
+    router.push('/login');
   };
 
   const links =

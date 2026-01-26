@@ -129,51 +129,160 @@ export function ProgramGeneratorWizard() {
 
       const { program_id } = await response.json();
 
-      // Step 2: Poll for status every 2 seconds
-      // Frontend polling timeout matches backend worker timeout:
-      // Netlify: 58s worker timeout, so poll for 70s (buffer for stragglers)
-      // Vercel: 300s worker timeout, so poll for 360s (buffer for stragglers)
-      // Conservative estimate: assume Netlify deployment (can adjust if Vercel)
-      const pollTimeoutSec = 70; // Assumes Netlify (58s worker + 12s buffer)
-      const maxPollAttempts = Math.ceil(pollTimeoutSec / 2); // Poll every 2s
+      // Step 2: Use Server-Sent Events (SSE) for real-time progress updates
+      // Falls back to polling if SSE fails
+      console.log(`🔄 Connecting to SSE stream for program ${program_id}...`);
 
-      console.log(`⏱️  Polling timeout: ${pollTimeoutSec}s for ${config.total_weeks}-week program`);
+      const useSSE = typeof EventSource !== 'undefined';
 
-      let pollAttempts = 0;
+      if (useSSE) {
+        await connectSSEStream(program_id, config);
+      } else {
+        console.log('⚠️ EventSource not supported, falling back to polling');
+        await pollForProgress(program_id, config);
+      }
 
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setGenerationResult({
+        success: false,
+        error: errorMessage,
+      });
+      setCurrentStep('results');
+    }
+  };
+
+  // SSE-based progress tracking (preferred)
+  const connectSSEStream = (programId: string, config: ProgramConfig): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const eventSource = new EventSource(`/api/ai-programs/${programId}/stream`);
+      let lastMessage = '';
+
+      eventSource.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          switch (data.type) {
+            case 'connected':
+              console.log('✅ SSE connected:', data.message);
+              break;
+
+            case 'progress':
+              // Update progress state
+              setProgressMessage(data.message || 'Generating...');
+              setProgressPercentage(data.percentage || 0);
+              setCurrentProgressStep(data.currentStep || 0);
+              setTotalProgressSteps(data.totalSteps || 0);
+
+              // Add to progress log if message changed
+              if (data.message && data.message !== lastMessage) {
+                lastMessage = data.message;
+                setProgressLog(prev => [...prev, data.message]);
+              }
+              break;
+
+            case 'completed':
+              console.log('✅ Generation completed via SSE');
+              eventSource.close();
+
+              // Fetch workouts to get accurate counts
+              await fetchProgramResults(programId);
+              resolve();
+              break;
+
+            case 'failed':
+              console.error('❌ Generation failed via SSE:', data.error);
+              eventSource.close();
+              setGenerationResult({
+                success: false,
+                error: data.error || 'Generation failed',
+              });
+              setCurrentStep('results');
+              resolve();
+              break;
+
+            case 'timeout':
+              console.warn('⚠️ SSE timeout:', data.error);
+              eventSource.close();
+              // Fall back to polling for remainder
+              await pollForProgress(programId, config);
+              resolve();
+              break;
+
+            case 'error':
+              console.error('❌ SSE error:', data.error);
+              eventSource.close();
+              // Fall back to polling
+              await pollForProgress(programId, config);
+              resolve();
+              break;
+          }
+        } catch (parseError) {
+          console.error('Failed to parse SSE message:', parseError);
+        }
+      };
+
+      eventSource.onerror = async (error) => {
+        console.error('❌ SSE connection error, falling back to polling:', error);
+        eventSource.close();
+        // Fall back to polling
+        await pollForProgress(programId, config);
+        resolve();
+      };
+    });
+  };
+
+  // Polling fallback (if SSE fails)
+  const pollForProgress = async (programId: string, config: ProgramConfig): Promise<void> => {
+    // Extended timeout for AI generation (6 minutes max)
+    const pollTimeoutSec = 360;
+    const maxPollAttempts = Math.ceil(pollTimeoutSec / 2);
+
+    console.log(`⏱️ Polling timeout: ${pollTimeoutSec}s for ${config.total_weeks}-week program`);
+
+    let pollAttempts = 0;
+
+    return new Promise((resolve, reject) => {
       const pollInterval = setInterval(async () => {
         try {
           pollAttempts++;
 
-          // Timeout after max attempts
           if (pollAttempts > maxPollAttempts) {
             clearInterval(pollInterval);
             console.error(`❌ Polling timeout after ${pollAttempts * 2} seconds`);
-            throw new Error(`Generation is taking longer than expected (${Math.floor(maxPollAttempts * 2 / 60)} minutes). The program may still be generating in the background. Check your programs list in a few minutes.`);
+            setGenerationResult({
+              success: false,
+              error: `Generation is taking longer than expected. The program may still be generating in the background. Check your programs list in a few minutes.`,
+            });
+            setCurrentStep('results');
+            resolve();
+            return;
           }
 
-          const statusResponse = await fetch(`/api/ai-programs/${program_id}`);
+          const statusResponse = await fetch(`/api/ai-programs/${programId}`);
 
           if (!statusResponse.ok) {
             clearInterval(pollInterval);
-            throw new Error('Failed to check generation status');
+            setGenerationResult({
+              success: false,
+              error: 'Failed to check generation status',
+            });
+            setCurrentStep('results');
+            resolve();
+            return;
           }
 
           const response = await statusResponse.json();
-          // API returns { program: { ...fields } }, so we need to unwrap it
           const programData = response.program || response;
 
-          // Extract real-time progress data
+          // Update progress state
           const message = programData?.progress_message || 'Generating...';
           const percentage = programData?.progress_percentage || 0;
-          const currentStep = programData?.current_step || 0;
-          const totalSteps = programData?.total_steps || 0;
 
-          // Update progress state
           setProgressMessage(message);
           setProgressPercentage(percentage);
-          setCurrentProgressStep(currentStep);
-          setTotalProgressSteps(totalSteps);
+          setCurrentProgressStep(programData?.current_step || 0);
+          setTotalProgressSteps(programData?.total_steps || 0);
 
           // Add to progress log if message changed
           setProgressLog(prev => {
@@ -184,77 +293,84 @@ export function ProgramGeneratorWizard() {
             return prev;
           });
 
-          // Debug logging
-          if (pollAttempts % 10 === 0) {
-            console.log(`Poll #${pollAttempts}: status = ${programData?.generation_status}, progress = ${percentage}%, ${message}`);
+          if (pollAttempts % 15 === 0) {
+            console.log(`Poll #${pollAttempts}: status = ${programData?.generation_status}, progress = ${percentage}%`);
           }
 
           if (programData?.generation_status === 'completed') {
             clearInterval(pollInterval);
-            console.log('✅ Generation completed successfully');
-
-            // Fetch workouts to get accurate counts
-            try {
-              const workoutsResponse = await fetch(`/api/ai-programs/${program_id}/workouts`);
-              if (workoutsResponse.ok) {
-                const workoutsData = await workoutsResponse.json();
-                const workouts = workoutsData.workouts || [];
-                const totalExercises = workouts.reduce((sum: number, workout: any) => {
-                  return sum + (workout.exercises?.length || 0);
-                }, 0);
-
-                console.log(`📊 Program stats: ${workouts.length} workouts, ${totalExercises} exercises`);
-
-                setGenerationResult({
-                  success: true,
-                  program_id: program_id,
-                  program: programData,
-                  workouts_count: workouts.length,
-                  exercises_count: totalExercises,
-                });
-              } else {
-                // Fallback if workouts fetch fails
-                console.warn('⚠️ Could not fetch workout counts, using defaults');
-                setGenerationResult({
-                  success: true,
-                  program_id: program_id,
-                  program: programData,
-                  workouts_count: 0,
-                  exercises_count: 0,
-                });
-              }
-            } catch (fetchError) {
-              console.error('❌ Error fetching workouts:', fetchError);
-              // Still show success, just without counts
-              setGenerationResult({
-                success: true,
-                program_id: program_id,
-                program: programData,
-                workouts_count: 0,
-                exercises_count: 0,
-              });
-            }
-
-            setCurrentStep('results');
+            console.log('✅ Generation completed via polling');
+            await fetchProgramResults(programId);
+            resolve();
           } else if (programData?.generation_status === 'failed') {
             clearInterval(pollInterval);
             console.error('❌ Generation failed:', programData.generation_error);
-            throw new Error(programData.generation_error || 'Generation failed');
+            setGenerationResult({
+              success: false,
+              error: programData.generation_error || 'Generation failed',
+            });
+            setCurrentStep('results');
+            resolve();
           }
         } catch (pollError) {
           clearInterval(pollInterval);
-          throw pollError;
+          setGenerationResult({
+            success: false,
+            error: pollError instanceof Error ? pollError.message : 'Unknown error',
+          });
+          setCurrentStep('results');
+          resolve();
         }
-      }, 2000); // Poll every 2 seconds
+      }, 2000);
+    });
+  };
 
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+  // Helper to fetch final program results
+  const fetchProgramResults = async (programId: string) => {
+    try {
+      // Fetch program data
+      const programResponse = await fetch(`/api/ai-programs/${programId}`);
+      const programJson = await programResponse.json();
+      const programData = programJson.program || programJson;
+
+      // Fetch workouts to get accurate counts
+      const workoutsResponse = await fetch(`/api/ai-programs/${programId}/workouts`);
+      if (workoutsResponse.ok) {
+        const workoutsData = await workoutsResponse.json();
+        const workouts = workoutsData.workouts || [];
+        const totalExercises = workouts.reduce((sum: number, workout: any) => {
+          return sum + (workout.exercises?.length || 0);
+        }, 0);
+
+        console.log(`📊 Program stats: ${workouts.length} workouts, ${totalExercises} exercises`);
+
+        setGenerationResult({
+          success: true,
+          program_id: programId,
+          program: programData,
+          workouts_count: workouts.length,
+          exercises_count: totalExercises,
+        });
+      } else {
+        setGenerationResult({
+          success: true,
+          program_id: programId,
+          program: programData,
+          workouts_count: 0,
+          exercises_count: 0,
+        });
+      }
+    } catch (fetchError) {
+      console.error('❌ Error fetching program results:', fetchError);
       setGenerationResult({
-        success: false,
-        error: errorMessage,
+        success: true,
+        program_id: programId,
+        workouts_count: 0,
+        exercises_count: 0,
       });
-      setCurrentStep('results');
     }
+
+    setCurrentStep('results');
   };
 
   const handleCreateAnother = () => {

@@ -1,7 +1,0 @@
-/**
- * Solo Practitioner View AI Program Page
- * Re-uses the trainer program view page component
- */
-import TrainerProgramViewPage from '@/app/trainer/programs/[id]/page';
-
-export default TrainerProgramViewPage;

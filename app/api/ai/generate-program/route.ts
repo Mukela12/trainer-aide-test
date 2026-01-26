@@ -10,8 +10,72 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAIProgram } from '@/lib/services/ai-program-service';
 import { getClientProfileById } from '@/lib/services/client-profile-service';
-import { extractWorkoutConstraints, GoalType, ExperienceLevel } from '@/lib/types/client-profile';
-import { getUserById } from '@/lib/mock-data/users';
+import { extractWorkoutConstraints, GoalType, ExperienceLevel, ClientProfile } from '@/lib/types/client-profile';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+
+/**
+ * Result from client data lookup
+ */
+interface ClientDataResult {
+  profile: ClientProfile;
+  isFromClientProfiles: boolean; // true if from client_profiles table, false if from fc_clients
+}
+
+/**
+ * Helper: Try to get client profile from client_profiles table,
+ * if not found, try fc_clients table and create a minimal profile object
+ */
+async function getClientData(clientId: string): Promise<ClientDataResult | null> {
+  // First try the client_profiles table
+  const clientProfile = await getClientProfileById(clientId);
+  if (clientProfile) {
+    return { profile: clientProfile, isFromClientProfiles: true };
+  }
+
+  // Fallback: try fc_clients table
+  const serviceClient = createServiceRoleClient();
+  const { data: fcClient, error } = await serviceClient
+    .from('fc_clients')
+    .select('*')
+    .eq('id', clientId)
+    .maybeSingle();
+
+  if (error || !fcClient) {
+    console.error('Client not found in either table:', clientId);
+    return null;
+  }
+
+  // Create a minimal ClientProfile from fc_clients data
+  const minimalProfile: ClientProfile = {
+    id: fcClient.id,
+    email: fcClient.email,
+    first_name: fcClient.first_name || fcClient.name?.split(' ')[0] || 'Client',
+    last_name: fcClient.last_name || fcClient.name?.split(' ').slice(1).join(' ') || '',
+    // Default values since fc_clients doesn't have these fields
+    experience_level: 'intermediate',
+    current_activity_level: 'moderately_active',
+    primary_goal: 'general_fitness',
+    secondary_goals: [],
+    preferred_training_days: ['monday', 'wednesday', 'friday'],
+    preferred_training_times: ['morning'],
+    available_equipment: ['dumbbells', 'barbell', 'bench', 'cables'],
+    injuries: [],
+    medical_conditions: [],
+    medications: [],
+    physical_limitations: [],
+    doctor_clearance: true,
+    preferred_exercise_types: [],
+    exercise_aversions: [],
+    preferred_movement_patterns: [],
+    dietary_restrictions: [],
+    dietary_preferences: [],
+    is_active: true,
+    created_at: fcClient.created_at,
+    updated_at: fcClient.created_at,
+  };
+
+  return { profile: minimalProfile, isFromClientProfiles: false };
+}
 
 /**
  * AI Program Generation Request
@@ -35,22 +99,36 @@ interface GenerateProgramAPIRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse request body
-    const body: GenerateProgramAPIRequest = await request.json();
+    // Verify user is authenticated
+    const supabase = await createServerSupabaseClient();
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-    // Validate required fields
-    if (!body.trainer_id) {
+    if (authError || !authUser) {
       return NextResponse.json(
-        { error: 'trainer_id is required' },
-        { status: 400 }
+        { error: 'Unauthorized' },
+        { status: 401 }
       );
     }
 
-    // Role-based access control: Only solo practitioners can create AI programs
-    const user = getUserById(body.trainer_id);
-    if (!user || user.role !== 'solo_practitioner') {
+    // Parse request body
+    const body: GenerateProgramAPIRequest = await request.json();
+
+    // Use authenticated user's ID if trainer_id not provided
+    const trainerId = body.trainer_id || authUser.id;
+
+    // Get user's role from profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', trainerId)
+      .maybeSingle();
+
+    // Role-based access control: Solo practitioners and studio owners can create AI programs
+    const userRole = profile?.role || 'solo_practitioner';
+    const allowedRoles = ['solo_practitioner', 'studio_owner', 'super_admin'];
+    if (!allowedRoles.includes(userRole)) {
       return NextResponse.json(
-        { error: 'Unauthorized: AI Programs are only available to solo practitioners' },
+        { error: 'Unauthorized: AI Programs are only available to solo practitioners and studio owners' },
         { status: 403 }
       );
     }
@@ -73,15 +151,25 @@ export async function POST(request: NextRequest) {
     let programName: string;
     let primaryGoal: string;
     let experienceLevel: string;
+    let availableEquipment: string[] = body.available_equipment || [];
+    let actualClientProfileId: string | null = null; // Only set if client is from client_profiles table
 
     if (body.client_profile_id) {
-      // Fetch client profile from database
-      const clientProfile = await getClientProfileById(body.client_profile_id);
-      if (!clientProfile) {
+      // Fetch client profile from database (tries client_profiles first, then fc_clients)
+      const clientData = await getClientData(body.client_profile_id);
+      if (!clientData) {
         return NextResponse.json(
-          { error: 'Client profile not found' },
+          { error: 'Client not found' },
           { status: 404 }
         );
+      }
+
+      const { profile: clientProfile, isFromClientProfiles } = clientData;
+
+      // Only set client_profile_id if the client is from client_profiles table
+      // (due to foreign key constraint on ai_programs table)
+      if (isFromClientProfiles) {
+        actualClientProfileId = body.client_profile_id;
       }
 
       // Extract workout constraints from profile
@@ -89,6 +177,7 @@ export async function POST(request: NextRequest) {
       programName = body.program_name || `${clientProfile.first_name}'s Training Program`;
       primaryGoal = constraints.primaryGoal;
       experienceLevel = constraints.experienceLevel;
+      availableEquipment = constraints.availableEquipment;
     } else {
       // Use provided parameters (manual mode)
       if (!body.primary_goal || !body.experience_level || !body.available_equipment) {
@@ -119,8 +208,9 @@ export async function POST(request: NextRequest) {
     console.log(`   Experience Level: ${experienceLevel}`);
 
     // Create master program record with "generating" status
+    // Note: client_profile_id is only set if client exists in client_profiles table (FK constraint)
     const programData = {
-      client_profile_id: body.client_profile_id || null,
+      client_profile_id: actualClientProfileId,
       trainer_id: body.trainer_id,
       created_by: body.trainer_id,
       program_name: programName,
@@ -190,7 +280,9 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         program_id: savedProgram.id,
-        client_profile_id: body.client_profile_id,
+        // Only pass client_profile_id if client exists in client_profiles table
+        // If null, worker will use the params directly (for fc_clients)
+        client_profile_id: actualClientProfileId,
         trainer_id: body.trainer_id,
         total_weeks: body.total_weeks,
         sessions_per_week: body.sessions_per_week,
@@ -198,9 +290,9 @@ export async function POST(request: NextRequest) {
         include_nutrition: body.include_nutrition,
         primary_goal: primaryGoal,
         experience_level: experienceLevel,
-        available_equipment: body.available_equipment,
-        injuries: body.injuries,
-        exercise_aversions: body.exercise_aversions,
+        available_equipment: availableEquipment,
+        injuries: body.injuries || [],
+        exercise_aversions: body.exercise_aversions || [],
       }),
     }).catch((error) => {
       console.error('❌ Failed to trigger worker:', error);

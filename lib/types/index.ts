@@ -30,7 +30,17 @@ export type SignOffMode = 'full_session' | 'per_block' | 'per_exercise';
 
 export type TemplateType = 'standard' | 'resistance_only';
 
-export type UserRole = 'studio_owner' | 'trainer' | 'client' | 'solo_practitioner';
+// Extended UserRole with all 8 roles from RBAC system
+// For the full type with all roles, import from @/lib/permissions
+export type UserRole =
+  | 'super_admin'
+  | 'solo_practitioner'
+  | 'studio_owner'
+  | 'studio_manager'
+  | 'trainer'
+  | 'receptionist'
+  | 'finance_manager'
+  | 'client';
 
 export type ExerciseLevel = 'beginner' | 'intermediate' | 'advanced';
 
@@ -84,7 +94,7 @@ export interface MuscleIntensityJson {
   stabilizers: Record<string, number>;
 }
 
-// Complete Supabase Exercise schema (ta_exercise_library_original)
+// Complete Supabase Exercise schema (ta_exercise_library)
 export interface SupabaseExercise {
   id: string; // UUID
   slug: string; // Kebab-case slug

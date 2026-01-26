@@ -162,7 +162,7 @@ export interface AIWorkoutExercise {
 
   // Links
   workout_id: string;
-  exercise_id: string;  // FK to ta_exercise_library_original
+  exercise_id: string;  // FK to ta_exercise_library
 
   // Position
   exercise_order: number;

@@ -1,11 +1,11 @@
 import { Exercise } from '@/lib/types';
 import generatedExercises from '@/data/generated-exercises.json';
 import {
-  getAllExercises as getSupabaseExercises,
-  getExerciseById as getSupabaseExerciseById,
-  getExercises,
-  searchExercises as searchSupabaseExercises,
-} from '@/lib/services/exercise-service';
+  getAllExercisesClient,
+  getExerciseByIdClient,
+  getExercisesClient,
+  searchExercisesClient,
+} from '@/lib/services/exercise-service-client';
 import {
   supabaseToFrontendExercises,
   supabaseToFrontendExercise,
@@ -42,8 +42,8 @@ export async function loadExercises(): Promise<Exercise[]> {
   }
 
   try {
-    // Try fetching from Supabase
-    const supabaseExercises = await getSupabaseExercises();
+    // Try fetching from Supabase (client-side)
+    const supabaseExercises = await getAllExercisesClient();
     const exercises = supabaseToFrontendExercises(supabaseExercises);
 
     // Update cache
@@ -79,7 +79,7 @@ export function clearExerciseCache(): void {
  */
 export async function getExerciseById(id: string): Promise<Exercise | null> {
   try {
-    const supabaseExercise = await getSupabaseExerciseById(id);
+    const supabaseExercise = await getExerciseByIdClient(id);
     if (!supabaseExercise) return null;
     return supabaseToFrontendExercise(supabaseExercise);
   } catch (error) {
@@ -102,7 +102,7 @@ export function getExerciseByIdSync(id: string): Exercise | undefined {
  */
 export async function getExercisesByCategory(category: string): Promise<Exercise[]> {
   try {
-    const supabaseExercises = await getExercises({
+    const supabaseExercises = await getExercisesClient({
       anatomicalCategory: category,
     });
     return supabaseToFrontendExercises(supabaseExercises);
@@ -125,7 +125,7 @@ export function getExercisesByCategorySync(category: string): Exercise[] {
  */
 export async function searchExercises(searchTerm: string, limit: number = 50): Promise<Exercise[]> {
   try {
-    const supabaseExercises = await searchSupabaseExercises(searchTerm, { limit });
+    const supabaseExercises = await searchExercisesClient(searchTerm, { limit });
     return supabaseToFrontendExercises(supabaseExercises);
   } catch (error) {
     console.error('Error searching exercises:', error);

@@ -1,14 +1,18 @@
-import { createClient } from '@supabase/supabase-js'
+/**
+ * Exercise Image Helpers
+ *
+ * This file provides utilities for fetching exercise images from the
+ * Images Database (Trainer-Aide - scpfuwijsbjxuhfwoogg.supabase.co)
+ *
+ * NOTE: This is a separate Supabase instance used ONLY for exercise images.
+ * For auth, users, templates, sessions, etc., use the main database clients
+ * from @/lib/supabase/index.ts
+ */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || ''
+import { imagesSupabase, isImagesSupabaseConfigured } from './supabase/images-client'
 
-// Create a client with fallback values for build time
-// This prevents build errors when env vars aren't available
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseKey || 'placeholder-key'
-)
+// Re-export for backwards compatibility
+export { imagesSupabase as supabase }
 
 /**
  * Constructs the public URL for an exercise image from Supabase storage
@@ -24,7 +28,7 @@ export function getExerciseImageUrl(
   exerciseName?: string
 ): string {
   // Return placeholder if Supabase is not configured
-  if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
+  if (!isImagesSupabaseConfigured()) {
     return ''
   }
 
@@ -37,7 +41,7 @@ export function getExerciseImageUrl(
     AVAILABLE_SUPABASE_FOLDERS
   )
 
-  const { data } = supabase.storage
+  const { data } = imagesSupabase.storage
     .from('exercise-images')
     .getPublicUrl(`${folderName}/${imageType}.webp`)
 
@@ -55,12 +59,12 @@ export async function exerciseImageExists(
   imageType: 'start' | 'end'
 ): Promise<boolean> {
   // Return false if Supabase is not configured
-  if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
+  if (!isImagesSupabaseConfigured()) {
     return false
   }
 
   try {
-    const { data, error } = await supabase.storage
+    const { data, error } = await imagesSupabase.storage
       .from('exercise-images')
       .list(exerciseId)
 
