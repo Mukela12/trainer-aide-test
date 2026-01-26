@@ -8,5 +8,14 @@
 
 import { createServiceRoleClient } from './supabase/server'
 
-// Re-export for backwards compatibility
-export const supabaseServer = createServiceRoleClient()
+// Lazy initialization to avoid build-time errors when env vars aren't available
+let _supabaseServer: ReturnType<typeof createServiceRoleClient> | null = null
+
+export const supabaseServer = new Proxy({} as ReturnType<typeof createServiceRoleClient>, {
+  get(_, prop) {
+    if (!_supabaseServer) {
+      _supabaseServer = createServiceRoleClient()
+    }
+    return (_supabaseServer as any)[prop]
+  }
+})
