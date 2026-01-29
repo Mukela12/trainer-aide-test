@@ -9,8 +9,18 @@ import {
   getPaymentReceiptEmail,
 } from './email-templates';
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization of Resend client to avoid build-time errors when API key is not set
+let resendClient: Resend | null = null;
+
+const getResendClient = (): Resend => {
+  if (!resendClient) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY environment variable is not set');
+    }
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+};
 
 // Supabase service client for database operations
 const getServiceClient = () =>
@@ -49,7 +59,7 @@ export async function sendBookingConfirmationEmail(params: {
       duration: params.duration,
     });
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: params.clientEmail,
       subject: email.subject,
@@ -103,7 +113,7 @@ export async function sendReminderEmail(params: {
       params.hours
     );
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: params.clientEmail,
       subject: email.subject,
@@ -151,7 +161,7 @@ export async function sendLowCreditsEmail(params: {
       bookingLink: params.bookingLink,
     });
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: params.clientEmail,
       subject: email.subject,
@@ -199,7 +209,7 @@ export async function sendPaymentReceiptEmail(params: {
       serviceName: params.serviceName,
     });
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: params.clientEmail,
       subject: email.subject,
@@ -297,7 +307,7 @@ This invitation will expire in 7 days.
 Powered by Trainer Aide
     `.trim();
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: params.recipientEmail,
       subject,
