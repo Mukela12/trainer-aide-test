@@ -46,7 +46,7 @@ Trainer: ${data.trainerName}
 See you then!
 
 —
-Powered by Trainer Aide
+Powered by allwondrous
     `.trim(),
     html: `
 <!DOCTYPE html>
@@ -95,7 +95,7 @@ Powered by Trainer Aide
       <p>See you then!</p>
     </div>
     <div class="footer">
-      Powered by Trainer Aide
+      Powered by allwondrous
     </div>
   </div>
 </body>
@@ -125,7 +125,7 @@ With ${data.trainerName}
 See you soon!
 
 —
-Powered by Trainer Aide
+Powered by allwondrous
     `.trim(),
     html: `
 <!DOCTYPE html>
@@ -158,7 +158,7 @@ Powered by Trainer Aide
       <p>See you soon!</p>
     </div>
     <div class="footer">
-      Powered by Trainer Aide
+      Powered by allwondrous
     </div>
   </div>
 </body>
@@ -180,7 +180,7 @@ To continue training with ${data.trainerName}, purchase a new package.
 ${data.bookingLink ? `Book now: ${data.bookingLink}` : ''}
 
 —
-Powered by Trainer Aide
+Powered by allwondrous
     `.trim(),
     html: `
 <!DOCTYPE html>
@@ -208,7 +208,7 @@ Powered by Trainer Aide
       ${data.bookingLink ? `<p><a href="${data.bookingLink}" class="cta">Buy More Sessions</a></p>` : ''}
     </div>
     <div class="footer">
-      Powered by Trainer Aide
+      Powered by allwondrous
     </div>
   </div>
 </body>
@@ -232,7 +232,7 @@ ${data.serviceName ? `Service: ${data.serviceName}` : ''}
 This is your receipt for your records.
 
 —
-Powered by Trainer Aide
+Powered by allwondrous
     `.trim(),
     html: `
 <!DOCTYPE html>
@@ -265,7 +265,7 @@ Powered by Trainer Aide
       <p style="color: #6b7280; font-size: 14px;">This is your receipt for your records.</p>
     </div>
     <div class="footer">
-      Powered by Trainer Aide
+      Powered by allwondrous
     </div>
   </div>
 </body>

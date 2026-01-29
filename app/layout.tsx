@@ -27,8 +27,12 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Trainer Aide | Wondrous",
-  description: "Professional fitness training platform by Wondrous",
+  title: "allwondrous",
+  description: "Professional fitness training platform",
+  icons: {
+    icon: "/images/w-icon-logo.ico",
+    apple: "/images/w-icon-logo.png",
+  },
 };
 
 export default function RootLayout({

@@ -112,9 +112,6 @@ export function Sidebar() {
                 />
               </div>
             </div>
-            <div className="text-center">
-              <p className="text-xs font-medium text-wondrous-grey-dark dark:text-gray-300">Trainer Aide</p>
-            </div>
           </>
         )}
         {collapsed && (

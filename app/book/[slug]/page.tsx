@@ -296,7 +296,7 @@ export default function TrainerBookingPage() {
       {/* Footer */}
       <div className="border-t border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
         <div className="max-w-4xl mx-auto px-4 py-6 text-center text-sm text-gray-500">
-          Powered by <span className="font-semibold">Trainer Aide</span>
+          Powered by <span className="font-semibold">allwondrous</span>
         </div>
       </div>
     </div>

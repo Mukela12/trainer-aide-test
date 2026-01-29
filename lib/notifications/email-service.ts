@@ -252,7 +252,7 @@ export async function sendInvitationEmail(params: {
   invitationId?: string;
 }): Promise<SendEmailResult> {
   try {
-    const subject = `${params.inviterName} invited you to join ${params.studioName || 'Trainer Aide'}`;
+    const subject = `${params.inviterName} invited you to join ${params.studioName || 'allwondrous'}`;
     const displayName = params.recipientName || 'there';
     const roleDisplay = params.role.replace('_', ' ');
 
@@ -285,7 +285,7 @@ export async function sendInvitationEmail(params: {
       <p style="font-size: 14px; color: #6b7280;">This invitation will expire in 7 days.</p>
     </div>
     <div class="footer">
-      Powered by Trainer Aide
+      Powered by allwondrous
     </div>
   </div>
 </body>
@@ -304,7 +304,7 @@ Accept your invitation: ${params.inviteUrl}
 This invitation will expire in 7 days.
 
 —
-Powered by Trainer Aide
+Powered by allwondrous
     `.trim();
 
     const { data, error } = await getResendClient().emails.send({

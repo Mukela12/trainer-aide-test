@@ -99,7 +99,7 @@ export default function BookingConfirmationPage() {
       title: `${booking.serviceName} with ${booking.trainerName}`,
       start: formatDate(startTime),
       end: formatDate(endTime),
-      description: `Training session booked via Trainer Aide`,
+      description: `Training session booked via allwondrous`,
     };
 
     // Google Calendar URL
@@ -239,7 +239,7 @@ export default function BookingConfirmationPage() {
 
         {/* Footer */}
         <div className="mt-12 text-center text-sm text-gray-400">
-          Powered by <span className="font-semibold">Trainer Aide</span>
+          Powered by <span className="font-semibold">allwondrous</span>
         </div>
       </div>
     </div>

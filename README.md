@@ -1,10 +1,10 @@
-# Trainer Aide Demo
+# allwondrous
 
-A standalone, high-quality demo of the Wondrous Trainer Aide system.
+A standalone, high-quality demo of the allwondrous fitness platform.
 
 ## 🎯 Project Overview
 
-This is a **frontend-only demo** showcasing a complete redesign of the Trainer Aide feature for the Wondrous fitness platform. It demonstrates:
+This is a **frontend-only demo** showcasing a complete redesign of the Trainer Aide feature for the allwondrous fitness platform. It demonstrates:
 
 - **Studio Owner** workflow: Create and manage workout templates
 - **Trainer** workflow: Run training sessions with clients using templates

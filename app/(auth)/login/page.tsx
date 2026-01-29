@@ -154,7 +154,7 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 font-heading mb-2">
-            Trainer Aide
+            allwondrous
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             {isSignUp ? 'Create your account' : 'Sign in to your account'}

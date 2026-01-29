@@ -336,7 +336,7 @@ export default function CreateAccountPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-400">
-          Powered by <span className="font-semibold">Trainer Aide</span>
+          Powered by <span className="font-semibold">allwondrous</span>
         </div>
       </div>
     </div>
