@@ -15,7 +15,6 @@ import {
   CreditCard,
   Lock,
 } from 'lucide-react';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { format } from 'date-fns';
 
 interface BookingSelection {
@@ -77,76 +76,38 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
-      const supabase = getSupabaseBrowserClient();
+      // Use API endpoint to handle booking creation server-side
+      // This avoids RLS issues with fc_clients table
+      const response = await fetch('/api/public/book', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          trainerId: selection.trainerId,
+          serviceId: selection.serviceId,
+          scheduledAt: selection.scheduledAt,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone || null,
+        }),
+      });
 
-      // Check if client already exists by email
-      let clientId: string;
-      const { data: existingClient } = await supabase
-        .from('fc_clients')
-        .select('id')
-        .eq('email', formData.email.toLowerCase())
-        .single();
+      const data = await response.json();
 
-      if (existingClient) {
-        clientId = existingClient.id;
-      } else {
-        // Create guest client
-        const { data: newClient, error: clientError } = await supabase
-          .from('fc_clients')
-          .insert({
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            name: `${formData.firstName} ${formData.lastName}`,
-            email: formData.email.toLowerCase(),
-            phone: formData.phone || null,
-            is_guest: true,
-            source: 'public_booking',
-            trainer_id: selection.trainerId,
-          })
-          .select()
-          .single();
-
-        if (clientError || !newClient) {
-          throw new Error('Failed to create client');
-        }
-        clientId = newClient.id;
-      }
-
-      // Create booking
-      const isFree = !selection.priceCents || selection.priceCents === 0;
-      const bookingStatus = isFree ? 'confirmed' : 'soft-hold';
-      const holdExpiry = isFree
-        ? null
-        : new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2 hour hold
-
-      const { data: booking, error: bookingError } = await supabase
-        .from('ta_bookings')
-        .insert({
-          trainer_id: selection.trainerId,
-          client_id: clientId,
-          service_id: selection.serviceId,
-          scheduled_at: selection.scheduledAt,
-          duration: selection.duration,
-          status: bookingStatus,
-          hold_expiry: holdExpiry,
-          notes: `Booked via public page. Guest: ${formData.firstName} ${formData.lastName} (${formData.email})`,
-        })
-        .select()
-        .single();
-
-      if (bookingError || !booking) {
-        throw new Error('Failed to create booking');
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to complete booking');
       }
 
       // Clear session storage
       sessionStorage.removeItem('booking_selection');
 
-      // If free, go directly to confirmation
-      // If paid, would redirect to Stripe checkout (for now, still go to confirmation)
-      router.push(`/book/${slug}/confirm/${booking.id}`);
+      // Redirect to confirmation page
+      router.push(`/book/${slug}/confirm/${data.bookingId}`);
     } catch (error) {
       console.error('Checkout error:', error);
-      setErrors({ submit: 'Failed to complete booking. Please try again.' });
+      setErrors({ submit: error instanceof Error ? error.message : 'Failed to complete booking. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }

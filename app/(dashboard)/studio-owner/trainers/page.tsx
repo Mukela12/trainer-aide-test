@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Search, Users, Mail, UserPlus, MoreVertical } from 'lucide-react';
+import { InviteTrainerDialog } from '@/components/studio-owner/InviteTrainerDialog';
 
 interface Trainer {
   id: string;
@@ -22,6 +23,7 @@ export default function TrainersPage() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchTrainers = async () => {
@@ -63,7 +65,10 @@ export default function TrainersPage() {
               Manage your studio trainers and their assignments
             </p>
           </div>
-          <Button className="w-full lg:w-auto gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">
+          <Button
+            onClick={() => setInviteDialogOpen(true)}
+            className="w-full lg:w-auto gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
+          >
             <UserPlus size={20} />
             <span>Invite Trainer</span>
           </Button>
@@ -158,9 +163,15 @@ export default function TrainersPage() {
               : 'Invite trainers to join your studio'
           }
           actionLabel={!searchQuery ? 'Invite Trainer' : undefined}
-          onAction={!searchQuery ? () => {} : undefined}
+          onAction={!searchQuery ? () => setInviteDialogOpen(true) : undefined}
         />
       )}
+
+      {/* Invite Trainer Dialog */}
+      <InviteTrainerDialog
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+      />
     </div>
   );
 }

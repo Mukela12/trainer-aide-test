@@ -113,24 +113,10 @@ async function lookupUserProfile(
     }
   }
 
-  // 4. Check fc_clients table
-  const { data: client } = await supabase
-    .from('fc_clients')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if (client) {
-    return {
-      id: user.id,
-      email: client.email || user.email || '',
-      firstName: client.first_name || client.name?.split(' ')[0] || '',
-      lastName: client.last_name || client.name?.split(' ').slice(1).join(' ') || '',
-      role: 'client',
-      studioId: client.studio_id,
-    }
-  }
-
+  // 4. For fc_clients, we skip direct browser queries due to RLS restrictions
+  // If user is not found in profiles/bs_staff/instructors, they might be a client
+  // Client data should be fetched via API when needed
+  // Return null to trigger profile creation or allow default handling
   return null
 }
 

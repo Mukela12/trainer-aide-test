@@ -13,7 +13,8 @@
  */
 
 // Main Database (Wondrous) - Browser client
-export { createClient, getSupabaseBrowserClient } from './client'
+// Note: Only getSupabaseBrowserClient is exported to enforce singleton pattern
+export { getSupabaseBrowserClient } from './client'
 
 // Main Database (Wondrous) - Server clients
 export { createServerSupabaseClient, createServiceRoleClient } from './server'

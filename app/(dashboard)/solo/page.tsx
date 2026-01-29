@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { FileText, Dumbbell, Calendar, Plus, Users, DollarSign, Clock, TrendingUp, Package } from 'lucide-react';
 import { format } from 'date-fns';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface DashboardStats {
   earningsThisWeek: number;
@@ -65,34 +64,17 @@ export default function SoloPractitionerDashboard() {
           });
         }
 
-        // Fetch upcoming sessions directly from Supabase
-        const supabase = getSupabaseBrowserClient();
-        const now = new Date();
-        const { data: bookings } = await supabase
-          .from('ta_bookings')
-          .select(`
-            id,
-            scheduled_at,
-            status,
-            fc_clients (first_name, last_name, name),
-            ta_services (name)
-          `)
-          .eq('trainer_id', currentUser.id)
-          .gte('scheduled_at', now.toISOString())
-          .in('status', ['confirmed', 'soft-hold'])
-          .order('scheduled_at', { ascending: true })
-          .limit(5);
-
-        if (bookings) {
+        // Fetch upcoming sessions via API to avoid RLS issues
+        const sessionsResponse = await fetch('/api/sessions/upcoming?limit=5');
+        if (sessionsResponse.ok) {
+          const sessionsData = await sessionsResponse.json();
           setUpcomingSessions(
-            bookings.map((b: { id: string; scheduled_at: string; status: string; fc_clients: unknown; ta_services: unknown }) => ({
-              id: b.id,
-              clientName: (b.fc_clients as { name?: string; first_name?: string; last_name?: string })?.name ||
-                `${(b.fc_clients as { first_name?: string; last_name?: string })?.first_name || ''} ${(b.fc_clients as { first_name?: string; last_name?: string })?.last_name || ''}`.trim() ||
-                'Unknown Client',
-              scheduledAt: new Date(b.scheduled_at),
-              serviceName: (b.ta_services as { name?: string })?.name || 'Session',
-              status: b.status,
+            (sessionsData.sessions || []).map((s: { id: string; scheduledAt: string; status: string; clientName: string; serviceName: string }) => ({
+              id: s.id,
+              clientName: s.clientName || 'Client',
+              scheduledAt: new Date(s.scheduledAt),
+              serviceName: s.serviceName || 'Session',
+              status: s.status,
             }))
           );
         }
