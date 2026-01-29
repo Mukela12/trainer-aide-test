@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTemplateStore } from '@/lib/stores/template-store';
 import { useSessionStore } from '@/lib/stores/session-store';
 import { useUserStore } from '@/lib/stores/user-store';
-import { MOCK_CLIENTS } from '@/lib/mock-data';
 import { useExerciseLookup } from '@/hooks/use-exercise';
 import { generateId } from '@/lib/utils/generators';
 import { convertAIWorkoutToSessionBlocks, getAIWorkoutSessionName } from '@/lib/utils/ai-workout-converter';
@@ -16,8 +15,28 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { SignOffMode, Client, WorkoutTemplate, SessionBlock } from '@/lib/types';
 import type { AIWorkout } from '@/lib/types/ai-program';
-import { Play, FileText, User, Settings, ChevronRight, Search, Sparkles } from 'lucide-react';
+import { Play, FileText, User, Settings, ChevronRight, Search, Sparkles, Building2, UserCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+interface ApiClient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+}
+
+interface AvailableTemplate {
+  template_id: string;
+  template_name: string;
+  source: 'trainer_toolkit' | 'client_specific' | 'own_template';
+}
+
+interface GroupedTemplates {
+  trainerToolkit: AvailableTemplate[];
+  clientSpecific: AvailableTemplate[];
+  ownTemplates: AvailableTemplate[];
+}
 
 const SIGN_OFF_MODES: { value: SignOffMode; label: string; description: string }[] = [
   {
@@ -57,6 +76,94 @@ function StartNewSessionContent() {
   const [sourceType, setSourceType] = useState<'manual' | 'ai'>('manual');
   const { getExercise } = useExerciseLookup();
 
+  // Real client fetching
+  const [apiClients, setApiClients] = useState<ApiClient[]>([]);
+  const [loadingClients, setLoadingClients] = useState(true);
+
+  // Available templates for selected client (grouped by source)
+  const [availableTemplates, setAvailableTemplates] = useState<AvailableTemplate[]>([]);
+  const [groupedTemplates, setGroupedTemplates] = useState<GroupedTemplates>({
+    trainerToolkit: [],
+    clientSpecific: [],
+    ownTemplates: [],
+  });
+  const [loadingAvailableTemplates, setLoadingAvailableTemplates] = useState(false);
+  const [selectedAvailableTemplate, setSelectedAvailableTemplate] = useState<AvailableTemplate | null>(null);
+
+  // Fetch real clients from API
+  useEffect(() => {
+    const fetchClients = async () => {
+      setLoadingClients(true);
+      try {
+        const response = await fetch('/api/clients');
+        if (response.ok) {
+          const data = await response.json();
+          setApiClients(data.clients || []);
+        }
+      } catch (error) {
+        console.error('Error fetching clients:', error);
+      } finally {
+        setLoadingClients(false);
+      }
+    };
+    fetchClients();
+  }, []);
+
+  // Fetch available templates when a client is selected
+  useEffect(() => {
+    const fetchAvailableTemplates = async () => {
+      if (!selectedClient) {
+        // No client selected - just show the trainer's own templates from store
+        setGroupedTemplates({
+          trainerToolkit: [],
+          clientSpecific: [],
+          ownTemplates: templates.map(t => ({
+            template_id: t.id,
+            template_name: t.name,
+            source: 'own_template' as const,
+          })),
+        });
+        setAvailableTemplates(templates.map(t => ({
+          template_id: t.id,
+          template_name: t.name,
+          source: 'own_template' as const,
+        })));
+        return;
+      }
+
+      setLoadingAvailableTemplates(true);
+      try {
+        const response = await fetch(`/api/clients/${selectedClient.id}/available-templates`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableTemplates(data.templates || []);
+          setGroupedTemplates(data.grouped || {
+            trainerToolkit: [],
+            clientSpecific: [],
+            ownTemplates: [],
+          });
+        } else {
+          // Fallback to templates from store
+          setGroupedTemplates({
+            trainerToolkit: [],
+            clientSpecific: [],
+            ownTemplates: templates.map(t => ({
+              template_id: t.id,
+              template_name: t.name,
+              source: 'own_template' as const,
+            })),
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching available templates:', error);
+      } finally {
+        setLoadingAvailableTemplates(false);
+      }
+    };
+
+    fetchAvailableTemplates();
+  }, [selectedClient, templates]);
+
   // Pre-fill from calendar booking or AI template
   useEffect(() => {
     const clientId = searchParams?.get('clientId');
@@ -66,10 +173,16 @@ function StartNewSessionContent() {
     const programId = searchParams?.get('programId');
     const workoutId = searchParams?.get('workoutId');
 
-    if (clientId) {
-      const client = MOCK_CLIENTS.find(c => c.id === clientId);
+    if (clientId && apiClients.length > 0) {
+      const client = apiClients.find(c => c.id === clientId);
       if (client) {
-        setSelectedClient(client);
+        setSelectedClient({
+          id: client.id,
+          firstName: client.first_name,
+          lastName: client.last_name,
+          email: client.email,
+          joinedAt: new Date().toISOString(),
+        });
       }
     }
 
@@ -116,10 +229,10 @@ function StartNewSessionContent() {
     if (signOffMode && (signOffMode === 'per_exercise' || signOffMode === 'per_block' || signOffMode === 'full_session')) {
       setSelectedSignOffMode(signOffMode);
     }
-  }, [searchParams, templates, toast]);
+  }, [searchParams, templates, toast, apiClients]);
 
-  const filteredClients = MOCK_CLIENTS.filter((client) =>
-    `${client.firstName} ${client.lastName}`.toLowerCase().includes(clientSearch.toLowerCase())
+  const filteredClients = apiClients.filter((client) =>
+    `${client.first_name} ${client.last_name}`.toLowerCase().includes(clientSearch.toLowerCase())
   );
 
   const handleStart = () => {
@@ -296,14 +409,14 @@ function StartNewSessionContent() {
             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${step >= 1 ? 'bg-wondrous-primary text-white' : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-300'}`}>
               1
             </div>
-            <span className="text-sm font-medium hidden sm:inline">Template</span>
+            <span className="text-sm font-medium hidden sm:inline">Client</span>
           </div>
           <ChevronRight className="text-gray-400 dark:text-gray-500" size={20} />
           <div className={`flex items-center gap-2 ${step >= 2 ? 'text-wondrous-primary' : 'text-gray-400 dark:text-gray-500'}`}>
             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${step >= 2 ? 'bg-wondrous-primary text-white' : 'bg-gray-200 dark:bg-gray-600 dark:text-gray-300'}`}>
               2
             </div>
-            <span className="text-sm font-medium hidden sm:inline">Client</span>
+            <span className="text-sm font-medium hidden sm:inline">Template</span>
           </div>
           <ChevronRight className="text-gray-400 dark:text-gray-500" size={20} />
           <div className={`flex items-center gap-2 ${step >= 3 ? 'text-wondrous-primary' : 'text-gray-400 dark:text-gray-500'}`}>
@@ -315,72 +428,242 @@ function StartNewSessionContent() {
         </div>
       )}
 
-      {/* Step 1: Select Template */}
-      {step === 1 && !loadingAiWorkout && (
+      {/* Step 2: Select Template */}
+      {step === 2 && !loadingAiWorkout && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="text-wondrous-primary" size={24} />
             <h2 className="text-heading-2">Select Workout Template</h2>
+            {selectedClient && (
+              <Badge variant="outline" className="ml-2">
+                For {selectedClient.firstName} {selectedClient.lastName}
+              </Badge>
+            )}
           </div>
 
-          {templates.map((template) => {
-            const totalExercises = template.blocks.reduce((sum, block) => sum + block.exercises.length, 0);
-            const isSelected = selectedTemplate?.id === template.id;
-
-            return (
-              <Card
-                key={template.id}
-                className={`cursor-pointer transition-all ${
-                  isSelected ? 'border-2 border-wondrous-primary bg-blue-50/30 dark:bg-blue-900/20' : 'hover:border-wondrous-blue dark:hover:border-blue-400'
-                }`}
-                onClick={() => setSelectedTemplate(template)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
-                        isSelected ? 'border-wondrous-primary bg-wondrous-primary' : 'border-gray-300'
-                      }`}
-                    >
-                      {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{template.name}</h3>
-                        <Badge variant={template.type === 'standard' ? 'default' : 'secondary'}>
-                          {template.type === 'standard' ? 'Standard' : 'Resistance Only'}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">{template.description}</p>
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
-                        <span>{template.blocks.length} Blocks</span>
-                        <span>{totalExercises} Exercises</span>
-                      </div>
-                    </div>
+          {loadingAvailableTemplates ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400 mr-2" />
+              <span className="text-gray-500">Loading templates...</span>
+            </div>
+          ) : (
+            <>
+              {/* Studio Workout Plans (Trainer Toolkit) */}
+              {groupedTemplates.trainerToolkit.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Building2 size={18} className="text-blue-600" />
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">Studio Workout Plans</h3>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                      Assigned to you
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  {groupedTemplates.trainerToolkit.map((availableTemplate) => {
+                    const template = templates.find(t => t.id === availableTemplate.template_id);
+                    const isSelected = selectedTemplate?.id === availableTemplate.template_id ||
+                                       selectedAvailableTemplate?.template_id === availableTemplate.template_id;
+
+                    return (
+                      <Card
+                        key={availableTemplate.template_id}
+                        className={`cursor-pointer transition-all ${
+                          isSelected ? 'border-2 border-blue-500 bg-blue-50/30 dark:bg-blue-900/20' : 'hover:border-blue-300 dark:hover:border-blue-600'
+                        }`}
+                        onClick={() => {
+                          if (template) {
+                            setSelectedTemplate(template);
+                            setSelectedAvailableTemplate(null);
+                          } else {
+                            setSelectedAvailableTemplate(availableTemplate);
+                            setSelectedTemplate(null);
+                          }
+                        }}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-4">
+                            <div
+                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
+                                isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                              }`}
+                            >
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100">{availableTemplate.template_name}</h3>
+                                <Building2 size={14} className="text-blue-500" />
+                              </div>
+                              {template && (
+                                <>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{template.description}</p>
+                                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                                    <span>{template.blocks.length} Blocks</span>
+                                    <span>{template.blocks.reduce((sum, block) => sum + block.exercises.length, 0)} Exercises</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Client-Specific Templates */}
+              {groupedTemplates.clientSpecific.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <UserCircle size={18} className="text-purple-600" />
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">Client-Specific Templates</h3>
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                      For this client
+                    </Badge>
+                  </div>
+                  {groupedTemplates.clientSpecific.map((availableTemplate) => {
+                    const template = templates.find(t => t.id === availableTemplate.template_id);
+                    const isSelected = selectedTemplate?.id === availableTemplate.template_id ||
+                                       selectedAvailableTemplate?.template_id === availableTemplate.template_id;
+
+                    return (
+                      <Card
+                        key={availableTemplate.template_id}
+                        className={`cursor-pointer transition-all ${
+                          isSelected ? 'border-2 border-purple-500 bg-purple-50/30 dark:bg-purple-900/20' : 'hover:border-purple-300 dark:hover:border-purple-600'
+                        }`}
+                        onClick={() => {
+                          if (template) {
+                            setSelectedTemplate(template);
+                            setSelectedAvailableTemplate(null);
+                          } else {
+                            setSelectedAvailableTemplate(availableTemplate);
+                            setSelectedTemplate(null);
+                          }
+                        }}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-4">
+                            <div
+                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
+                                isSelected ? 'border-purple-500 bg-purple-500' : 'border-gray-300'
+                              }`}
+                            >
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100">{availableTemplate.template_name}</h3>
+                                <UserCircle size={14} className="text-purple-500" />
+                              </div>
+                              {template && (
+                                <>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{template.description}</p>
+                                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                                    <span>{template.blocks.length} Blocks</span>
+                                    <span>{template.blocks.reduce((sum, block) => sum + block.exercises.length, 0)} Exercises</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* My Templates (Own Templates) */}
+              {groupedTemplates.ownTemplates.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <FileText size={18} className="text-wondrous-primary" />
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">My Templates</h3>
+                  </div>
+                  {groupedTemplates.ownTemplates.map((availableTemplate) => {
+                    const template = templates.find(t => t.id === availableTemplate.template_id);
+                    const isSelected = selectedTemplate?.id === availableTemplate.template_id ||
+                                       selectedAvailableTemplate?.template_id === availableTemplate.template_id;
+
+                    if (!template) return null;
+
+                    const totalExercises = template.blocks.reduce((sum, block) => sum + block.exercises.length, 0);
+
+                    return (
+                      <Card
+                        key={availableTemplate.template_id}
+                        className={`cursor-pointer transition-all ${
+                          isSelected ? 'border-2 border-wondrous-primary bg-blue-50/30 dark:bg-blue-900/20' : 'hover:border-wondrous-blue dark:hover:border-blue-400'
+                        }`}
+                        onClick={() => {
+                          setSelectedTemplate(template);
+                          setSelectedAvailableTemplate(null);
+                        }}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-4">
+                            <div
+                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 ${
+                                isSelected ? 'border-wondrous-primary bg-wondrous-primary' : 'border-gray-300'
+                              }`}
+                            >
+                              {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100">{template.name}</h3>
+                                <Badge variant={template.type === 'standard' ? 'default' : 'secondary'}>
+                                  {template.type === 'standard' ? 'Standard' : 'Resistance Only'}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{template.description}</p>
+                              <div className="flex items-center gap-4 text-xs text-gray-500">
+                                <span>{template.blocks.length} Blocks</span>
+                                <span>{totalExercises} Exercises</span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Empty state */}
+              {groupedTemplates.trainerToolkit.length === 0 &&
+               groupedTemplates.clientSpecific.length === 0 &&
+               groupedTemplates.ownTemplates.length === 0 && (
+                <Card className="p-8 text-center">
+                  <FileText className="mx-auto mb-4 text-gray-400" size={48} />
+                  <p className="text-gray-600 dark:text-gray-400">No templates available</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                    Create a template or ask your studio owner to assign one to you
+                  </p>
+                </Card>
+              )}
+            </>
+          )}
 
           <div className="flex gap-3 pt-4">
-            <Button variant="outline" onClick={() => router.back()} className="flex-1 sm:flex-none">
-              Cancel
+            <Button variant="outline" onClick={() => setStep(1)} className="flex-1 sm:flex-none">
+              Back
             </Button>
             <Button
-              onClick={() => setStep(2)}
-              disabled={!selectedTemplate}
+              onClick={() => setStep(3)}
+              disabled={!selectedTemplate && !selectedAvailableTemplate}
               className="flex-1 sm:flex-none"
             >
-              Next: Select Client
+              Next: Sign-Off Mode
               <ChevronRight size={20} className="ml-2" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* Step 2: Select Client */}
-      {step === 2 && (
+      {/* Step 1: Select Client */}
+      {step === 1 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-4">
             <User className="text-wondrous-primary" size={24} />
@@ -398,69 +681,89 @@ function StartNewSessionContent() {
             />
           </div>
 
-          {/* Walk-in Option */}
-          <Card
-            className={`cursor-pointer transition-all ${
-              selectedClient === null ? 'border-2 border-wondrous-primary bg-blue-50/30 dark:bg-blue-900/20' : 'hover:border-wondrous-blue dark:hover:border-blue-400'
-            }`}
-            onClick={() => setSelectedClient(null)}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-4">
-                <div
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                    selectedClient === null ? 'border-wondrous-primary bg-wondrous-primary' : 'border-gray-300'
-                  }`}
-                >
-                  {selectedClient === null && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">Walk-in Client</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">No client assignment</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Client List */}
-          {filteredClients.map((client) => {
-            const isSelected = selectedClient?.id === client.id;
-
-            return (
+          {loadingClients ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400 mr-2" />
+              <span className="text-gray-500">Loading clients...</span>
+            </div>
+          ) : (
+            <>
+              {/* Walk-in Option */}
               <Card
-                key={client.id}
                 className={`cursor-pointer transition-all ${
-                  isSelected ? 'border-2 border-wondrous-primary bg-blue-50/30 dark:bg-blue-900/20' : 'hover:border-wondrous-blue dark:hover:border-blue-400'
+                  selectedClient === null ? 'border-2 border-wondrous-primary bg-blue-50/30 dark:bg-blue-900/20' : 'hover:border-wondrous-blue dark:hover:border-blue-400'
                 }`}
-                onClick={() => setSelectedClient(client)}
+                onClick={() => setSelectedClient(null)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
                     <div
                       className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                        isSelected ? 'border-wondrous-primary bg-wondrous-primary' : 'border-gray-300'
+                        selectedClient === null ? 'border-wondrous-primary bg-wondrous-primary' : 'border-gray-300'
                       }`}
                     >
-                      {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                      {selectedClient === null && <div className="w-2 h-2 rounded-full bg-white"></div>}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                        {client.firstName} {client.lastName}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{client.email}</p>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">Walk-in Client</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">No client assignment</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
+
+              {/* Client List */}
+              {filteredClients.map((client) => {
+                const clientObj: Client = {
+                  id: client.id,
+                  firstName: client.first_name,
+                  lastName: client.last_name,
+                  email: client.email,
+                  joinedAt: new Date().toISOString(),
+                };
+                const isSelected = selectedClient?.id === client.id;
+
+                return (
+                  <Card
+                    key={client.id}
+                    className={`cursor-pointer transition-all ${
+                      isSelected ? 'border-2 border-wondrous-primary bg-blue-50/30 dark:bg-blue-900/20' : 'hover:border-wondrous-blue dark:hover:border-blue-400'
+                    }`}
+                    onClick={() => setSelectedClient(clientObj)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                            isSelected ? 'border-wondrous-primary bg-wondrous-primary' : 'border-gray-300'
+                          }`}
+                        >
+                          {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                            {client.first_name} {client.last_name}
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{client.email}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              {filteredClients.length === 0 && clientSearch && (
+                <p className="text-center text-gray-500 py-4">No clients found matching "{clientSearch}"</p>
+              )}
+            </>
+          )}
 
           <div className="flex gap-3 pt-4">
-            <Button variant="outline" onClick={() => setStep(1)} className="flex-1 sm:flex-none">
-              Back
+            <Button variant="outline" onClick={() => router.back()} className="flex-1 sm:flex-none">
+              Cancel
             </Button>
-            <Button onClick={() => setStep(3)} className="flex-1 sm:flex-none">
-              Next: Sign-Off Mode
+            <Button onClick={() => setStep(2)} className="flex-1 sm:flex-none">
+              Next: Select Template
               <ChevronRight size={20} className="ml-2" />
             </Button>
           </div>

@@ -12,22 +12,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's studio
+    // Get user's studio - check bs_staff first
     const { data: staff } = await supabase
       .from('bs_staff')
       .select('studio_id, staff_type')
       .eq('id', user.id)
       .single();
 
-    if (!staff?.studio_id || !['owner', 'admin'].includes(staff.staff_type)) {
-      return NextResponse.json({ error: 'Not authorized to manage invitations' }, { status: 403 });
+    let studioId: string | null = null;
+
+    if (staff?.studio_id && ['owner', 'admin'].includes(staff.staff_type)) {
+      studioId = staff.studio_id;
+    } else {
+      // Fallback: check profiles for studio_owner or solo_practitioner
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, studio_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile && ['studio_owner', 'solo_practitioner'].includes(profile.role || '')) {
+        studioId = profile.studio_id || user.id; // For solo practitioners, use user.id as studio
+      }
+    }
+
+    if (!studioId) {
+      return NextResponse.json({
+        error: 'Not authorized to manage invitations',
+        debug: { userId: user.id, hasStaff: !!staff, staffType: staff?.staff_type }
+      }, { status: 403 });
     }
 
     // Fetch invitations
     const { data: invitations, error } = await supabase
       .from('ta_invitations')
       .select('*')
-      .eq('studio_id', staff.studio_id)
+      .eq('studio_id', studioId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -70,15 +90,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's studio
+    // Get user's studio - check bs_staff first
     const { data: staff } = await supabase
       .from('bs_staff')
       .select('studio_id, staff_type')
       .eq('id', user.id)
       .single();
 
-    if (!staff?.studio_id || !['owner', 'admin'].includes(staff.staff_type)) {
-      return NextResponse.json({ error: 'Not authorized to create invitations' }, { status: 403 });
+    let studioId: string | null = null;
+
+    if (staff?.studio_id && ['owner', 'admin'].includes(staff.staff_type)) {
+      studioId = staff.studio_id;
+    } else {
+      // Fallback: check profiles for studio_owner or solo_practitioner
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, studio_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile && ['studio_owner', 'solo_practitioner'].includes(profile.role || '')) {
+        studioId = profile.studio_id || user.id; // For solo practitioners, use user.id as studio
+      }
+    }
+
+    if (!studioId) {
+      return NextResponse.json({
+        error: 'Not authorized to create invitations',
+        debug: { userId: user.id, hasStaff: !!staff, staffType: staff?.staff_type }
+      }, { status: 403 });
     }
 
     // Check if invitation already exists
@@ -86,7 +126,7 @@ export async function POST(request: NextRequest) {
       .from('ta_invitations')
       .select('id')
       .eq('email', email.toLowerCase())
-      .eq('studio_id', staff.studio_id)
+      .eq('studio_id', studioId)
       .eq('status', 'pending')
       .single();
 
@@ -105,7 +145,7 @@ export async function POST(request: NextRequest) {
     const { data: invitation, error: createError } = await supabase
       .from('ta_invitations')
       .insert({
-        studio_id: staff.studio_id,
+        studio_id: studioId,
         invited_by: user.id,
         email: email.toLowerCase(),
         first_name: firstName || null,
@@ -127,6 +167,8 @@ export async function POST(request: NextRequest) {
 
     // Send invitation email
     const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/invite/${token}`;
+    let emailSent = false;
+    let emailError: string | null = null;
 
     try {
       // Get inviter's name and studio info
@@ -139,7 +181,7 @@ export async function POST(request: NextRequest) {
       const { data: studio } = await supabase
         .from('bs_studios')
         .select('name')
-        .eq('id', staff.studio_id)
+        .eq('id', studioId)
         .single();
 
       const inviterName = inviterProfile
@@ -156,8 +198,10 @@ export async function POST(request: NextRequest) {
         message: message || undefined,
         invitationId: invitation.id,
       });
-    } catch (emailError) {
-      console.error('Error sending invitation email:', emailError);
+      emailSent = true;
+    } catch (err) {
+      console.error('Error sending invitation email:', err);
+      emailError = err instanceof Error ? err.message : 'Unknown email error';
       // Don't fail the invitation creation if email fails
     }
 
@@ -167,6 +211,8 @@ export async function POST(request: NextRequest) {
       token: invitation.token,
       expiresAt: invitation.expires_at,
       inviteUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/invite/${token}`,
+      emailSent,
+      emailError,
     });
   } catch (error) {
     console.error('Error in invitations POST:', error);

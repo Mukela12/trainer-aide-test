@@ -5,8 +5,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { Search, Package, Plus, MoreVertical, Users, CreditCard } from 'lucide-react';
+import { Search, Package, Plus, MoreVertical, Users, CreditCard, Loader2 } from 'lucide-react';
 
 interface TrainingPackage {
   id: string;
@@ -33,26 +41,79 @@ export default function PackagesPage() {
   const [clientPackages, setClientPackages] = useState<ClientPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    sessionCount: '10',
+    priceInPounds: '360',
+    validityDays: '90',
+    isPublic: true,
+  });
+
+  const loadPackages = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/packages?format=wrapped');
+      if (!response.ok) throw new Error('Failed to fetch packages');
+      const data = await response.json();
+      setPackages(data.packages || []);
+      setClientPackages(data.clientPackages || []);
+    } catch (error) {
+      console.error('Error fetching packages:', error);
+      setPackages([]);
+      setClientPackages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchPackages = async () => {
-      try {
-        const response = await fetch('/api/packages');
-        if (!response.ok) throw new Error('Failed to fetch packages');
-        const data = await response.json();
-        setPackages(data.packages || []);
-        setClientPackages(data.clientPackages || []);
-      } catch (error) {
-        console.error('Error fetching packages:', error);
-        setPackages([]);
-        setClientPackages([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPackages();
+    loadPackages();
   }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.sessionCount || !formData.priceInPounds) return;
+
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/packages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description || null,
+          sessionCount: parseInt(formData.sessionCount),
+          priceCents: Math.round(parseFloat(formData.priceInPounds) * 100),
+          validityDays: parseInt(formData.validityDays) || 90,
+          isPublic: formData.isPublic,
+        }),
+      });
+
+      if (response.ok) {
+        setIsDialogOpen(false);
+        setFormData({
+          name: '',
+          description: '',
+          sessionCount: '10',
+          priceInPounds: '360',
+          validityDays: '90',
+          isPublic: true,
+        });
+        loadPackages();
+      }
+    } catch (error) {
+      console.error('Error creating package:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const perSessionPrice = formData.sessionCount && formData.priceInPounds
+    ? (parseFloat(formData.priceInPounds) / parseInt(formData.sessionCount)).toFixed(2)
+    : '0';
 
   const filteredPackages = packages.filter((pkg) => {
     const name = pkg.name.toLowerCase();
@@ -80,7 +141,10 @@ export default function PackagesPage() {
               Create and manage training packages for your clients
             </p>
           </div>
-          <Button className="w-full lg:w-auto gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">
+          <Button
+            onClick={() => setIsDialogOpen(true)}
+            className="w-full lg:w-auto gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
+          >
             <Plus size={20} />
             <span>Create Package</span>
           </Button>
@@ -237,7 +301,7 @@ export default function PackagesPage() {
                 : 'Create your first training package'
             }
             actionLabel={!searchQuery ? 'Create Package' : undefined}
-            onAction={!searchQuery ? () => {} : undefined}
+            onAction={!searchQuery ? () => setIsDialogOpen(true) : undefined}
           />
         )}
       </div>
@@ -295,6 +359,139 @@ export default function PackagesPage() {
           </div>
         </div>
       )}
+
+      {/* Create Package Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-lg dark:bg-gray-800 dark:border-gray-700">
+          <DialogHeader>
+            <DialogTitle className="dark:text-gray-100">Create Session Package</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="dark:text-gray-200">Package Name *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="e.g., 10 Session Bundle"
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description" className="dark:text-gray-200">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, description: e.target.value }))
+                }
+                placeholder="What's included in this package?"
+                rows={2}
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="sessionCount" className="dark:text-gray-200">Number of Sessions *</Label>
+                <Input
+                  id="sessionCount"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={formData.sessionCount}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, sessionCount: e.target.value }))
+                  }
+                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price" className="dark:text-gray-200">Total Price (£) *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.priceInPounds}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, priceInPounds: e.target.value }))
+                  }
+                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                />
+              </div>
+            </div>
+
+            {/* Price per session preview */}
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                <strong>£{perSessionPrice}</strong> per session
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="validityDays" className="dark:text-gray-200">Validity (Days)</Label>
+              <Input
+                id="validityDays"
+                type="number"
+                min="30"
+                max="365"
+                value={formData.validityDays}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, validityDays: e.target.value }))
+                }
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Credits expire {formData.validityDays || 90} days after purchase
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isPublic"
+                checked={formData.isPublic}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, isPublic: e.target.checked }))
+                }
+                className="rounded border-gray-300 dark:border-gray-600"
+              />
+              <Label htmlFor="isPublic" className="cursor-pointer dark:text-gray-200">
+                Show on public booking page
+              </Label>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+                className="dark:border-gray-600 dark:text-gray-300"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSaving}
+                className="bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Package'
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

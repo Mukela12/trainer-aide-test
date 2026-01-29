@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Search, Users, Mail, UserPlus, MoreVertical } from 'lucide-react';
 import { InviteTrainerDialog } from '@/components/studio-owner/InviteTrainerDialog';
+import { TrainerProfileDialog } from '@/components/studio-owner/TrainerProfileDialog';
+import { AssignTemplateDialog } from '@/components/studio-owner/AssignTemplateDialog';
 
 interface Trainer {
   id: string;
@@ -24,6 +26,9 @@ export default function TrainersPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null);
 
   useEffect(() => {
     const fetchTrainers = async () => {
@@ -138,6 +143,10 @@ export default function TrainersPage() {
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs dark:border-gray-600 dark:text-gray-300"
+                    onClick={() => {
+                      setSelectedTrainer(trainer);
+                      setProfileDialogOpen(true);
+                    }}
                   >
                     View Profile
                   </Button>
@@ -145,6 +154,10 @@ export default function TrainersPage() {
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs dark:border-gray-600 dark:text-gray-300"
+                    onClick={() => {
+                      setSelectedTrainer(trainer);
+                      setAssignDialogOpen(true);
+                    }}
                   >
                     Assign Templates
                   </Button>
@@ -172,6 +185,23 @@ export default function TrainersPage() {
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
       />
+
+      {/* Trainer Profile Dialog */}
+      <TrainerProfileDialog
+        open={profileDialogOpen}
+        onOpenChange={setProfileDialogOpen}
+        trainer={selectedTrainer}
+      />
+
+      {/* Assign Templates Dialog */}
+      {selectedTrainer && (
+        <AssignTemplateDialog
+          open={assignDialogOpen}
+          onOpenChange={setAssignDialogOpen}
+          trainerId={selectedTrainer.id}
+          trainerName={`${selectedTrainer.first_name} ${selectedTrainer.last_name}`}
+        />
+      )}
     </div>
   );
 }
