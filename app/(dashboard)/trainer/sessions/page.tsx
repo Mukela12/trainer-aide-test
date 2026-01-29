@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useSessionStore } from '@/lib/stores/session-store';
-import { useCalendarStore } from '@/lib/stores/calendar-store';
+import { useCalendarStore } from '@/lib/stores/booking-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

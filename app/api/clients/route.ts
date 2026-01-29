@@ -164,9 +164,8 @@ export async function POST(request: NextRequest) {
     // For solo practitioners, user_id acts as studio_id
     const studioId = profile.studio_id || user.id;
 
-    // Create client data
-    const clientData = {
-      id: body.id || `client_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+    // Create client data - let database generate UUID if not provided
+    const clientData: Record<string, unknown> = {
       first_name: body.firstName || body.first_name || null,
       last_name: body.lastName || body.last_name || null,
       name: body.name || `${body.firstName || ''} ${body.lastName || ''}`.trim() || null,
@@ -178,6 +177,11 @@ export async function POST(request: NextRequest) {
       self_booking_allowed: body.selfBookingAllowed || false,
       credits: body.credits || 0,
     };
+
+    // Only include id if it's a valid UUID
+    if (body.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.id)) {
+      clientData.id = body.id;
+    }
 
     const { data, error } = await serviceClient
       .from('fc_clients')

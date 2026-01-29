@@ -6,7 +6,7 @@ import { useTemplateStore } from '@/lib/stores/template-store';
 import { useSessionStore } from '@/lib/stores/session-store';
 import { useUserStore } from '@/lib/stores/user-store';
 import { MOCK_CLIENTS } from '@/lib/mock-data';
-import { getExerciseByIdSync } from '@/lib/mock-data';
+import { useExerciseLookup } from '@/hooks/use-exercise';
 import { generateId } from '@/lib/utils/generators';
 import { convertAIWorkoutToSessionBlocks, getAIWorkoutSessionName } from '@/lib/utils/ai-workout-converter';
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,7 @@ function StartNewSessionContent() {
   const [aiWorkout, setAiWorkout] = useState<AIWorkout | null>(null);
   const [loadingAiWorkout, setLoadingAiWorkout] = useState(false);
   const [sourceType, setSourceType] = useState<'manual' | 'ai'>('manual');
+  const { getExercise } = useExerciseLookup();
 
   // Pre-fill from calendar booking or AI template
   useEffect(() => {

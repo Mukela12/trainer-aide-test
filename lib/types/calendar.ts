@@ -23,13 +23,13 @@ export type SessionStatus =
 export interface CalendarSession {
   id: string;
   datetime: Date;
-  clientId: string;
-  clientName: string;
+  clientId: string | null; // Can be null for soft-holds
+  clientName: string | null; // Can be null for soft-holds
   clientAvatar?: string;
   clientColor?: string;
   clientCredits?: number;
   status: SessionStatus;
-  serviceTypeId: string;
+  serviceTypeId: string | null; // Can be null for soft-holds
   workoutId?: string | null; // Legacy field for simple workout reference
   templateId?: string | null; // Full workout template with blocks/exercises
   signOffMode?: SignOffMode; // How to complete session: per_exercise, per_block, full_session

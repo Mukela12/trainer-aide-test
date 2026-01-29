@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSessionStore } from '@/lib/stores/session-store';
 import { useUserStore } from '@/lib/stores/user-store';
@@ -7,7 +8,7 @@ import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dumbbell, TrendingUp, Calendar, Clock, History, FileText } from 'lucide-react';
+import { Dumbbell, TrendingUp, Calendar, Clock, History, FileText, CreditCard, CalendarCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatDuration } from '@/lib/utils/generators';
 
@@ -30,6 +31,37 @@ export default function ClientDashboard() {
   const { sessions } = useSessionStore();
   const { currentUser } = useUserStore();
   const { greeting, title } = getTimeBasedGreeting();
+  const [credits, setCredits] = useState<number | null>(null);
+  const [upcomingBookingsCount, setUpcomingBookingsCount] = useState<number>(0);
+
+  // Fetch credits and bookings on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch credits
+        const creditsRes = await fetch('/api/client/packages');
+        if (creditsRes.ok) {
+          const data = await creditsRes.json();
+          setCredits(data.totalCredits || 0);
+        }
+
+        // Fetch upcoming bookings count
+        const bookingsRes = await fetch('/api/client/bookings');
+        if (bookingsRes.ok) {
+          const data = await bookingsRes.json();
+          const upcoming = (data.bookings || []).filter(
+            (b: { scheduledAt: string; status: string }) =>
+              new Date(b.scheduledAt) > new Date() && b.status !== 'cancelled'
+          );
+          setUpcomingBookingsCount(upcoming.length);
+        }
+      } catch (err) {
+        console.error('Error fetching client data:', err);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Use the authenticated user's ID to filter sessions
   // The client sees sessions where they are the client
@@ -78,7 +110,19 @@ export default function ClientDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
+        <StatCard
+          title="Credits"
+          value={credits !== null ? credits : '-'}
+          icon={CreditCard}
+          color="magenta"
+        />
+        <StatCard
+          title="Upcoming"
+          value={upcomingBookingsCount}
+          icon={CalendarCheck}
+          color="green"
+        />
         <StatCard
           title="Total"
           value={totalSessions}
@@ -95,13 +139,13 @@ export default function ClientDashboard() {
           title="Avg RPE"
           value={averageRpe > 0 ? `${averageRpe}/10` : 'N/A'}
           icon={TrendingUp}
-          color="green"
+          color="orange"
         />
         <StatCard
           title="Duration"
           value={averageDuration > 0 ? formatDuration(averageDuration) : 'N/A'}
           icon={Clock}
-          color="magenta"
+          color="blue"
         />
       </div>
 
@@ -148,7 +192,29 @@ export default function ClientDashboard() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-heading-2 dark:text-gray-100">Quick Actions</h2>
         </div>
-        <div className="grid grid-cols-2 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          <Link href="/client/bookings" className="group">
+            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-green-200/50 dark:border-green-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-green-500/10 to-transparent opacity-50" />
+              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <CalendarCheck className="text-green-600 dark:text-green-400" size={22} strokeWidth={2.5} />
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">My Bookings</span>
+              </div>
+            </div>
+          </Link>
+          <Link href="/client/packages" className="group">
+            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-magenta-200/50 dark:border-magenta-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-pink-500/10 to-transparent opacity-50" />
+              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-pink-500/20 to-pink-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <CreditCard className="text-wondrous-magenta dark:text-pink-400" size={22} strokeWidth={2.5} />
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">My Credits</span>
+              </div>
+            </div>
+          </Link>
           <Link href="/client/sessions" className="group">
             <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-blue-200/50 dark:border-blue-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
               <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-blue-500/10 to-transparent opacity-50" />
@@ -156,7 +222,7 @@ export default function ClientDashboard() {
                 <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <History className="text-wondrous-blue dark:text-blue-400" size={22} strokeWidth={2.5} />
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">View Session History</span>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Session History</span>
               </div>
             </div>
           </Link>
@@ -167,7 +233,7 @@ export default function ClientDashboard() {
                 <FileText className="text-gray-600 dark:text-gray-500" size={22} strokeWidth={2.5} />
               </div>
               <div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base block">View Progress Reports</span>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base block">Progress Reports</span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block">(Coming Soon)</span>
               </div>
             </div>

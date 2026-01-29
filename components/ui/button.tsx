@@ -10,6 +10,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-wondrous-primary text-white hover:bg-wondrous-primary-hover active:scale-[0.98] dark:bg-wondrous-magenta dark:hover:bg-wondrous-magenta-alt",
         secondary: "bg-wondrous-blue text-white hover:bg-wondrous-dark-blue active:scale-[0.98] dark:bg-wondrous-dark-blue dark:hover:bg-wondrous-blue",
+        destructive: "bg-red-600 text-white hover:bg-red-700 active:scale-[0.98] dark:bg-red-700 dark:hover:bg-red-800",
         outline: "border-2 border-wondrous-dark-blue text-wondrous-dark-blue hover:bg-wondrous-dark-blue hover:text-white dark:border-wondrous-blue dark:text-wondrous-blue dark:hover:bg-wondrous-blue dark:hover:text-white",
         ghost: "hover:bg-gray-100 text-gray-700 dark:text-gray-300 dark:hover:bg-gray-700",
         link: "text-wondrous-primary underline-offset-4 hover:underline dark:text-wondrous-magenta",

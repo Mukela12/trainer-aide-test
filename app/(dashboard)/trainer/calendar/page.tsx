@@ -8,18 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useUserStore } from "@/lib/stores/user-store";
-import { useCalendarStore } from "@/lib/stores/calendar-store";
+import { useCalendarStore } from "@/lib/stores/booking-store";
 import { useTemplateStore } from "@/lib/stores/template-store";
 import { useAvailabilityStore } from "@/lib/stores/availability-store";
-import {
-  SERVICE_TYPES,
-  CALENDAR_CLIENTS,
-  WORKOUT_TEMPLATES,
-  getServiceType,
-  getClient,
-  getWorkoutTemplate,
-  type CalendarClient,
-} from "@/lib/data/calendar-data";
+import { useServiceStore } from "@/lib/stores/service-store";
+import { useBookingRequestStore } from "@/lib/stores/booking-request-store";
 import {
   generateTimeSlots,
   isTimeAvailable,
@@ -31,11 +24,8 @@ import {
   formatTime,
 } from "@/lib/utils/calendar-utils";
 import type { CalendarSession } from "@/lib/types/calendar";
-import type { BookingRequest } from "@/lib/types/booking-request";
 import type { SessionCompletionFormData } from "@/lib/types/session-completion";
 import type { SignOffMode } from "@/lib/types";
-import { MOCK_BOOKING_REQUESTS } from "@/lib/data/booking-requests";
-import { DEFAULT_TRAINER_AVAILABILITY, isWithinAvailability, getAvailabilityForDay, isTimeBlocked } from "@/lib/data/availability-data";
 import type { BlockReasonType, RecurrenceType } from "@/lib/types/availability";
 import { cn } from "@/lib/utils/cn";
 
@@ -47,10 +37,101 @@ export default function TrainerCalendar() {
 
   // Store hooks
   const currentUser = useUserStore((state) => state.currentUser);
-  const { sessions, initializeSessions, addSession, updateSession, removeSession } = useCalendarStore();
+  const { sessions, addSession, updateSession, removeSession, fetchBookings } = useCalendarStore();
   const { templates } = useTemplateStore();
-  const { addBlock, getBlockedBlocks } = useAvailabilityStore();
+  const { addBlock, getBlockedBlocks, availability: trainerAvailability, fetchAvailability } = useAvailabilityStore();
+  const { services, fetchServices, getServiceById } = useServiceStore();
+  const { requests: bookingRequests, fetchRequests, acceptRequest, declineRequest } = useBookingRequestStore();
   const { toast } = useToast();
+
+  // Helper functions to replace mock data functions
+  const getServiceType = (serviceTypeId: string | null) => {
+    if (!serviceTypeId) return null;
+    const service = services.find(s => s.id === serviceTypeId);
+    if (!service) return null;
+    return {
+      id: service.id,
+      name: service.name,
+      duration: service.duration,
+      color: service.color,
+      creditsRequired: service.creditsRequired,
+    };
+  };
+
+  const getClient = (clientId: string | null) => {
+    if (!clientId) return null;
+    return clients.find(c => c.id === clientId) || null;
+  };
+
+  const getWorkoutTemplate = (templateId: string | null | undefined) => {
+    if (!templateId) return null;
+    return templates.find(t => t.id === templateId) || null;
+  };
+
+  // Availability helper functions (replaces imports from availability-data)
+  const isWithinAvailability = (datetime: Date, availability: typeof trainerAvailability): boolean => {
+    const dayOfWeek = datetime.getDay();
+    const hour = datetime.getHours();
+    const minute = datetime.getMinutes();
+    const timeInMinutes = hour * 60 + minute;
+
+    // Check if time is within available blocks
+    const isAvailable = availability.blocks.some((block) => {
+      if (block.blockType !== 'available') return false;
+      if (block.dayOfWeek !== dayOfWeek) return false;
+
+      const blockStart = block.startHour * 60 + block.startMinute;
+      const blockEnd = block.endHour * 60 + block.endMinute;
+
+      return timeInMinutes >= blockStart && timeInMinutes < blockEnd;
+    });
+
+    if (!isAvailable) return false;
+
+    // Check if time is blocked
+    return !isTimeBlocked(datetime, availability);
+  };
+
+  const isTimeBlocked = (datetime: Date, availability: typeof trainerAvailability): boolean => {
+    const dayOfWeek = datetime.getDay();
+    const hour = datetime.getHours();
+    const minute = datetime.getMinutes();
+    const timeInMinutes = hour * 60 + minute;
+    const dateStr = datetime.toISOString().split('T')[0];
+
+    return availability.blocks.some((block) => {
+      if (block.blockType !== 'blocked') return false;
+
+      // Check recurring weekly blocks
+      if (block.recurrence === 'weekly') {
+        if (block.dayOfWeek !== dayOfWeek) return false;
+
+        const blockStart = block.startHour * 60 + block.startMinute;
+        const blockEnd = block.endHour * 60 + block.endMinute;
+
+        return timeInMinutes >= blockStart && timeInMinutes < blockEnd;
+      }
+
+      // Check one-time blocks
+      if (block.recurrence === 'once' && block.specificDate) {
+        if (block.specificDate !== dateStr) return false;
+
+        if (!block.endDate || block.endDate === block.specificDate) {
+          const blockStart = block.startHour * 60 + block.startMinute;
+          const blockEnd = block.endHour * 60 + block.endMinute;
+          return timeInMinutes >= blockStart && timeInMinutes < blockEnd;
+        }
+
+        if (block.endDate && dateStr >= block.specificDate && dateStr <= block.endDate) {
+          const blockStart = block.startHour * 60 + block.startMinute;
+          const blockEnd = block.endHour * 60 + block.endMinute;
+          return timeInMinutes >= blockStart && timeInMinutes < blockEnd;
+        }
+      }
+
+      return false;
+    });
+  };
 
   // Client-side only flag to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false);
@@ -59,9 +140,14 @@ export default function TrainerCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [calendarTab, setCalendarTab] = useState<CalendarTab>("schedule");
-  const [clients, setClients] = useState<CalendarClient[]>(CALENDAR_CLIENTS);
-  const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>(MOCK_BOOKING_REQUESTS);
-  const [trainerAvailability] = useState(DEFAULT_TRAINER_AVAILABILITY);
+  const [clients, setClients] = useState<Array<{
+    id: string;
+    initials: string;
+    name: string;
+    color: string;
+    credits: number;
+    phone?: string;
+  }>>([]);
 
   // Inline booking panel state (NO MODALS)
   const [showBookingPanel, setShowBookingPanel] = useState(false);
@@ -102,15 +188,50 @@ export default function TrainerCalendar() {
   const [blockReason, setBlockReason] = useState<BlockReasonType>('personal');
   const [blockNotes, setBlockNotes] = useState<string>('');
 
-  // Mark as mounted on client
+  // Mark as mounted on client and fetch data from API
   useEffect(() => {
     setIsMounted(true);
-  }, []);
 
-  // Initialize sessions from store
-  useEffect(() => {
-    initializeSessions();
-  }, [initializeSessions]);
+    // Fetch clients from API
+    async function fetchClients() {
+      try {
+        const response = await fetch('/api/clients');
+        if (response.ok) {
+          const data = await response.json();
+          const transformedClients = (data.clients || []).map((c: {
+            id: string;
+            first_name?: string;
+            last_name?: string;
+            credits?: number;
+          }) => ({
+            id: c.id,
+            initials: `${(c.first_name || '')[0] || ''}${(c.last_name || '')[0] || ''}`.toUpperCase() || '??',
+            name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Unknown',
+            color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+            credits: c.credits || 0,
+          }));
+          setClients(transformedClients);
+        }
+      } catch (error) {
+        console.error('Error fetching clients:', error);
+      }
+    }
+
+    // Fetch bookings for current week
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    fetchClients();
+    fetchBookings(currentUser.id, startOfWeek, endOfWeek);
+    fetchServices();
+    fetchAvailability(currentUser.id);
+    fetchRequests(currentUser.id, 'pending');
+  }, [currentUser.id, fetchBookings, fetchServices, fetchAvailability, fetchRequests]);
 
   // Soft hold expiry enforcement
   useEffect(() => {
@@ -192,7 +313,7 @@ export default function TrainerCalendar() {
   // Handle quick slot click
   const handleQuickSlotClick = (datetime: Date) => {
     setSelectedSlot(datetime);
-    setSelectedServiceType(SERVICE_TYPES[0].id);
+    setSelectedServiceType(services[0].id);
     setShowBookingPanel(true);
     setSearchClient("");
   };
@@ -343,7 +464,6 @@ export default function TrainerCalendar() {
       datetime: datetime,
       clientId: client.id,
       clientName: client.name,
-      clientAvatar: client.avatar,
       clientColor: client.color,
       clientCredits: client.credits - serviceType.creditsRequired,
       status: "confirmed",
@@ -431,13 +551,13 @@ export default function TrainerCalendar() {
     nextWeek.setDate(nextWeek.getDate() + 7);
 
     setSelectedSlot(nextWeek);
-    setSelectedServiceType(session.serviceTypeId);
+    setSelectedServiceType(session.serviceTypeId ?? null);
     setShowBookingPanel(true);
-    setSearchClient(session.clientName);
+    setSearchClient(session.clientName ?? "");
 
     toast({
       title: "Quick Rebook",
-      description: `Pre-filled for ${session.clientName} - Select time`,
+      description: `Pre-filled for ${session.clientName ?? "client"} - Select time`,
     });
   };
 
@@ -458,7 +578,7 @@ export default function TrainerCalendar() {
   // Mark no show
   const handleMarkNoShow = (sessionId: string) => {
     const session = sessions.find((s) => s.id === sessionId);
-    if (!session) return;
+    if (!session || !session.serviceTypeId || !session.clientId) return;
 
     const serviceType = getServiceType(session.serviceTypeId);
     const client = clients.find((c) => c.id === session.clientId);
@@ -487,7 +607,7 @@ export default function TrainerCalendar() {
   // Cancel session
   const handleCancelSession = (sessionId: string) => {
     const session = sessions.find((s) => s.id === sessionId);
-    if (!session) return;
+    if (!session || !session.serviceTypeId || !session.clientId) return;
 
     const serviceType = getServiceType(session.serviceTypeId);
     const client = clients.find((c) => c.id === session.clientId);
@@ -532,7 +652,7 @@ export default function TrainerCalendar() {
   // Submit reschedule
   const submitReschedule = (sessionId: string) => {
     const session = sessions.find((s) => s.id === sessionId);
-    if (!session) return;
+    if (!session || !session.serviceTypeId) return;
 
     if (!rescheduleDate || !rescheduleTime) {
       toast({
@@ -622,10 +742,10 @@ export default function TrainerCalendar() {
   // Accept booking request
   const handleAcceptRequest = (requestId: string, selectedTime: Date) => {
     const request = bookingRequests.find((r) => r.id === requestId);
-    if (!request) return;
+    if (!request || !request.serviceId) return;
 
     const client = clients.find((c) => c.id === request.clientId);
-    const serviceType = getServiceType(request.serviceTypeId);
+    const serviceType = getServiceType(request.serviceId);
 
     if (!client || !serviceType) return;
 
@@ -655,11 +775,10 @@ export default function TrainerCalendar() {
       datetime: selectedTime,
       clientId: request.clientId,
       clientName: request.clientName,
-      clientAvatar: request.clientAvatar,
-      clientColor: request.clientColor,
+      clientColor: client.color,
       clientCredits: client.credits - serviceType.creditsRequired,
       status: "confirmed",
-      serviceTypeId: request.serviceTypeId,
+      serviceTypeId: request.serviceId,
       workoutId: null,
     };
 
@@ -674,16 +793,12 @@ export default function TrainerCalendar() {
       )
     );
 
-    // Mark request as accepted
-    setBookingRequests(
-      bookingRequests.map((r) =>
-        r.id === requestId ? { ...r, status: "accepted" as const } : r
-      )
-    );
+    // Mark request as accepted via API
+    acceptRequest(requestId, selectedTime.toISOString());
 
     toast({
       title: "Request Accepted",
-      description: `${request.clientName} booked for ${formatTime(selectedTime)}`,
+      description: `${request.clientName ?? "Client"} booked for ${formatTime(selectedTime)}`,
     });
   };
 
@@ -692,15 +807,12 @@ export default function TrainerCalendar() {
     const request = bookingRequests.find((r) => r.id === requestId);
     if (!request) return;
 
-    setBookingRequests(
-      bookingRequests.map((r) =>
-        r.id === requestId ? { ...r, status: "declined" as const } : r
-      )
-    );
+    // Decline request via API
+    declineRequest(requestId);
 
     toast({
       title: "Request Declined",
-      description: `${request.clientName}'s request has been declined`,
+      description: `${request.clientName ?? "Client"}'s request has been declined`,
     });
   };
 
@@ -869,7 +981,7 @@ export default function TrainerCalendar() {
                             style={{ background: client?.color || "#12229D" }}
                             className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-md"
                           >
-                            {client?.avatar}
+                            {client?.initials}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-bold text-lg text-wondrous-grey-dark dark:text-gray-100 mb-1">
@@ -1402,9 +1514,9 @@ export default function TrainerCalendar() {
                               className="font-bold truncate text-[9px] lg:text-xs"
                               style={{ color: serviceType.color }}
                             >
-                              <span className="hidden sm:inline">{client?.avatar} </span>
+                              <span className="hidden sm:inline">{client?.initials} </span>
                               <span className="hidden md:inline">{session.clientName}</span>
-                              <span className="md:hidden">{client?.avatar}</span>
+                              <span className="md:hidden">{client?.initials}</span>
                             </div>
                             <div className="text-[8px] lg:text-[10px] text-gray-600 dark:text-gray-400 hidden sm:block">
                               {formatTime(session.datetime)}
@@ -1454,7 +1566,7 @@ export default function TrainerCalendar() {
                   {bookingRequests
                     .filter((r) => r.status === "pending")
                     .map((request) => {
-                      const serviceType = getServiceType(request.serviceTypeId);
+                      const serviceType = getServiceType(request.serviceId);
                       if (!serviceType) return null;
 
                       return (
@@ -1465,23 +1577,23 @@ export default function TrainerCalendar() {
                           {/* Client Info */}
                           <div className="flex items-center gap-3 mb-3">
                             <div
-                              style={{ background: request.clientColor }}
+                              style={{ background: serviceType.color }}
                               className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0 shadow-sm"
                             >
                               <User size={24} className="text-white" />
                             </div>
                             <div className="flex-1">
                               <div className="font-bold text-base text-wondrous-grey-dark dark:text-gray-100">
-                                {request.clientName}
+                                {request.clientName ?? "Client"}
                               </div>
                               <div className="text-xs text-gray-600 dark:text-gray-400">
-                                {request.clientCredits} credits available
+                                {request.client?.credits ?? 0} credits available
                               </div>
                             </div>
                             <div className="text-right">
                               <div className="text-xs text-gray-500 dark:text-gray-400">
                                 {Math.floor(
-                                  (Date.now() - request.createdAt.getTime()) /
+                                  (Date.now() - new Date(request.createdAt).getTime()) /
                                     (1000 * 60 * 60)
                                 )}
                                 h ago
@@ -1527,8 +1639,9 @@ export default function TrainerCalendar() {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               {request.preferredTimes.map((time, index) => {
+                                const timeDate = new Date(time);
                                 const available = isTimeAvailable(
-                                  time,
+                                  timeDate,
                                   serviceType.duration,
                                   sessions
                                 );
@@ -1538,7 +1651,7 @@ export default function TrainerCalendar() {
                                     key={index}
                                     onClick={() => {
                                       if (available) {
-                                        handleAcceptRequest(request.id, time);
+                                        handleAcceptRequest(request.id, timeDate);
                                       }
                                     }}
                                     disabled={!available}
@@ -1549,8 +1662,8 @@ export default function TrainerCalendar() {
                                         : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed"
                                     )}
                                   >
-                                    <div>{formatDate(time)}</div>
-                                    <div className="font-bold">{formatTime(time)}</div>
+                                    <div>{formatDate(timeDate)}</div>
+                                    <div className="font-bold">{formatTime(timeDate)}</div>
                                     {!available && (
                                       <div className="text-[10px] text-red-500">Conflict</div>
                                     )}
@@ -1634,7 +1747,7 @@ export default function TrainerCalendar() {
                   Session Type
                 </div>
                 <div className="grid grid-cols-1 gap-2">
-                  {SERVICE_TYPES.map((service) => (
+                  {services.map((service) => (
                     <button
                       key={service.id}
                       onClick={() => setSelectedServiceType(service.id)}
@@ -1805,7 +1918,7 @@ export default function TrainerCalendar() {
               {/* Client List - INLINE */}
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
                 {filteredClients.map((client) => {
-                  const serviceType = SERVICE_TYPES.find(
+                  const serviceType = services.find(
                     (s) => s.id === selectedServiceType
                   );
                   const hasEnoughCredits =
@@ -1821,7 +1934,7 @@ export default function TrainerCalendar() {
                           style={{ background: client.color }}
                           className="w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0 shadow-sm"
                         >
-                          {client.avatar}
+                          {client.initials}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-wondrous-grey-dark dark:text-gray-100">
@@ -1870,7 +1983,6 @@ export default function TrainerCalendar() {
                                   datetime: selectedSlot,
                                   clientId: client.id,
                                   clientName: client.name,
-                                  clientAvatar: client.avatar,
                                   clientColor: client.color,
                                   clientCredits: client.credits,
                                   status: "soft-hold",

@@ -1,5 +1,5 @@
 import { useSessionStore } from '@/lib/stores/session-store';
-import { useCalendarStore } from '@/lib/stores/calendar-store';
+import { useCalendarStore } from '@/lib/stores/booking-store';
 import { useUserStore } from '@/lib/stores/user-store';
 import { Session } from '@/lib/types';
 import { CalendarSession } from '@/lib/types/calendar';

@@ -69,6 +69,12 @@ export function AuthCallbackInner() {
         // Update Zustand store with profile data
         setUserFromProfile(profile)
 
+        // Check if user needs onboarding
+        if (!profile.isOnboarded) {
+          router.push('/onboarding')
+          return
+        }
+
         // Redirect to appropriate dashboard based on role
         const dashboard = ROLE_DASHBOARDS[profile.role as UserRole] || '/solo'
         router.push(dashboard)
@@ -150,7 +156,7 @@ function mapRole(role: string | null): string {
 async function lookupUserProfile(
   supabase: ReturnType<typeof getSupabaseBrowserClient>,
   user: { id: string; email?: string }
-): Promise<{ id: string; email: string; firstName: string; lastName: string; role: string; studioId?: string } | null> {
+): Promise<{ id: string; email: string; firstName: string; lastName: string; role: string; studioId?: string; isOnboarded?: boolean } | null> {
 
   // 1. Check profiles table first
   const { data: profile } = await supabase
@@ -166,6 +172,7 @@ async function lookupUserProfile(
       firstName: profile.first_name || '',
       lastName: profile.last_name || '',
       role: mapRole(profile.role),
+      isOnboarded: profile.is_onboarded === true,
     }
   }
 

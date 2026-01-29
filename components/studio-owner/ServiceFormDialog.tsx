@@ -53,7 +53,7 @@ export function ServiceFormDialog({ open, onClose, onSave, service }: ServiceFor
       setFormData({
         name: service.name,
         description: service.description,
-        duration: service.duration,
+        duration: service.duration as ServiceDuration,
         type: service.type,
         maxCapacity: service.maxCapacity,
         creditsRequired: service.creditsRequired,

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTemplateStore } from '@/lib/stores/template-store';
 import { useUserStore } from '@/lib/stores/user-store';
-import { getExerciseByIdSync } from '@/lib/mock-data';
+import { useExerciseLookup } from '@/hooks/use-exercise';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -27,6 +27,7 @@ export default function TrainerTemplates() {
   const [viewingExerciseId, setViewingExerciseId] = useState<string | null>(null);
   const [aiTemplates, setAITemplates] = useState<AIProgram[]>([]);
   const [loadingAITemplates, setLoadingAITemplates] = useState(true);
+  const { getExercise } = useExerciseLookup();
 
   // Fetch AI templates (only for solo practitioners)
   useEffect(() => {
@@ -230,7 +231,7 @@ export default function TrainerTemplates() {
                           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{block.name}</h3>
                           <div className="space-y-2">
                             {block.exercises.map((templateExercise) => {
-                              const exercise = getExerciseByIdSync(templateExercise.exerciseId);
+                              const exercise = getExercise(templateExercise.exerciseId);
                               if (!exercise) return null;
 
                               return (

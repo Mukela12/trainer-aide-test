@@ -5,4 +5,3 @@ export * from './templates';
 export * from './clients';
 export * from './sessions';
 export * from './users';
-export * from './bookings';

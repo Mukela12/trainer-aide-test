@@ -9,6 +9,8 @@ interface ProfileData {
   lastName: string;
   role: string;
   studioId?: string;
+  isOnboarded?: boolean;
+  businessSlug?: string;
 }
 
 // Default empty user (unauthenticated state)
@@ -24,10 +26,14 @@ interface UserState {
   currentUser: User;
   currentRole: UserRole;
   isAuthenticated: boolean;
+  isOnboarded: boolean;
   studioId: string | null;
+  businessSlug: string | null;
   setUser: (user: User) => void;
   setRole: (role: UserRole) => void;
   setUserFromProfile: (profile: ProfileData) => void;
+  setOnboarded: (isOnboarded: boolean) => void;
+  setBusinessSlug: (slug: string) => void;
   logout: () => void;
   reset: () => void;
   // Permission methods
@@ -44,7 +50,9 @@ export const useUserStore = create<UserState>()(
       currentUser: EMPTY_USER,
       currentRole: 'solo_practitioner',
       isAuthenticated: false,
+      isOnboarded: false,
       studioId: null,
+      businessSlug: null,
 
       setUser: (user) => set({ currentUser: user, currentRole: user.role, isAuthenticated: true }),
 
@@ -64,8 +72,14 @@ export const useUserStore = create<UserState>()(
         },
         currentRole: profile.role as UserRole,
         isAuthenticated: true,
+        isOnboarded: profile.isOnboarded || false,
         studioId: profile.studioId || null,
+        businessSlug: profile.businessSlug || null,
       }),
+
+      setOnboarded: (isOnboarded: boolean) => set({ isOnboarded }),
+
+      setBusinessSlug: (slug: string) => set({ businessSlug: slug }),
 
       // Logout - clears user data, sessions, and timer
       logout: () => {
@@ -82,7 +96,9 @@ export const useUserStore = create<UserState>()(
           currentUser: EMPTY_USER,
           currentRole: 'solo_practitioner',
           isAuthenticated: false,
+          isOnboarded: false,
           studioId: null,
+          businessSlug: null,
         });
       },
 
@@ -90,7 +106,9 @@ export const useUserStore = create<UserState>()(
         currentUser: EMPTY_USER,
         currentRole: 'solo_practitioner',
         isAuthenticated: false,
+        isOnboarded: false,
         studioId: null,
+        businessSlug: null,
       }),
 
       // Permission methods

@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTemplateStore } from '@/lib/stores/template-store';
-import { getExerciseByIdSync } from '@/lib/mock-data';
+import { useExerciseLookup } from '@/hooks/use-exercise';
 import { generateId } from '@/lib/utils/generators';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +48,7 @@ function TemplateBuilderContent() {
 
   // Track unsaved changes for sticky save bar
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const { getExercise } = useExerciseLookup();
   const [initialState, setInitialState] = useState<string>('');
 
   // Load existing template if editing
@@ -487,7 +488,7 @@ function TemplateBuilderContent() {
                   )}
 
                   {block.exercises.map((templateExercise, exerciseIndex) => {
-                    const exercise = getExerciseByIdSync(templateExercise.exerciseId);
+                    const exercise = getExercise(templateExercise.exerciseId);
                     if (!exercise) return null;
 
                     const isFirst = exerciseIndex === 0;

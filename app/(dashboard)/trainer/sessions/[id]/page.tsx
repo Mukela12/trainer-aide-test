@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useSessionStore } from '@/lib/stores/session-store';
 import { useTimerStore } from '@/lib/stores/timer-store';
-import { getExerciseByIdSync } from '@/lib/mock-data';
+import { useExerciseLookup } from '@/hooks/use-exercise';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,7 @@ export default function SessionRunner() {
   const session = sessions.find((s) => s.id === sessionId);
 
   const { getElapsedSeconds, isPaused, isTimerActive } = useTimerStore();
+  const { getExercise } = useExerciseLookup();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Update elapsed seconds for alert system
@@ -186,7 +187,7 @@ export default function SessionRunner() {
             </CardHeader>
             <CardContent className="space-y-4">
               {block.exercises.map((exercise) => {
-                const exerciseData = getExerciseByIdSync(exercise.exerciseId);
+                const exerciseData = getExercise(exercise.exerciseId);
                 if (!exerciseData) return null;
 
                 return (
@@ -409,7 +410,7 @@ export default function SessionRunner() {
           </CardHeader>
           <CardContent className="space-y-4">
             {currentBlock.exercises.map((exercise) => {
-              const exerciseData = getExerciseByIdSync(exercise.exerciseId);
+              const exerciseData = getExercise(exercise.exerciseId);
               if (!exerciseData) return null;
 
               return (
@@ -626,7 +627,7 @@ export default function SessionRunner() {
       return null;
     }
 
-    const exerciseData = getExerciseByIdSync(currentExercise.exerciseId);
+    const exerciseData = getExercise(currentExercise.exerciseId);
     if (!exerciseData) {
       return null;
     }

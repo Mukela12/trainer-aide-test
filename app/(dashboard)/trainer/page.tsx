@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useTemplateStore } from '@/lib/stores/template-store';
 import { useSessionStore } from '@/lib/stores/session-store';
 import { useUserStore } from '@/lib/stores/user-store';
-import { useCalendarStore } from '@/lib/stores/calendar-store';
+import { useCalendarStore } from '@/lib/stores/booking-store';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';

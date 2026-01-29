@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useSessionStore } from '@/lib/stores/session-store';
 import { useUserStore } from '@/lib/stores/user-store';
-import { getExerciseByIdSync } from '@/lib/mock-data';
+import { useExerciseLookup } from '@/hooks/use-exercise';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ export default function ClientSessionHistory() {
   const { sessions } = useSessionStore();
   const { currentUser } = useUserStore();
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+  const { getExercise, isLoading: isLoadingExercises } = useExerciseLookup();
 
   // Use the authenticated user's ID to filter sessions
   const clientId = currentUser.id;
@@ -126,7 +127,7 @@ export default function ClientSessionHistory() {
 
                           <div className="space-y-3">
                             {block.exercises.map((exercise) => {
-                              const exerciseData = getExerciseByIdSync(exercise.exerciseId);
+                              const exerciseData = getExercise(exercise.exerciseId);
                               if (!exerciseData) return null;
 
                               return (

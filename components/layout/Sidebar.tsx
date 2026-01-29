@@ -19,6 +19,9 @@ import {
   LogOut,
   Clock,
   Sparkles,
+  Package,
+  CreditCard,
+  UserPlus,
 } from 'lucide-react';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -34,7 +37,9 @@ const studioOwnerLinks: NavLink[] = [
   { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
   { href: '/studio-owner/programs', label: 'AI Programs', icon: <Sparkles size={20} /> },
   { href: '/studio-owner/trainers', label: 'Trainers', icon: <Users size={20} /> },
+  { href: '/studio-owner/team', label: 'Team', icon: <UserPlus size={20} /> },
   { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
+  { href: '/studio-owner/packages', label: 'Packages', icon: <Package size={20} /> },
   { href: '/studio-owner/templates', label: 'Templates', icon: <FileText size={20} /> },
   { href: '/studio-owner/sessions', label: 'All Sessions', icon: <Dumbbell size={20} /> },
   { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
@@ -50,7 +55,9 @@ const trainerLinks: NavLink[] = [
 
 const clientLinks: NavLink[] = [
   { href: '/client', label: 'Home', icon: <Home size={20} /> },
-  { href: '/client/history', label: 'History', icon: <BookOpen size={20} /> },
+  { href: '/client/bookings', label: 'My Bookings', icon: <Calendar size={20} /> },
+  { href: '/client/packages', label: 'My Credits', icon: <CreditCard size={20} /> },
+  { href: '/client/sessions', label: 'Session History', icon: <Dumbbell size={20} /> },
   { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
 ];
 
@@ -59,6 +66,7 @@ const soloPractitionerLinks: NavLink[] = [
   { href: '/solo/programs', label: 'AI Programs', icon: <Sparkles size={20} /> },
   { href: '/solo/sessions', label: 'Sessions', icon: <Dumbbell size={20} /> },
   { href: '/solo/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
+  { href: '/solo/packages', label: 'Packages', icon: <Package size={20} /> },
   { href: '/solo/templates', label: 'Templates', icon: <FileText size={20} /> },
   { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
 ];

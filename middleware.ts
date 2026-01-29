@@ -7,6 +7,13 @@ const PUBLIC_ROUTES = [
   '/',
   '/login',
   '/auth/callback',
+  '/book',
+]
+
+// Route prefixes that are public (for pattern matching)
+const PUBLIC_ROUTE_PREFIXES = [
+  '/book/',
+  '/invite/',
 ]
 
 // Routes that are API routes (handle separately)
@@ -31,14 +38,27 @@ export async function middleware(request: NextRequest) {
   // Update session (refresh tokens if needed)
   const { user, response } = await updateSession(request)
 
+  // Check if route is public
+  const isPublicRoute = PUBLIC_ROUTES.includes(pathname) ||
+    PUBLIC_ROUTE_PREFIXES.some(prefix => pathname.startsWith(prefix))
+
   // Allow public routes
-  if (PUBLIC_ROUTES.includes(pathname)) {
+  if (isPublicRoute) {
     // If user is authenticated and on login page, redirect to dashboard
     if (user && pathname === '/login') {
       // Get user role from profile (would need to fetch from DB)
       // For now, redirect to solo dashboard as default
       const redirectUrl = new URL('/solo', request.url)
       return NextResponse.redirect(redirectUrl)
+    }
+    return response
+  }
+
+  // Allow onboarding routes for authenticated users
+  if (pathname.startsWith('/onboarding')) {
+    if (!user) {
+      const loginUrl = new URL('/login', request.url)
+      return NextResponse.redirect(loginUrl)
     }
     return response
   }
