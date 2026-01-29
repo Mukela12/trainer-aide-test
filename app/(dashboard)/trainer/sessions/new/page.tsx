@@ -753,7 +753,7 @@ function StartNewSessionContent() {
               })}
 
               {filteredClients.length === 0 && clientSearch && (
-                <p className="text-center text-gray-500 py-4">No clients found matching "{clientSearch}"</p>
+                <p className="text-center text-gray-500 py-4">No clients found matching &ldquo;{clientSearch}&rdquo;</p>
               )}
             </>
           )}
