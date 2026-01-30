@@ -10,6 +10,7 @@ import {
   getBookingRequestCreatedEmail,
   getBookingRequestAcceptedEmail,
   getBookingRequestDeclinedEmail,
+  getClientInvitationEmail,
 } from './email-templates';
 
 // Lazy initialization of Resend client to avoid build-time errors when API key is not set
@@ -384,6 +385,57 @@ export async function sendBookingRequestDeclinedEmail(params: {
     return { success: true, messageId: data?.id };
   } catch (error) {
     console.error('Error sending booking request declined email:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Send client invitation email
+ */
+export async function sendClientInvitationEmail(params: {
+  recipientEmail: string;
+  recipientName?: string;
+  inviterName: string;
+  studioName?: string;
+  inviteUrl: string;
+  message?: string;
+  invitationId?: string;
+}): Promise<SendEmailResult> {
+  try {
+    const email = getClientInvitationEmail({
+      recipientName: params.recipientName,
+      inviterName: params.inviterName,
+      studioName: params.studioName,
+      inviteUrl: params.inviteUrl,
+      message: params.message,
+    });
+
+    const { data, error } = await getResendClient().emails.send({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: params.recipientEmail,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (params.invitationId) {
+      await logNotification({
+        type: 'client_invitation',
+        recipientEmail: params.recipientEmail,
+        invitationId: params.invitationId,
+        status: 'sent',
+        messageId: data?.id,
+      });
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (error) {
+    console.error('Error sending client invitation email:', error);
     return { success: false, error: String(error) };
   }
 }

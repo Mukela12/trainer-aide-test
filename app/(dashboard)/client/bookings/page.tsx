@@ -23,6 +23,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface Booking {
   id: string;
@@ -171,13 +172,14 @@ export default function ClientBookingsPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-heading-1 dark:text-gray-100 mb-2">My Bookings</h1>
-        <p className="text-body-sm text-gray-600 dark:text-gray-400">
-          View and manage your upcoming sessions
-        </p>
-      </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="View and manage your upcoming sessions"
+        stats={[
+          { label: 'upcoming', value: upcomingBookings.length, color: 'primary' },
+          { label: 'past', value: pastBookings.length, color: 'default' },
+        ]}
+      />
 
       {/* Upcoming Bookings */}
       <div className="mb-8">

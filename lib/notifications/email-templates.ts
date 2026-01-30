@@ -443,6 +443,81 @@ Powered by AllWondrous
   };
 }
 
+interface ClientInvitationData {
+  recipientName?: string;
+  inviterName: string;
+  studioName?: string;
+  inviteUrl: string;
+  message?: string;
+}
+
+export function getClientInvitationEmail(data: ClientInvitationData) {
+  const displayName = data.recipientName || 'there';
+  const studioDisplay = data.studioName || 'your trainer';
+
+  return {
+    subject: `${data.inviterName} invited you to join ${data.studioName || 'AllWondrous'}`,
+    text: `
+Hi ${displayName},
+
+${data.inviterName} has invited you to join ${studioDisplay} as a client.
+
+${data.message ? `Message from your trainer: "${data.message}"` : ''}
+
+Click here to accept and create your account: ${data.inviteUrl}
+
+This invitation will expire in 7 days.
+
+—
+Powered by AllWondrous
+    `.trim(),
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>${baseStyles}
+    .welcome-badge { display: inline-block; background: #B8E6F0; color: #0A1466; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>You are Invited!</h1>
+    </div>
+    <div class="content">
+      <p>Hi ${displayName},</p>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <span class="welcome-badge">New Client Invitation</span>
+      </div>
+
+      <p><strong style="color: #0A1466;">${data.inviterName}</strong> has invited you to join ${data.studioName ? `<strong>${data.studioName}</strong>` : 'their training platform'} as a client.</p>
+
+      ${data.message ? `
+      <div class="note">
+        <div class="label" style="margin-bottom: 8px;">Message from your trainer:</div>
+        <div style="color: #272030; font-style: italic;">"${data.message}"</div>
+      </div>
+      ` : ''}
+
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${data.inviteUrl}" class="cta">Accept Invitation</a>
+      </div>
+
+      <p style="color: #6b7280; font-size: 14px; text-align: center;">This invitation will expire in 7 days.</p>
+    </div>
+    <div class="footer">
+      Powered by AllWondrous
+    </div>
+  </div>
+</body>
+</html>
+    `.trim(),
+  };
+}
+
 export function getPaymentReceiptEmail(data: PaymentData) {
   return {
     subject: `Payment Receipt: £${(data.amount / 100).toFixed(2)}`,

@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { AIProgram } from '@/lib/types/ai-program';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface Template {
   id: string;
@@ -146,29 +147,27 @@ export default function TemplateLibrary() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="mb-6 lg:mb-8">
-        {/* Title Section */}
-        <div className="mb-4">
-          <h1 className="text-2xl lg:text-heading-1 font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Workout Templates
-          </h1>
-          <p className="text-sm lg:text-body-sm text-gray-600 dark:text-gray-400">
-            Create and manage standardized workout templates
-          </p>
-        </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Create and manage standardized workout templates"
+        stats={[
+          { label: 'templates', value: templates.length, color: 'primary' },
+          { label: 'AI generated', value: aiTemplates.length, color: 'magenta' },
+        ]}
+        actions={
+          <Link href="/studio-owner/templates/builder">
+            <Button className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">
+              <Plus size={20} />
+              <span className="hidden sm:inline">Create Template</span>
+              <span className="sm:hidden">New</span>
+            </Button>
+          </Link>
+        }
+      />
 
-        {/* Action Button - Full width on mobile */}
-        <Link href="/studio-owner/templates/builder" className="block lg:inline-block mb-4">
-          <Button className="w-full lg:w-auto gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">
-            <Plus size={20} />
-            <span>Create New Template</span>
-          </Button>
-        </Link>
-
-        {/* Search and Filters */}
-        <div className="space-y-3">
-          {/* Search Bar */}
+      {/* Search and Filters */}
+      <div className="mb-6 lg:mb-8 space-y-3">
+        {/* Search Bar */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
             <Input
@@ -216,7 +215,6 @@ export default function TemplateLibrary() {
               AI Generated ({aiTemplates.length})
             </Button>
           </div>
-        </div>
       </div>
 
       {/* Templates Content */}

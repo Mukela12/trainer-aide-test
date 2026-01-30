@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
+import ContentHeader from '@/components/shared/ContentHeader';
 import { formatDuration } from '@/lib/utils/generators';
 import { Dumbbell, Calendar, Clock, TrendingUp, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { format } from 'date-fns';
@@ -32,11 +33,13 @@ export default function ClientSessionHistory() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-heading-1 mb-2">Session History</h1>
-        <p className="text-body-sm text-gray-600">View all your completed training sessions</p>
-      </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="View all your completed training sessions"
+        stats={[
+          { label: 'completed', value: clientSessions.length, color: 'success' },
+        ]}
+      />
 
       {/* Sessions List */}
       {clientSessions.length > 0 ? (

@@ -7,7 +7,7 @@ import { useUserStore } from '@/lib/stores/user-store';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { FileText, CheckCircle, Dumbbell, TrendingUp, Plus, Inbox } from 'lucide-react';
+import { FileText, CheckCircle, Dumbbell, TrendingUp, Plus, Inbox, Users, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Format today's date
@@ -20,6 +20,16 @@ interface DashboardStats {
   totalSessions: number;
   averageRpe: number;
   pendingRequests: number;
+  totalClients: number;
+}
+
+interface RecentClient {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  credits: number;
+  createdAt: Date;
 }
 
 export default function StudioOwnerDashboard() {
@@ -32,7 +42,9 @@ export default function StudioOwnerDashboard() {
     totalSessions: 0,
     averageRpe: 0,
     pendingRequests: 0,
+    totalClients: 0,
   });
+  const [recentClients, setRecentClients] = useState<RecentClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -69,6 +81,35 @@ export default function StudioOwnerDashboard() {
           // Fall back to store data
         }
 
+        // Fetch clients data
+        let clientsCount = 0;
+        try {
+          const clientsRes = await fetch('/api/clients');
+          if (clientsRes.ok) {
+            const clientsData = await clientsRes.json();
+            const clients = clientsData.clients || [];
+            clientsCount = clients.length;
+
+            // Sort by created_at and take recent 5
+            const sortedClients = clients
+              .sort((a: { created_at: string }, b: { created_at: string }) =>
+                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              )
+              .slice(0, 5)
+              .map((c: { id: string; first_name: string; last_name: string; email: string; credits: number; created_at: string }) => ({
+                id: c.id,
+                firstName: c.first_name || '',
+                lastName: c.last_name || '',
+                email: c.email,
+                credits: c.credits || 0,
+                createdAt: new Date(c.created_at),
+              }));
+            setRecentClients(sortedClients);
+          }
+        } catch {
+          // Ignore errors
+        }
+
         if (analyticsResponse.ok) {
           const data = await analyticsResponse.json();
           setStats({
@@ -77,6 +118,7 @@ export default function StudioOwnerDashboard() {
             totalSessions: data.sessionsThisWeek || 0,
             averageRpe: data.averageRpe || 0,
             pendingRequests: pendingRequestsCount,
+            totalClients: clientsCount,
           });
         } else {
           // Fall back to store-based calculations
@@ -86,6 +128,7 @@ export default function StudioOwnerDashboard() {
             totalSessions: 0,
             averageRpe: 0,
             pendingRequests: pendingRequestsCount,
+            totalClients: clientsCount,
           });
         }
       } catch (error) {
@@ -97,6 +140,7 @@ export default function StudioOwnerDashboard() {
           totalSessions: 0,
           averageRpe: 0,
           pendingRequests: 0,
+          totalClients: 0,
         });
       } finally {
         setIsLoading(false);
@@ -227,6 +271,20 @@ export default function StudioOwnerDashboard() {
             </div>
           </Link>
         </div>
+        {/* Second row of quick actions */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-3">
+          <Link href="/studio-owner/clients" className="group">
+            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-purple-200/50 dark:border-purple-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-purple-500/10 to-transparent opacity-50" />
+              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <UserPlus className="text-purple-600 dark:text-purple-400" size={22} strokeWidth={2.5} />
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Manage Clients</span>
+              </div>
+            </div>
+          </Link>
+        </div>
       </div>
 
       {/* Recent Templates */}
@@ -278,6 +336,61 @@ export default function StudioOwnerDashboard() {
               <p className="text-xs lg:text-sm mb-4 dark:text-gray-400">Create your first workout template to get started</p>
               <Link href="/studio-owner/templates/builder">
                 <Button className="bg-wondrous-magenta hover:bg-wondrous-magenta-dark text-sm">Create Template</Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+      </div>
+
+      {/* Recent Clients */}
+      <div className="mt-6 lg:mt-8">
+        <div className="flex items-center justify-between mb-3 lg:mb-4">
+          <h2 className="text-lg lg:text-heading-2 font-bold text-gray-900 dark:text-gray-100">
+            Recent Clients
+          </h2>
+          <Link href="/studio-owner/clients">
+            <Button variant="ghost" size="sm" className="text-xs lg:text-sm">View All ({stats.totalClients})</Button>
+          </Link>
+        </div>
+
+        {recentClients.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+            {recentClients.map((client) => (
+              <Card key={client.id} className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-wondrous-blue-light flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-semibold text-wondrous-dark-blue">
+                        {client.firstName?.[0]}{client.lastName?.[0]}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {client.firstName} {client.lastName}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        {client.email}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {client.credits}
+                      </span>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">credits</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="p-6 lg:p-8 dark:bg-gray-800 dark:border-gray-700">
+            <div className="text-center text-gray-500">
+              <Users className="mx-auto mb-3 lg:mb-4 text-gray-400 dark:text-gray-600" size={40} />
+              <p className="text-base lg:text-lg font-medium mb-2 text-gray-900 dark:text-gray-100">No clients yet</p>
+              <p className="text-xs lg:text-sm mb-4 dark:text-gray-400">Add or invite clients to get started</p>
+              <Link href="/studio-owner/clients">
+                <Button className="bg-wondrous-magenta hover:bg-wondrous-magenta-dark text-sm">Add Client</Button>
               </Link>
             </div>
           </Card>

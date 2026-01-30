@@ -18,6 +18,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface Goal {
   id: string;
@@ -150,13 +151,14 @@ export default function ClientProgressPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-heading-1 dark:text-gray-100 mb-2">My Progress</h1>
-        <p className="text-body-sm text-gray-600 dark:text-gray-400">
-          Track your fitness journey and celebrate your achievements
-        </p>
-      </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Track your fitness journey and celebrate your achievements"
+        stats={[
+          { label: 'active goals', value: progress?.active_goals || activeGoals.length, color: 'primary' },
+          { label: 'achieved', value: progress?.achieved_goals || achievedGoals.length, color: 'success' },
+        ]}
+      />
 
       {/* Progress Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">

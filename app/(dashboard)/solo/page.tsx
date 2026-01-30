@@ -7,7 +7,7 @@ import { useCalendarStore } from '@/lib/stores/booking-store';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dumbbell, Calendar, Plus, Users, DollarSign, Clock, TrendingUp, Package, Inbox, FileText } from 'lucide-react';
+import { Dumbbell, Calendar, Plus, Users, DollarSign, Clock, TrendingUp, Package, Inbox, FileText, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Format today's date
@@ -33,6 +33,15 @@ interface UpcomingSession {
   status: string;
 }
 
+interface RecentClient {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  credits: number;
+  createdAt: Date;
+}
+
 export default function SoloPractitionerDashboard() {
   const { currentUser } = useUserStore();
   const { sessions: calendarSessions } = useCalendarStore();
@@ -48,6 +57,7 @@ export default function SoloPractitionerDashboard() {
     pendingRequests: 0,
   });
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
+  const [recentClients, setRecentClients] = useState<RecentClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -99,6 +109,26 @@ export default function SoloPractitionerDashboard() {
               status: s.status,
             }))
           );
+        }
+
+        // Fetch recent clients
+        const clientsResponse = await fetch('/api/clients');
+        if (clientsResponse.ok) {
+          const clientsData = await clientsResponse.json();
+          const sortedClients = (clientsData.clients || [])
+            .sort((a: { created_at: string }, b: { created_at: string }) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+            .slice(0, 5)
+            .map((c: { id: string; first_name: string; last_name: string; email: string; credits: number; created_at: string }) => ({
+              id: c.id,
+              firstName: c.first_name || '',
+              lastName: c.last_name || '',
+              email: c.email,
+              credits: c.credits || 0,
+              createdAt: new Date(c.created_at),
+            }));
+          setRecentClients(sortedClients);
         }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
@@ -294,12 +324,23 @@ export default function SoloPractitionerDashboard() {
 
         {/* Additional Quick Actions Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-4">
-          <Link href="/solo/requests" className="group">
+          <Link href="/solo/clients" className="group">
             <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-cyan-200/50 dark:border-cyan-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
               <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-cyan-500/10 to-transparent opacity-50" />
               <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
                 <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Inbox className="text-cyan-600 dark:text-cyan-400" size={22} strokeWidth={2.5} />
+                  <UserPlus className="text-cyan-600 dark:text-cyan-400" size={22} strokeWidth={2.5} />
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Manage Clients</span>
+              </div>
+            </div>
+          </Link>
+          <Link href="/solo/requests" className="group">
+            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-indigo-200/50 dark:border-indigo-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-indigo-500/10 to-transparent opacity-50" />
+              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Inbox className="text-indigo-600 dark:text-indigo-400" size={22} strokeWidth={2.5} />
                 </div>
                 <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Booking Requests</span>
               </div>
@@ -362,6 +403,63 @@ export default function SoloPractitionerDashboard() {
               <p className="text-sm mb-4 dark:text-gray-400">Schedule your next session to get started</p>
               <Link href="/solo/calendar">
                 <Button>View Calendar</Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+      </div>
+
+      {/* Recent Clients */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-heading-2 dark:text-gray-100">Recent Clients</h2>
+          <Link href="/solo/clients">
+            <Button variant="ghost" size="sm">View All</Button>
+          </Link>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-4 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : recentClients.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {recentClients.map((client) => (
+              <Card key={client.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-wondrous-blue-light flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-semibold text-wondrous-dark-blue">
+                        {client.firstName?.[0]}{client.lastName?.[0]}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {client.firstName} {client.lastName}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        {client.email}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {client.credits}
+                      </span>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">credits</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="p-8">
+            <div className="text-center text-gray-500 dark:text-gray-400">
+              <Users className="mx-auto mb-4 text-gray-400 dark:text-gray-500" size={48} />
+              <p className="text-lg font-medium mb-2 dark:text-gray-300">No clients yet</p>
+              <p className="text-sm mb-4 dark:text-gray-400">Add or invite clients to get started</p>
+              <Link href="/solo/clients">
+                <Button>Add Client</Button>
               </Link>
             </div>
           </Card>

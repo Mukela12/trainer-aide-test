@@ -23,6 +23,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface BookingRequest {
   id: string;
@@ -145,13 +146,14 @@ export default function TrainerBookingRequestsPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-heading-1 dark:text-gray-100 mb-2">Booking Requests</h1>
-        <p className="text-body-sm text-gray-600 dark:text-gray-400">
-          Review and respond to client booking requests
-        </p>
-      </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Review and respond to client booking requests"
+        stats={[
+          { label: 'pending', value: pendingRequests.length, color: 'warning' },
+          { label: 'processed', value: processedRequests.length, color: 'default' },
+        ]}
+      />
 
       {/* Pending Requests */}
       <div className="mb-8">

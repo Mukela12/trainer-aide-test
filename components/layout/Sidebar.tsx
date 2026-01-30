@@ -35,8 +35,9 @@ interface NavLink {
 
 const studioOwnerLinks: NavLink[] = [
   { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+  { href: '/studio-owner/clients', label: 'Clients', icon: <Users size={20} /> },
   { href: '/studio-owner/programs', label: 'AI Programs', icon: <Sparkles size={20} /> },
-  { href: '/studio-owner/trainers', label: 'Trainers', icon: <Users size={20} /> },
+  { href: '/studio-owner/trainers', label: 'Trainers', icon: <UserPlus size={20} /> },
   { href: '/studio-owner/team', label: 'Team', icon: <UserPlus size={20} /> },
   { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
   { href: '/studio-owner/packages', label: 'Packages', icon: <Package size={20} /> },
@@ -63,6 +64,7 @@ const clientLinks: NavLink[] = [
 
 const soloPractitionerLinks: NavLink[] = [
   { href: '/solo', label: 'Dashboard', icon: <Home size={20} /> },
+  { href: '/solo/clients', label: 'Clients', icon: <Users size={20} /> },
   { href: '/solo/programs', label: 'AI Programs', icon: <Sparkles size={20} /> },
   { href: '/solo/sessions', label: 'Sessions', icon: <Dumbbell size={20} /> },
   { href: '/solo/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
