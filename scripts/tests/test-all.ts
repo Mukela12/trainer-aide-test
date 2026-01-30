@@ -1,6 +1,52 @@
 /**
  * Master Test Runner
  * Runs all test suites sequentially and generates final report
+ *
+ * TEST ORDER RATIONALE:
+ * =====================
+ * The tests are ordered to follow a logical business flow while ensuring
+ * each test suite is independent (cleans up its own data).
+ *
+ * 1. TRAINER ROLE - Foundation layer
+ *    - Creates services, availability slots, clients, bookings
+ *    - Tests core trainer features (CRUD operations)
+ *    - This runs first to verify basic platform functionality
+ *
+ * 2. STUDIO OWNER ROLE - Management layer
+ *    - Tests studio management, team management, invitations
+ *    - Creates studio infrastructure
+ *
+ * 3. TEMPLATE ASSIGNMENTS - Feature layer
+ *    - Tests template creation and assignment to trainers/clients
+ *    - Depends on having trainers and clients in the system
+ *
+ * 4. BOOKING REQUESTS - Request/response flow
+ *    - Tests booking request creation, acceptance, decline
+ *    - Tests email notifications for booking requests
+ *
+ * 5. CREDIT CONSUMPTION - Billing flow
+ *    - Tests credit deduction when completing bookings
+ *    - Depends on having packages and booking completion working
+ *
+ * 6. CLIENT GOALS - Progress tracking
+ *    - Tests goal creation, milestones, status updates
+ *    - Client-facing feature for tracking fitness objectives
+ *
+ * 7. BODY METRICS - Measurement tracking
+ *    - Tests metric recording, retrieval, progress summaries
+ *    - Client-facing feature for tracking body measurements
+ *
+ * 8. PUBLIC BOOKING FLOW - User journey
+ *    - Tests the public-facing booking process
+ *    - Uses services and availability (created fresh or existing)
+ *
+ * 9. CLIENT ROLE - Client perspective
+ *    - Tests client-facing features
+ *    - Views bookings, profiles, credits
+ *
+ * 10. NOTIFICATIONS SYSTEM - Background processes
+ *    - Tests notification triggers and processing
+ *    - Runs last as it depends on bookings and other events
  */
 
 import { execSync } from 'child_process';
@@ -14,12 +60,37 @@ interface SuiteResult {
   error?: string;
 }
 
+// Test suites in recommended execution order
 const suites = [
-  { name: 'Public Booking Flow', file: 'test-public-booking.ts' },
-  { name: 'Trainer Role', file: 'test-trainer-role.ts' },
-  { name: 'Client Role', file: 'test-client-role.ts' },
-  { name: 'Studio Owner Role', file: 'test-studio-owner.ts' },
-  { name: 'Notifications System', file: 'test-notifications.ts' },
+  // 1. Core trainer functionality - foundation for everything
+  { name: 'Trainer Role', file: 'test-trainer-role.ts', category: 'core' },
+
+  // 2. Studio owner management features
+  { name: 'Studio Owner Role', file: 'test-studio-owner.ts', category: 'management' },
+
+  // 3. Template assignment system
+  { name: 'Template Assignments', file: 'test-template-assignments.ts', category: 'features' },
+
+  // 4. Booking requests - request/response flow with email notifications
+  { name: 'Booking Requests', file: 'test-booking-requests.ts', category: 'features' },
+
+  // 5. Credit consumption - billing flow
+  { name: 'Credit Consumption', file: 'test-credit-consumption.ts', category: 'billing' },
+
+  // 6. Client goals - progress tracking
+  { name: 'Client Goals', file: 'test-client-goals.ts', category: 'progress' },
+
+  // 7. Body metrics - measurement tracking
+  { name: 'Body Metrics', file: 'test-body-metrics.ts', category: 'progress' },
+
+  // 8. Public-facing booking flow
+  { name: 'Public Booking Flow', file: 'test-public-booking.ts', category: 'user-journey' },
+
+  // 9. Client-facing features
+  { name: 'Client Role', file: 'test-client-role.ts', category: 'user-journey' },
+
+  // 10. Background notification system
+  { name: 'Notifications System', file: 'test-notifications.ts', category: 'background' },
 ];
 
 // Run cleanup before each suite to avoid stale data conflicts

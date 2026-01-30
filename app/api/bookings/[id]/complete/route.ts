@@ -90,6 +90,24 @@ export async function POST(
       }
     }
 
+    // Deduct credits for completed session
+    const creditsRequired = existingBooking.service?.credits_required || 1;
+
+    const { error: creditError } = await serviceClient.rpc(
+      'deduct_client_credit',
+      {
+        p_client_id: existingBooking.client_id,
+        p_trainer_id: existingBooking.trainer_id || user.id,
+        p_booking_id: id,
+        p_credits: creditsRequired,
+      }
+    );
+
+    if (creditError) {
+      console.error('Credit deduction failed:', creditError);
+      // Log but don't fail - session is completed regardless
+    }
+
     // Update booking to completed
     const updateData: Record<string, unknown> = {
       status: 'completed',

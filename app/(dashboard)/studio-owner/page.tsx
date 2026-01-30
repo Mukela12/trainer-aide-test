@@ -1,28 +1,109 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTemplateStore } from '@/lib/stores/template-store';
-import { useSessionStore } from '@/lib/stores/session-store';
 import { useUserStore } from '@/lib/stores/user-store';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { FileText, CheckCircle, Dumbbell, TrendingUp, Plus } from 'lucide-react';
+import { FileText, CheckCircle, Dumbbell, TrendingUp, Plus, Inbox } from 'lucide-react';
+
+interface DashboardStats {
+  totalTemplates: number;
+  activeTemplates: number;
+  totalSessions: number;
+  averageRpe: number;
+  pendingRequests: number;
+}
 
 export default function StudioOwnerDashboard() {
   const templates = useTemplateStore((state) => state.templates);
-  const sessions = useSessionStore((state) => state.sessions);
   const { currentUser } = useUserStore();
 
-  // Calculate stats
-  const totalTemplates = templates.length;
-  const activeTemplates = templates.length; // All templates are active in this demo
-  const totalSessions = sessions.filter(s => s.completed).length;
-  const averageRpe = sessions.filter(s => s.overallRpe).length > 0
-    ? Math.round(sessions.filter(s => s.overallRpe).reduce((acc, s) => acc + (s.overallRpe || 0), 0) / sessions.filter(s => s.overallRpe).length)
-    : 0;
+  const [stats, setStats] = useState<DashboardStats>({
+    totalTemplates: 0,
+    activeTemplates: 0,
+    totalSessions: 0,
+    averageRpe: 0,
+    pendingRequests: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Get recent templates
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      setIsLoading(true);
+
+      try {
+        // Fetch analytics from API
+        const analyticsResponse = await fetch('/api/analytics/dashboard');
+        let pendingRequestsCount = 0;
+
+        // Fetch pending booking requests count
+        try {
+          const requestsRes = await fetch('/api/booking-requests');
+          if (requestsRes.ok) {
+            const requestsData = await requestsRes.json();
+            pendingRequestsCount = (requestsData.requests || []).filter(
+              (r: { status: string }) => r.status === 'pending'
+            ).length;
+          }
+        } catch {
+          // Ignore errors fetching requests
+        }
+
+        // Fetch templates count from API
+        let templatesCount = templates.length;
+        try {
+          const templatesRes = await fetch('/api/templates');
+          if (templatesRes.ok) {
+            const templatesData = await templatesRes.json();
+            templatesCount = (templatesData.templates || []).length;
+          }
+        } catch {
+          // Fall back to store data
+        }
+
+        if (analyticsResponse.ok) {
+          const data = await analyticsResponse.json();
+          setStats({
+            totalTemplates: templatesCount || templates.length,
+            activeTemplates: templatesCount || templates.length,
+            totalSessions: data.sessionsThisWeek || 0,
+            averageRpe: data.averageRpe || 0,
+            pendingRequests: pendingRequestsCount,
+          });
+        } else {
+          // Fall back to store-based calculations
+          setStats({
+            totalTemplates: templates.length,
+            activeTemplates: templates.length,
+            totalSessions: 0,
+            averageRpe: 0,
+            pendingRequests: pendingRequestsCount,
+          });
+        }
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        // Fall back to store data on error
+        setStats({
+          totalTemplates: templates.length,
+          activeTemplates: templates.length,
+          totalSessions: 0,
+          averageRpe: 0,
+          pendingRequests: 0,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (currentUser.id) {
+      loadDashboardData();
+    }
+  }, [currentUser.id, templates.length]);
+
+  // Get recent templates from store as fallback
   const recentTemplates = templates.slice(0, 3);
 
   return (
@@ -41,25 +122,25 @@ export default function StudioOwnerDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-6 lg:mb-8">
         <StatCard
           title="Templates"
-          value={totalTemplates}
+          value={isLoading ? '...' : stats.totalTemplates}
           icon={FileText}
           color="blue"
         />
         <StatCard
           title="Active"
-          value={activeTemplates}
+          value={isLoading ? '...' : stats.activeTemplates}
           icon={CheckCircle}
           color="green"
         />
         <StatCard
           title="Sessions"
-          value={totalSessions}
+          value={isLoading ? '...' : stats.totalSessions}
           icon={Dumbbell}
           color="magenta"
         />
         <StatCard
           title="Avg RPE"
-          value={averageRpe > 0 ? `${averageRpe}/10` : 'N/A'}
+          value={isLoading ? '...' : (stats.averageRpe > 0 ? `${stats.averageRpe}/10` : 'N/A')}
           icon={TrendingUp}
           color="orange"
         />
@@ -70,7 +151,7 @@ export default function StudioOwnerDashboard() {
         <h2 className="text-lg lg:text-heading-2 font-bold text-gray-900 dark:text-gray-100 mb-3 lg:mb-4">
           Quick Actions
         </h2>
-        <div className="grid grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <Link href="/studio-owner/templates/builder" className="group">
             <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-blue-200/50 dark:border-blue-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
               <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-blue-500/10 to-transparent opacity-50" />
@@ -101,6 +182,17 @@ export default function StudioOwnerDashboard() {
                   <Dumbbell className="text-wondrous-orange" size={22} strokeWidth={2.5} />
                 </div>
                 <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">View All Sessions</span>
+              </div>
+            </div>
+          </Link>
+          <Link href="/studio-owner/requests" className="group">
+            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-cyan-200/50 dark:border-cyan-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-cyan-500/10 to-transparent opacity-50" />
+              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Inbox className="text-cyan-600 dark:text-cyan-400" size={22} strokeWidth={2.5} />
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Booking Requests</span>
               </div>
             </div>
           </Link>

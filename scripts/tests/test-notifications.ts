@@ -231,13 +231,21 @@ async function runTests() {
   // ============================================================
 
   await runner.test('Notification has template_data', async () => {
-    const { data: notifications } = await supabase
+    const { data: notifications, error } = await supabase
       .from('ta_notifications')
       .select('template_data')
       .eq('booking_id', testBookingId);
 
+    if (error) {
+      console.log(`    Debug: Query error - ${error.message}`);
+    }
+    console.log(`    Debug: Found ${notifications?.length || 0} notifications`);
+    if (notifications && notifications.length > 0) {
+      console.log(`    Debug: template_data = ${JSON.stringify(notifications[0].template_data)}`);
+    }
+
     assert(notifications && notifications.length > 0, 'Expected notifications');
-    const templateData = notifications[0].template_data;
+    const templateData = notifications[0].template_data as Record<string, unknown> | null;
     assert(templateData, 'Should have template_data');
     assert(templateData.client_name, 'Should have client_name in template');
     assert(templateData.scheduled_at, 'Should have scheduled_at in template');

@@ -7,7 +7,7 @@ import { useCalendarStore } from '@/lib/stores/booking-store';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { FileText, Dumbbell, Calendar, Plus, Users, DollarSign, Clock, TrendingUp, Package } from 'lucide-react';
+import { FileText, Dumbbell, Calendar, Plus, Users, DollarSign, Clock, TrendingUp, Package, Inbox } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface DashboardStats {
@@ -18,6 +18,7 @@ interface DashboardStats {
   softHoldsCount: number;
   outstandingCredits: number;
   lowCreditClients: number;
+  pendingRequests: number;
 }
 
 interface UpcomingSession {
@@ -40,6 +41,7 @@ export default function SoloPractitionerDashboard() {
     softHoldsCount: 0,
     outstandingCredits: 0,
     lowCreditClients: 0,
+    pendingRequests: 0,
   });
   const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +53,21 @@ export default function SoloPractitionerDashboard() {
       try {
         // Fetch analytics from API
         const analyticsResponse = await fetch('/api/analytics/dashboard');
+        let pendingRequestsCount = 0;
+
+        // Fetch pending booking requests count
+        try {
+          const requestsRes = await fetch('/api/booking-requests');
+          if (requestsRes.ok) {
+            const requestsData = await requestsRes.json();
+            pendingRequestsCount = (requestsData.requests || []).filter(
+              (r: { status: string }) => r.status === 'pending'
+            ).length;
+          }
+        } catch {
+          // Ignore errors fetching requests
+        }
+
         if (analyticsResponse.ok) {
           const data = await analyticsResponse.json();
           setStats({
@@ -61,6 +78,7 @@ export default function SoloPractitionerDashboard() {
             softHoldsCount: data.softHoldsCount || 0,
             outstandingCredits: data.outstandingCredits || 0,
             lowCreditClients: data.lowCreditClients || 0,
+            pendingRequests: pendingRequestsCount,
           });
         }
 
@@ -135,8 +153,27 @@ export default function SoloPractitionerDashboard() {
       </div>
 
       {/* Secondary Stats Row */}
-      {(stats.outstandingCredits > 0 || displaySoftHolds > 0) && (
-        <div className="grid grid-cols-2 gap-3 md:gap-6 mb-8">
+      {(stats.outstandingCredits > 0 || displaySoftHolds > 0 || stats.pendingRequests > 0) && (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 mb-8">
+          {stats.pendingRequests > 0 && (
+            <Link href="/solo/requests">
+              <Card className="border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-900/10 hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                    <Inbox className="text-blue-600 dark:text-blue-400" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-700 dark:text-blue-400 font-medium">
+                      {stats.pendingRequests} Booking Request{stats.pendingRequests !== 1 ? 's' : ''}
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-500">
+                      Awaiting your response
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
           {displaySoftHolds > 0 && (
             <Card className="border-yellow-200 dark:border-yellow-800/50 bg-yellow-50/50 dark:bg-yellow-900/10">
               <CardContent className="p-4 flex items-center gap-3">
@@ -221,6 +258,21 @@ export default function SoloPractitionerDashboard() {
                   <FileText className="text-wondrous-magenta" size={22} strokeWidth={2.5} />
                 </div>
                 <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Build Template</span>
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        {/* Additional Quick Actions Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-4">
+          <Link href="/solo/requests" className="group">
+            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-cyan-200/50 dark:border-cyan-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-cyan-500/10 to-transparent opacity-50" />
+              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Inbox className="text-cyan-600 dark:text-cyan-400" size={22} strokeWidth={2.5} />
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Booking Requests</span>
               </div>
             </div>
           </Link>

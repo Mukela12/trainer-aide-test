@@ -161,8 +161,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
 
-    // For solo practitioners, user_id acts as studio_id
-    const studioId = profile.studio_id || user.id;
+    // Get or create studio_id for the user
+    let studioId = profile.studio_id;
+
+    // For solo practitioners without a studio, create one on-the-fly
+    if (!studioId) {
+      // Check if a studio already exists for this user
+      const { data: existingStudio } = await serviceClient
+        .from('bs_studios')
+        .select('id')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      if (existingStudio) {
+        studioId = existingStudio.id;
+      } else if (role === 'solo_practitioner') {
+        // Create a new studio for the solo practitioner
+        const { data: newStudio, error: studioError } = await serviceClient
+          .from('bs_studios')
+          .insert({
+            name: profile?.firstName ? `${profile.firstName}'s Studio` : 'My Studio',
+            owner_id: user.id,
+            plan: 'free',
+            license_level: 'single-site',
+            studio_type: 'personal_training',
+            studio_mode: 'single-site',
+            platform_version: 'v2',
+          })
+          .select()
+          .single();
+
+        if (studioError) {
+          console.error('Error creating studio for solo practitioner:', studioError);
+          return NextResponse.json(
+            { error: 'Failed to create client', details: 'Could not create studio for solo practitioner' },
+            { status: 500 }
+          );
+        }
+
+        studioId = newStudio.id;
+      } else {
+        // Non-solo practitioners need to have a studio_id
+        return NextResponse.json(
+          { error: 'Failed to create client', details: 'No studio associated with your account' },
+          { status: 400 }
+        );
+      }
+    }
 
     // Create client data - let database generate UUID if not provided
     const clientData: Record<string, unknown> = {

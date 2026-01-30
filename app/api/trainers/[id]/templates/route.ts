@@ -20,6 +20,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const serviceClient = createServiceRoleClient();
 
     // Fetch assigned templates
+    // Actual ta_workout_templates columns: id, trainer_id, name, created_at, studio_id, created_by, title, description, is_active, json_definition, is_default, sign_off_mode
     const { data: assignments, error } = await serviceClient
       .from('ta_trainer_template_assignments')
       .select(`
@@ -28,8 +29,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ta_workout_templates (
           id,
           name,
+          title,
           description,
-          type,
+          sign_off_mode,
+          is_default,
           created_at
         )
       `)
@@ -48,9 +51,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const template = a.ta_workout_templates as Record<string, unknown> | null;
       return {
         id: template?.id,
-        name: template?.name,
+        name: template?.name || template?.title,
         description: template?.description,
-        type: template?.type,
+        signOffMode: template?.sign_off_mode,
+        isDefault: template?.is_default,
         assignedAt: a.assigned_at,
         createdAt: template?.created_at,
       };

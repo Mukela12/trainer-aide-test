@@ -186,6 +186,14 @@ export async function POST(request: NextRequest) {
         // Queue reminder emails
         const scheduledAt = new Date(data.scheduled_at);
 
+        // Template data for notification emails
+        const templateData = {
+          client_name: clientName,
+          service_name: data.service?.name || 'Session',
+          scheduled_at: data.scheduled_at,
+          trainer_name: trainerName,
+        };
+
         // 24-hour reminder
         const reminder24h = new Date(scheduledAt.getTime() - 24 * 60 * 60 * 1000);
         if (reminder24h > new Date()) {
@@ -193,7 +201,9 @@ export async function POST(request: NextRequest) {
             type: 'reminder_24h',
             recipientEmail: data.client.email,
             bookingId: data.id,
+            clientId: data.client_id,
             scheduledFor: reminder24h,
+            templateData,
           });
         }
 
@@ -204,7 +214,9 @@ export async function POST(request: NextRequest) {
             type: 'reminder_2h',
             recipientEmail: data.client.email,
             bookingId: data.id,
+            clientId: data.client_id,
             scheduledFor: reminder2h,
+            templateData,
           });
         }
       } catch (emailError) {

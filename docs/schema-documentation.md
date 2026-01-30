@@ -1,321 +1,391 @@
 # Trainer-Aide Database Schema
 
-Last Updated: 2026-01-29
+Last Updated: 2026-01-30T01:07:16.814Z
 
 ---
 
-## Key Notes
+## profiles
 
-### Important Schema Differences
-
-1. **fc_clients** table does NOT have `user_id` or `trainer_id` columns
-   - Clients are linked to users by matching **email addresses**
-   - The `invited_by` column stores the trainer who created the client record
-   - `is_guest` flag indicates if client created via public booking (true) vs has account (false)
-
-2. **ta_sessions** uses `json_definition` instead of `blocks`
-   - Session data stored as JSONB in `json_definition` column
-   - Has `workout_id` reference to workout templates
-
----
-
-## Core Tables
-
-### profiles
-- **Row Count:** 126
+- **Row Count:** 130
 - **Columns:** 58
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key, links to auth.users |
-| email | string | User email |
-| first_name | string | |
-| last_name | string | |
-| role | string | 'solo_practitioner', 'studio_owner', 'trainer', 'client' |
-| is_onboarded | boolean | Completed onboarding |
-| onboarding_step | number | Current step (0-5) |
-| business_name | string | Business/brand name |
-| business_slug | string | URL slug for public booking |
-| years_experience | number | |
-| specializations | array | |
-| bio | string | |
-| profile_image_url | string | |
-| location | string | |
-| platform_version | string | 'v2' |
-| v2_active | boolean | |
+```
+  id: string
+  email: string
+  phone: NULL
+  first_name: string
+  last_name: string
+  display_name: NULL
+  avatar: NULL
+  user_type: string
+  plan: NULL
+  store_name: NULL
+  bio: NULL
+  occupation: NULL
+  instagram: NULL
+  youtube: NULL
+  tiktok: NULL
+  twitter: NULL
+  website: NULL
+  other_social: NULL
+  best_contact_method: NULL
+  consent_email: boolean
+  consent_sms: boolean
+  consent_dm: boolean
+  features: NULL
+  is_active: boolean
+  deleted_at: NULL
+  created_at: string
+  updated_at: string
+  priorities: NULL
+  logo_url: NULL
+  brand_color: NULL
+  tagline: NULL
+  business_type: NULL
+  business_scale: NULL
+  engagement_method: NULL
+  join_reason: NULL
+  email_confirmed: boolean
+  active_clients: NULL
+  studio_sites: NULL
+  personalization: NULL
+  onboarding_complete: boolean
+  role: string
+  is_onboarded: boolean
+  avatar_url: NULL
+  quiz_answer: string
+  studio_type: NULL
+  is_super_admin: boolean
+  role_permissions: ARRAY
+  custom_permissions: ARRAY
+  platform_version: string
+  v2_active: boolean
+  primary_platform: string
+  onboarding_step: number
+  location: NULL
+  business_name: NULL
+  business_slug: NULL
+  years_experience: NULL
+  specializations: NULL
+  profile_image_url: NULL
+```
 
-### bs_studios
-- **Row Count:** 2
+## bs_studios
+
+- **Row Count:** 3
 - **Columns:** 24
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| name | string | |
-| owner_id | UUID | References auth.users |
-| studio_type | string | |
-| plan | string | |
-| stripe_connect_id | string | Stripe Connect account |
-| soft_hold_length | number | |
-| cancellation_window_hours | number | |
+```
+  id: string
+  name: string
+  address: NULL
+  created_at: string
+  owner_id: string
+  logo_url: NULL
+  plan: string
+  license_level: string
+  feature_flags: JSONB
+  usage_limits: JSONB
+  studio_type: string
+  tags: NULL
+  soft_hold_length: number
+  cancellation_window_hours: number
+  stripe_connect_id: NULL
+  studio_mode: string
+  platform_version: string
+  email_subaccount_id: NULL
+  email_api_key: NULL
+  email_sender_email: NULL
+  email_sender_name: NULL
+  email_enabled: boolean
+  email_provisioned_at: NULL
+  sender_domain_verified: boolean
+```
 
-### bs_staff
+## bs_staff
+
 - **Row Count:** 28
 - **Columns:** 18
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key, links to auth.users |
-| email | string | |
-| first_name | string | |
-| last_name | string | |
-| studio_id | UUID | References bs_studios (nullable) |
-| staff_type | string | 'owner', 'admin', 'trainer', 'client' |
-| is_solo | boolean | |
-| is_onboarded | boolean | |
+```
+  id: string
+  email: string
+  created_at: string
+  first_name: string
+  last_name: string
+  studio_id: NULL
+  is_solo: boolean
+  staff_type: string
+  is_onboarded: boolean
+  updated_at: string
+  quiz_answer: NULL
+  studio_type: NULL
+  business_model: NULL
+  store_name: NULL
+  logo_url: NULL
+  brand_color: NULL
+  tagline: NULL
+  selected_template_name: NULL
+```
 
-### fc_clients
-- **Row Count:** 78
-- **Columns:** 15
+## ta_services
 
-**IMPORTANT:** No `user_id` or `trainer_id` columns - use email matching!
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| name | string | Full name |
-| email | string | **Used for linking to auth users** |
-| phone | string | |
-| first_name | string | |
-| last_name | string | |
-| is_guest | boolean | true = public booking, false = has account |
-| source | string | 'manual', 'public_booking', 'referral' |
-| invited_by | UUID | **Trainer who created this client** |
-| studio_id | UUID | References bs_studios |
-| credits | number | Legacy credit balance |
-| is_onboarded | boolean | |
-| notification_preferences | JSONB | |
-
----
-
-## Trainer-Aide Tables
-
-### ta_services
-- **Row Count:** 5
+- **Row Count:** 28
 - **Columns:** 17
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| studio_id | UUID | References bs_studios |
-| created_by | UUID | References auth.users (trainer) |
-| name | string | |
-| description | string | |
-| duration | number | Minutes |
-| type | string | '1-2-1', 'duet', 'group' |
-| max_capacity | number | |
-| credits_required | number | |
-| price_cents | number | Price for public booking |
-| is_active | boolean | |
-| is_public | boolean | Show on public booking page |
-| is_intro_session | boolean | Free intro session |
-| booking_buffer_minutes | number | Minimum advance booking |
-| color | string | Calendar display color |
+```
+  id: string
+  studio_id: string
+  name: string
+  description: string
+  duration: number
+  type: string
+  max_capacity: number
+  credits_required: number
+  color: string
+  is_active: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
+  is_public: boolean
+  price_cents: NULL
+  is_intro_session: boolean
+  booking_buffer_minutes: number
+```
 
-### ta_bookings
-- **Row Count:** 0 (empty)
-- **Columns:** ~15
+## ta_bookings
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| studio_id | UUID | References bs_studios |
-| trainer_id | UUID | References auth.users |
-| client_id | UUID | References fc_clients |
-| service_id | UUID | References ta_services |
-| scheduled_at | timestamp | |
-| duration | number | Minutes |
-| status | string | 'confirmed', 'soft-hold', 'checked-in', 'completed', 'cancelled', 'no-show' |
-| hold_expiry | timestamp | For soft-hold status |
-| session_id | UUID | References ta_sessions |
-| template_id | UUID | References ta_workout_templates |
-| sign_off_mode | string | 'full_session', 'per_block', 'per_exercise' |
-| notes | string | |
+- **Row Count:** 3
+- **Columns:** 15
 
-### ta_availability
-- **Row Count:** 11
+```
+  id: string
+  studio_id: string
+  trainer_id: string
+  client_id: NULL
+  service_id: string
+  scheduled_at: string
+  duration: number
+  status: string
+  hold_expiry: NULL
+  session_id: NULL
+  template_id: NULL
+  sign_off_mode: string
+  notes: NULL
+  created_at: string
+  updated_at: string
+```
+
+## ta_availability
+
+- **Row Count:** 17
 - **Columns:** 16
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| trainer_id | UUID | References auth.users |
-| studio_id | UUID | References bs_studios |
-| block_type | string | 'available', 'blocked' |
-| recurrence | string | 'once', 'weekly' |
-| day_of_week | number | 0=Sun, 1=Mon, ... 6=Sat |
-| start_hour | number | |
-| start_minute | number | |
-| end_hour | number | |
-| end_minute | number | |
-| specific_date | date | For one-time blocks |
-| end_date | date | For multi-day blocks |
-| reason | string | |
-| notes | string | |
+```
+  id: string
+  trainer_id: string
+  studio_id: string
+  block_type: string
+  recurrence: string
+  day_of_week: number
+  start_hour: number
+  start_minute: number
+  end_hour: number
+  end_minute: number
+  specific_date: NULL
+  end_date: NULL
+  reason: NULL
+  notes: NULL
+  created_at: string
+  updated_at: string
+```
 
-### ta_packages
-- **Row Count:** 0 (empty)
+## ta_booking_requests
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| trainer_id | UUID | References auth.users |
-| studio_id | UUID | References bs_studios |
-| name | string | |
-| description | string | |
-| session_count | number | |
-| price_cents | number | |
-| validity_days | number | Default 90 |
-| per_session_price_cents | number | Calculated |
-| savings_percent | number | |
-| is_active | boolean | |
-| is_public | boolean | |
+- **Row Count:** 0
+- **Columns:** (empty table)
 
-### ta_client_packages
-- **Row Count:** 0 (empty)
+## fc_clients
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| client_id | UUID | References fc_clients |
-| package_id | UUID | References ta_packages |
-| trainer_id | UUID | References auth.users |
-| payment_id | UUID | References ta_payments |
-| sessions_total | number | |
-| sessions_used | number | |
-| sessions_remaining | number | Computed |
-| purchased_at | timestamp | |
-| expires_at | timestamp | |
-| status | string | 'active', 'expired', 'exhausted' |
-| notes | string | |
+- **Row Count:** 95
+- **Columns:** 15
 
-### ta_payments
-- **Row Count:** 0 (empty)
+```
+  id: string
+  name: string
+  email: string
+  phone: string
+  created_at: string
+  notification_preferences: JSONB
+  first_name: string
+  last_name: string
+  is_onboarded: boolean
+  self_booking_allowed: boolean
+  credits: number
+  invited_by: NULL
+  studio_id: NULL
+  is_guest: boolean
+  source: string
+```
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| trainer_id | UUID | References auth.users |
-| client_id | UUID | References fc_clients |
-| booking_id | UUID | References ta_bookings |
-| package_id | UUID | References ta_packages |
-| stripe_payment_intent_id | string | |
-| stripe_charge_id | string | |
-| amount_cents | number | |
-| platform_fee_cents | number | 2.5% |
-| trainer_amount_cents | number | |
-| currency | string | 'gbp' |
-| status | string | 'pending', 'succeeded', 'failed', 'refunded' |
-| payment_type | string | 'session', 'package' |
+## ta_packages
 
-### ta_stripe_accounts
-- **Row Count:** 0 (empty)
+- **Row Count:** 2
+- **Columns:** 14
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| user_id | UUID | References auth.users (unique) |
-| stripe_account_id | string | Stripe Connect ID |
-| charges_enabled | boolean | |
-| payouts_enabled | boolean | |
-| onboarding_complete | boolean | |
+```
+  id: string
+  trainer_id: string
+  studio_id: NULL
+  name: string
+  description: string
+  session_count: number
+  price_cents: number
+  validity_days: number
+  per_session_price_cents: number
+  savings_percent: NULL
+  is_active: boolean
+  is_public: boolean
+  created_at: string
+  updated_at: string
+```
 
-### ta_notifications
-- **Row Count:** 0 (empty)
+## ta_client_packages
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| user_id | UUID | References auth.users |
-| booking_id | UUID | References ta_bookings |
-| client_id | UUID | References fc_clients |
-| type | string | 'reminder_24h', 'booking_confirmed', etc. |
-| channel | string | 'email', 'sms', 'push' |
-| recipient_email | string | |
-| subject | string | |
-| body | string | |
-| status | string | 'pending', 'sent', 'failed' |
-| scheduled_for | timestamp | |
-| sent_at | timestamp | |
+- **Row Count:** 0
+- **Columns:** (empty table)
 
-### ta_invitations
-- **Row Count:** 0 (empty)
+## ta_credit_usage
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| studio_id | UUID | References bs_studios |
-| invited_by | UUID | References auth.users |
-| email | string | |
-| first_name | string | |
-| last_name | string | |
-| role | string | 'trainer', 'manager', etc. |
-| token | string | Unique invitation token |
-| status | string | 'pending', 'accepted', 'expired', 'revoked' |
-| expires_at | timestamp | |
-| commission_percent | number | Default 70% |
+- **Row Count:** 0
+- **Columns:** (empty table)
 
-### ta_sessions
+## ta_payments
+
+- **Row Count:** 0
+- **Columns:** (empty table)
+
+## ta_stripe_accounts
+
+- **Row Count:** 0
+- **Columns:** (empty table)
+
+## ta_notifications
+
+- **Row Count:** 2
+- **Columns:** 22
+
+```
+  id: string
+  user_id: string
+  booking_id: string
+  client_id: NULL
+  type: string
+  channel: string
+  recipient_email: NULL
+  recipient_phone: NULL
+  subject: string
+  body: NULL
+  html_body: NULL
+  template_data: JSONB
+  status: string
+  scheduled_for: string
+  sent_at: NULL
+  error_message: NULL
+  retry_count: number
+  max_retries: number
+  external_id: NULL
+  provider: NULL
+  created_at: string
+  updated_at: string
+```
+
+## ta_notification_preferences
+
+- **Row Count:** 0
+- **Columns:** (empty table)
+
+## ta_invitations
+
+- **Row Count:** 4
+- **Columns:** 17
+
+```
+  id: string
+  studio_id: string
+  invited_by: string
+  email: string
+  first_name: string
+  last_name: string
+  role: string
+  token: string
+  status: string
+  expires_at: string
+  accepted_at: NULL
+  accepted_by: NULL
+  permissions: JSONB
+  commission_percent: number
+  message: NULL
+  created_at: string
+  updated_at: string
+```
+
+## ta_sessions
+
 - **Row Count:** 10
 - **Columns:** 16
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| trainer_id | UUID | References auth.users |
-| client_id | UUID | References fc_clients |
-| workout_id | UUID | |
-| template_id | UUID | References ta_workout_templates |
-| session_name | string | |
-| json_definition | JSONB | **Session blocks data** |
-| overall_rpe | number | 1-10 |
-| notes | string | |
-| trainer_declaration | boolean | |
-| completed | boolean | |
-| started_at | timestamp | |
-| completed_at | timestamp | |
+```
+  id: string
+  trainer_id: string
+  client_id: string
+  workout_id: string
+  template_id: NULL
+  session_name: string
+  json_definition: JSONB
+  overall_rpe: number
+  notes: string
+  trainer_declaration: boolean
+  declaration_timestamp: string
+  completed: boolean
+  started_at: string
+  completed_at: string
+  created_at: string
+  updated_at: string
+```
 
-### ta_workout_templates
-- **Row Count:** 0 (empty)
+## ta_workout_templates
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID | Primary key |
-| name | string | |
-| description | string | |
-| type | string | 'standard', 'resistance_only' |
-| created_by | UUID | References auth.users |
-| studio_id | UUID | References bs_studios |
-| blocks | JSONB | Template block definitions |
-| default_sign_off_mode | string | |
-| is_default | boolean | |
+- **Row Count:** 4
+- **Columns:** 12
 
----
+```
+  id: string
+  trainer_id: string
+  name: string
+  created_at: string
+  studio_id: string
+  created_by: string
+  title: string
+  description: string
+  is_active: boolean
+  json_definition: ARRAY
+  is_default: boolean
+  sign_off_mode: string
+```
 
-## Database Views
+## ta_body_metrics
 
-- `v_client_credits` - Client credit summary
-- `v_trainer_earnings` - Earnings by period
-- `v_session_stats` - Session statistics
-- `v_trainer_utilization` - Calendar utilization
-- `v_active_clients` - Recent client activity
-- `v_dashboard_summary` - All-in-one dashboard metrics
-- `v_client_progress` - Progress tracking summary
+- **Row Count:** 0
+- **Columns:** (empty table)
 
----
+## ta_client_goals
 
-## Key Functions
+- **Row Count:** 0
+- **Columns:** (empty table)
 
-- `deduct_client_credit(client_id, trainer_id, booking_id, credits)` - FIFO credit deduction
-- `generate_business_slug(business_name, first_name, last_name)` - Slug generation
-- `create_booking_reminders(booking_id)` - Create notification reminders
+## ta_goal_milestones
+
+- **Row Count:** 0
+- **Columns:** (empty table)
+

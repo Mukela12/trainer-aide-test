@@ -42,7 +42,7 @@ const trainerLinks: NavLink[] = [
 
 const clientLinks: NavLink[] = [
   { href: '/client', label: 'Home', icon: <Home size={20} /> },
-  { href: '/client/history', label: 'History', icon: <BookOpen size={20} /> },
+  { href: '/client/sessions', label: 'History', icon: <BookOpen size={20} /> },
   { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
 ];
 

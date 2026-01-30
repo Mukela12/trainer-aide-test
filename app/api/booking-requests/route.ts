@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { lookupUserProfile } from '@/lib/services/profile-service';
+import {
+  sendBookingRequestCreatedEmail,
+  sendBookingRequestAcceptedEmail,
+  sendBookingRequestDeclinedEmail,
+} from '@/lib/notifications/email-service';
 
 /**
  * GET /api/booking-requests
@@ -134,6 +139,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Send email notification to trainer
+    const trainerId = requestData.trainer_id;
+    const { data: trainer } = await serviceClient
+      .from('fc_trainers')
+      .select('email, first_name, last_name')
+      .eq('id', trainerId)
+      .single();
+
+    if (trainer?.email && data?.client) {
+      const clientName = `${data.client.first_name || ''} ${data.client.last_name || ''}`.trim() || 'A client';
+      const trainerName = `${trainer.first_name || ''} ${trainer.last_name || ''}`.trim() || 'Trainer';
+
+      sendBookingRequestCreatedEmail({
+        trainerEmail: trainer.email,
+        trainerName,
+        clientName,
+        serviceName: data.service?.name,
+        preferredTimes: requestData.preferred_times,
+        notes: requestData.notes || undefined,
+        requestId: data.id,
+      }).catch((err) => console.error('Failed to send booking request email:', err));
+    }
+
     return NextResponse.json({ request: data }, { status: 201 });
   } catch (error) {
     console.error('Unexpected error:', error);
@@ -254,6 +282,42 @@ export async function PUT(request: NextRequest) {
         { error: 'Failed to update booking request', details: error.message },
         { status: 500 }
       );
+    }
+
+    // Send email notification to client based on status
+    if (data?.client?.email && (body.status === 'accepted' || body.status === 'declined')) {
+      const clientName = `${data.client.first_name || ''} ${data.client.last_name || ''}`.trim() || 'Client';
+
+      // Get trainer name
+      const trainerId = existingRequest.trainer_id || user.id;
+      const { data: trainer } = await serviceClient
+        .from('fc_trainers')
+        .select('first_name, last_name')
+        .eq('id', trainerId)
+        .single();
+      const trainerName = trainer
+        ? `${trainer.first_name || ''} ${trainer.last_name || ''}`.trim() || 'Your trainer'
+        : 'Your trainer';
+
+      if (body.status === 'accepted') {
+        const acceptedTime = body.acceptedTime || body.accepted_time;
+        sendBookingRequestAcceptedEmail({
+          clientEmail: data.client.email,
+          clientName,
+          trainerName,
+          serviceName: data.service?.name,
+          acceptedTime,
+          requestId: data.id,
+        }).catch((err) => console.error('Failed to send booking accepted email:', err));
+      } else if (body.status === 'declined') {
+        sendBookingRequestDeclinedEmail({
+          clientEmail: data.client.email,
+          clientName,
+          trainerName,
+          serviceName: data.service?.name,
+          requestId: data.id,
+        }).catch((err) => console.error('Failed to send booking declined email:', err));
+      }
     }
 
     return NextResponse.json({

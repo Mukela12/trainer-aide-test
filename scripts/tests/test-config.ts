@@ -10,25 +10,53 @@ dotenv.config();
 
 export const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
 
+// Service role client for database operations (bypasses RLS)
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
 );
 
-// Test accounts
+// Separate anon client for auth operations (doesn't affect service role client)
+const authClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+// Test accounts - PRESERVED FOR TESTING
+// These accounts are used across all test suites. Do not modify without updating tests.
 export const TEST_ACCOUNTS = {
+  // Studio Owner - Primary account for studio management tests
   studioOwner: {
     email: 'jessekatungu@gmail.com',
     password: 'TestPassword123!',
   },
+  // Solo Practitioners - For testing solo practitioner features
+  soloPractitioners: [
+    { email: 'ketosa1100@gamening.com', password: 'TestPassword123!' },
+    { email: 'gepasip761@coswz.com', password: 'TestPassword123!' },
+  ],
+  // Legacy solo practitioner reference (for backward compatibility)
   soloPractitioner: {
-    email: 'mukelathegreat@gmail.com',
-    password: 'newTest123???',
+    email: 'ketosa1100@gamening.com',
+    password: 'TestPassword123!',
   },
+  // Trainers - For testing trainer role features
+  trainers: [
+    { email: 'cefija1346@okexbit.com', password: 'TestPassword123!' },
+    { email: 'wecayib389@1200b.com', password: 'TestPassword123!' },
+  ],
+  // Legacy trainer reference (for backward compatibility)
   trainer: {
-    email: 'hb12@wondrous.store',
-    password: 'newTest123???',
+    email: 'cefija1346@okexbit.com',
+    password: 'TestPassword123!',
   },
+  // Test clients - Used for booking and client management tests
   clients: [
     { email: 'codelibrary21@gmail.com' },
     { email: 'milanmayoba80@gmail.com' },
@@ -125,13 +153,15 @@ export function assert(condition: boolean, message: string) {
 }
 
 // Helper to get auth token for a user
+// Uses a separate auth client to avoid affecting the service role client's state
 export async function getAuthToken(email: string, password: string): Promise<string | null> {
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await authClient.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error || !data.session) {
+    console.log(`Auth error for ${email}:`, error?.message);
     return null;
   }
 

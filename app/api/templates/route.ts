@@ -92,21 +92,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For solo practitioners, user_id acts as studio_id
-    const studioId = profile?.studio_id || user.id;
+    // Get or create studio_id for the user
+    let studioId = profile?.studio_id;
+
+    // For solo practitioners without a studio, create one on-the-fly
+    if (!studioId) {
+      // Check if a studio already exists for this user
+      const { data: existingStudio } = await serviceClient
+        .from('bs_studios')
+        .select('id')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      if (existingStudio) {
+        studioId = existingStudio.id;
+      } else {
+        // Create a new studio for the solo practitioner
+        const { data: newStudio, error: studioError } = await serviceClient
+          .from('bs_studios')
+          .insert({
+            name: profile?.firstName ? `${profile.firstName}'s Studio` : 'My Studio',
+            owner_id: user.id,
+            plan: 'free',
+            license_level: 'single-site',
+            studio_type: 'personal_training',
+            studio_mode: 'single-site',
+            platform_version: 'v2',
+          })
+          .select()
+          .single();
+
+        if (studioError) {
+          console.error('Error creating studio for solo practitioner:', studioError);
+          return NextResponse.json(
+            { error: 'Failed to create template', details: 'Could not create studio for solo practitioner' },
+            { status: 500 }
+          );
+        }
+
+        studioId = newStudio.id;
+      }
+    }
 
     // Convert camelCase to snake_case for database
+    // Actual columns: id, trainer_id, name, created_at, studio_id, created_by, title, description, is_active, json_definition, is_default, sign_off_mode
     const templateData = {
-      id: body.id || `template_${Date.now()}_${Math.random().toString(36).substring(7)}`,
       name: body.name,
+      title: body.name, // title is required, use name as default
       description: body.description || null,
-      type: body.type || 'standard',
       created_by: user.id,
       studio_id: studioId,
-      blocks: body.blocks || [],
-      default_sign_off_mode: body.defaultSignOffMode || null,
-      alert_interval_minutes: body.alertIntervalMinutes || null,
+      trainer_id: user.id,
+      json_definition: body.blocks || body.jsonDefinition || null,
+      sign_off_mode: body.defaultSignOffMode || body.signOffMode || 'full_session',
       is_default: body.isDefault || false,
+      is_active: true,
     };
 
     const { data, error } = await serviceClient

@@ -7,6 +7,9 @@ import {
   getReminderEmail,
   getLowCreditsEmail,
   getPaymentReceiptEmail,
+  getBookingRequestCreatedEmail,
+  getBookingRequestAcceptedEmail,
+  getBookingRequestDeclinedEmail,
 } from './email-templates';
 
 // Lazy initialization of Resend client to avoid build-time errors when API key is not set
@@ -239,6 +242,153 @@ export async function sendPaymentReceiptEmail(params: {
 }
 
 /**
+ * Send booking request created email to trainer
+ */
+export async function sendBookingRequestCreatedEmail(params: {
+  trainerEmail: string;
+  trainerName: string;
+  clientName: string;
+  serviceName?: string;
+  preferredTimes: string[];
+  notes?: string;
+  requestId?: string;
+}): Promise<SendEmailResult> {
+  try {
+    const email = getBookingRequestCreatedEmail({
+      clientName: params.clientName,
+      trainerName: params.trainerName,
+      serviceName: params.serviceName,
+      preferredTimes: params.preferredTimes,
+      notes: params.notes,
+    });
+
+    const { data, error } = await getResendClient().emails.send({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: params.trainerEmail,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (params.requestId) {
+      await logNotification({
+        type: 'booking_request_created',
+        recipientEmail: params.trainerEmail,
+        bookingId: params.requestId,
+        status: 'sent',
+        messageId: data?.id,
+      });
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (error) {
+    console.error('Error sending booking request created email:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Send booking request accepted email to client
+ */
+export async function sendBookingRequestAcceptedEmail(params: {
+  clientEmail: string;
+  clientName: string;
+  trainerName: string;
+  serviceName?: string;
+  acceptedTime: string | Date;
+  requestId?: string;
+}): Promise<SendEmailResult> {
+  try {
+    const email = getBookingRequestAcceptedEmail({
+      clientName: params.clientName,
+      trainerName: params.trainerName,
+      serviceName: params.serviceName,
+      acceptedTime: params.acceptedTime,
+    });
+
+    const { data, error } = await getResendClient().emails.send({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: params.clientEmail,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (params.requestId) {
+      await logNotification({
+        type: 'booking_request_accepted',
+        recipientEmail: params.clientEmail,
+        bookingId: params.requestId,
+        status: 'sent',
+        messageId: data?.id,
+      });
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (error) {
+    console.error('Error sending booking request accepted email:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Send booking request declined email to client
+ */
+export async function sendBookingRequestDeclinedEmail(params: {
+  clientEmail: string;
+  clientName: string;
+  trainerName: string;
+  serviceName?: string;
+  requestId?: string;
+}): Promise<SendEmailResult> {
+  try {
+    const email = getBookingRequestDeclinedEmail({
+      clientName: params.clientName,
+      trainerName: params.trainerName,
+      serviceName: params.serviceName,
+    });
+
+    const { data, error } = await getResendClient().emails.send({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: params.clientEmail,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (params.requestId) {
+      await logNotification({
+        type: 'booking_request_declined',
+        recipientEmail: params.clientEmail,
+        bookingId: params.requestId,
+        status: 'sent',
+        messageId: data?.id,
+      });
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (error) {
+    console.error('Error sending booking request declined email:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
  * Send invitation email to new trainer/staff
  */
 export async function sendInvitationEmail(params: {
@@ -376,18 +526,22 @@ export async function queueNotification(params: {
   type: string;
   recipientEmail: string;
   bookingId?: string;
+  clientId?: string;
   scheduledFor?: Date;
+  templateData?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   try {
     const supabase = getServiceClient();
     await supabase.from('ta_notifications').insert({
       type: params.type,
+      channel: 'email',
       recipient_email: params.recipientEmail,
       booking_id: params.bookingId,
+      client_id: params.clientId,
       status: 'pending',
       scheduled_for: params.scheduledFor?.toISOString(),
-      metadata: params.metadata,
+      template_data: params.templateData || {},
     });
   } catch (error) {
     console.error('Error queuing notification:', error);

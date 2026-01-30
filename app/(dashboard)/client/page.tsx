@@ -226,18 +226,17 @@ export default function ClientDashboard() {
               </div>
             </div>
           </Link>
-          <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-gray-200/50 dark:border-gray-700 rounded-xl lg:rounded-2xl p-4 lg:p-6 opacity-60 cursor-not-allowed">
-            <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-gray-500/10 to-transparent opacity-50" />
-            <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-              <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-gray-500/20 to-gray-600/20 flex items-center justify-center">
-                <FileText className="text-gray-600 dark:text-gray-500" size={22} strokeWidth={2.5} />
-              </div>
-              <div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base block">Progress Reports</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block">(Coming Soon)</span>
+          <Link href="/client/progress" className="group">
+            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-purple-200/50 dark:border-purple-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-purple-500/10 to-transparent opacity-50" />
+              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <TrendingUp className="text-purple-600 dark:text-purple-400" size={22} strokeWidth={2.5} />
+                </div>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">My Progress</span>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
       </div>
 
