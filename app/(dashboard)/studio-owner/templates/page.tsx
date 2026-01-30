@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTemplateStore } from '@/lib/stores/template-store';
+import { useUserStore } from '@/lib/stores/user-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
@@ -18,10 +19,61 @@ import {
   Dumbbell,
 } from 'lucide-react';
 
+interface Template {
+  id: string;
+  name: string;
+  description: string;
+  type: 'standard' | 'resistance_only';
+  blocks: Array<{ exercises: unknown[] }>;
+  assignedStudios: string[];
+}
+
 export default function TemplateLibrary() {
-  const { templates, deleteTemplate, duplicateTemplate } = useTemplateStore();
+  const { deleteTemplate, duplicateTemplate } = useTemplateStore();
+  const { currentUser } = useUserStore();
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'standard' | 'resistance_only'>('all');
+
+  // Fetch templates from API on mount
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (!currentUser.id) return;
+
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/templates');
+        if (response.ok) {
+          const data = await response.json();
+          // Map database format to frontend format
+          const mappedTemplates = (data.templates || []).map((t: {
+            id: string;
+            name: string;
+            description?: string;
+            type?: string;
+            json_definition?: Array<{ exercises: unknown[] }>;
+            blocks?: Array<{ exercises: unknown[] }>;
+            studio_id?: string;
+          }) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description || '',
+            type: t.type || 'standard',
+            blocks: t.json_definition || t.blocks || [],
+            assignedStudios: t.studio_id ? [t.studio_id] : [],
+          }));
+          setTemplates(mappedTemplates);
+        }
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTemplates();
+  }, [currentUser.id]);
 
   // Filter templates
   const filteredTemplates = templates.filter((template) => {
@@ -31,14 +83,27 @@ export default function TemplateLibrary() {
     return matchesSearch && matchesType;
   });
 
-  const handleDelete = (templateId: string, templateName: string) => {
+  const handleDelete = async (templateId: string, templateName: string) => {
     if (confirm(`Are you sure you want to delete "${templateName}"? This action cannot be undone.`)) {
-      deleteTemplate(templateId);
+      await deleteTemplate(templateId);
+      // Remove from local state
+      setTemplates(templates.filter(t => t.id !== templateId));
     }
   };
 
-  const handleDuplicate = (templateId: string) => {
-    duplicateTemplate(templateId);
+  const handleDuplicate = async (templateId: string) => {
+    const duplicated = await duplicateTemplate(templateId);
+    if (duplicated) {
+      // Add to local state
+      setTemplates([...templates, {
+        id: duplicated.id,
+        name: duplicated.name,
+        description: duplicated.description,
+        type: duplicated.type,
+        blocks: duplicated.blocks,
+        assignedStudios: duplicated.assignedStudios,
+      }]);
+    }
   };
 
   return (
@@ -108,7 +173,11 @@ export default function TemplateLibrary() {
       </div>
 
       {/* Templates Grid */}
-      {filteredTemplates.length > 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-8 h-8 border-4 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filteredTemplates.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {filteredTemplates.map((template) => {
             const totalExercises = template.blocks.reduce(

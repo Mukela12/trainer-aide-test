@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useTemplateStore } from '@/lib/stores/template-store';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useExerciseLookup } from '@/hooks/use-exercise';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,8 @@ import type { AIProgram } from '@/lib/types/ai-program';
 export default function TrainerTemplates() {
   const { toast } = useToast();
   const currentUser = useUserStore((state) => state.currentUser);
-  const templates = useTemplateStore((state) => state.templates);
+  const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'standard' | 'resistance_only'>('all');
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
@@ -28,6 +28,55 @@ export default function TrainerTemplates() {
   const [aiTemplates, setAITemplates] = useState<AIProgram[]>([]);
   const [loadingAITemplates, setLoadingAITemplates] = useState(true);
   const { getExercise } = useExerciseLookup();
+
+  // Fetch templates from API
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (!currentUser.id) return;
+
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/templates');
+        if (response.ok) {
+          const data = await response.json();
+          // Map database format to frontend format
+          const mappedTemplates: WorkoutTemplate[] = (data.templates || []).map((t: {
+            id: string;
+            name: string;
+            description?: string;
+            type?: 'standard' | 'resistance_only';
+            json_definition?: WorkoutTemplate['blocks'];
+            blocks?: WorkoutTemplate['blocks'];
+            studio_id?: string;
+            created_by?: string;
+            created_at?: string;
+            updated_at?: string;
+            sign_off_mode?: string;
+            is_default?: boolean;
+          }) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description || '',
+            type: t.type || 'standard',
+            blocks: t.json_definition || t.blocks || [],
+            assignedStudios: t.studio_id ? [t.studio_id] : [],
+            createdBy: t.created_by || '',
+            createdAt: t.created_at || new Date().toISOString(),
+            updatedAt: t.updated_at || new Date().toISOString(),
+            defaultSignOffMode: t.sign_off_mode as WorkoutTemplate['defaultSignOffMode'],
+            isDefault: t.is_default || false,
+          }));
+          setTemplates(mappedTemplates);
+        }
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTemplates();
+  }, [currentUser.id]);
 
   // Fetch AI templates (only for solo practitioners)
   useEffect(() => {
@@ -171,7 +220,11 @@ export default function TrainerTemplates() {
       )}
 
       {/* Templates List */}
-      {filteredTemplates.length > 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-8 h-8 border-4 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filteredTemplates.length > 0 ? (
         <div className="space-y-4">
           {filteredTemplates.map((template) => {
             const isExpanded = expandedTemplateId === template.id;
