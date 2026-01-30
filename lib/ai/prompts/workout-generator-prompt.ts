@@ -206,6 +206,7 @@ export function getUserPrompt(
     exercise_aversions = [],
     preferred_exercise_types = [],
     preferred_movement_patterns = [],
+    client_goals = [],
   } = request;
 
   // Format injuries with restrictions
@@ -248,6 +249,36 @@ ${exercises.slice(0, 20).map((ex) => `• "${ex.name}" → ID: ${ex.id} [${ex.eq
 **REMINDER**: Copy exercise IDs EXACTLY as shown above. Example valid ID format: e450c468-cb76-49f7-8087-b1f099f1830d
 `;
 
+  // Format client goals with specific targets
+  const clientGoalsSection = client_goals.length > 0
+    ? `## CLIENT GOALS (SPECIFIC TARGETS)
+
+**⚠️ IMPORTANT: The client has set the following specific goals. Design the program to help achieve these targets.**
+
+${client_goals.map((goal, index) => {
+  const parts = [`${index + 1}. **${goal.goal_type.replace('_', ' ').toUpperCase()}**: ${goal.description}`];
+  if (goal.target_value && goal.target_unit) {
+    parts.push(`   - Target: ${goal.target_value} ${goal.target_unit}`);
+  }
+  if (goal.current_value && goal.target_unit) {
+    parts.push(`   - Current: ${goal.current_value} ${goal.target_unit}`);
+  }
+  if (goal.target_date) {
+    const targetDate = new Date(goal.target_date);
+    parts.push(`   - Deadline: ${targetDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`);
+  }
+  return parts.join('\n');
+}).join('\n\n')}
+
+**Goal-Based Programming Guidance:**
+- If weight loss goal: Prioritize metabolic conditioning, circuit training, higher volume
+- If muscle gain goal: Focus on hypertrophy rep ranges (8-12), progressive overload
+- If strength goal: Emphasize compound lifts, lower rep ranges (3-6), adequate rest
+- If endurance goal: Include conditioning work, higher reps, shorter rest periods
+- Consider goal deadlines when planning program intensity and progression
+`
+    : '';
+
   return `# CLIENT PROFILE & PROGRAM REQUIREMENTS
 
 ## CLIENT INFORMATION
@@ -257,6 +288,7 @@ ${secondary_goals.length > 0 ? `**Secondary Goals**: ${secondary_goals.join(', '
 **Experience Level**: ${experience_level}
 **Training Location**: ${training_location}
 
+${clientGoalsSection}
 ## PROGRAM PARAMETERS
 
 **Program Duration**: ${total_weeks} weeks

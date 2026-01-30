@@ -430,6 +430,17 @@ export interface GenerateProgramRequest {
   // Optional overrides
   movement_pattern_quotas?: Partial<MovementBalanceSummary>;
   include_nutrition?: boolean;
+
+  // Client goals from ta_client_goals table (detailed targets with deadlines)
+  client_goals?: Array<{
+    goal_type: string;
+    description: string;
+    target_value: number | null;
+    target_unit: string | null;
+    current_value: number | null;
+    target_date: string | null;
+    priority: number;
+  }>;
 }
 
 /**

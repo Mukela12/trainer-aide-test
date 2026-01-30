@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { AITemplateCard } from '@/components/templates/AITemplateCard';
 import {
   Plus,
   Search,
@@ -17,7 +18,9 @@ import {
   Trash2,
   FileText,
   Dumbbell,
+  Sparkles,
 } from 'lucide-react';
+import type { AIProgram } from '@/lib/types/ai-program';
 
 interface Template {
   id: string;
@@ -32,21 +35,27 @@ export default function TemplateLibrary() {
   const { deleteTemplate, duplicateTemplate } = useTemplateStore();
   const { currentUser } = useUserStore();
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [aiTemplates, setAITemplates] = useState<AIProgram[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'standard' | 'resistance_only'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'standard' | 'resistance_only' | 'ai'>('all');
 
   // Fetch templates from API on mount
   useEffect(() => {
-    const fetchTemplates = async () => {
+    const fetchAllTemplates = async () => {
       if (!currentUser.id) return;
 
       setIsLoading(true);
       try {
-        const response = await fetch('/api/templates');
-        if (response.ok) {
-          const data = await response.json();
-          // Map database format to frontend format
+        // Fetch both regular templates and AI templates in parallel
+        const [templatesRes, aiTemplatesRes] = await Promise.all([
+          fetch('/api/templates'),
+          fetch('/api/ai-programs/templates'),
+        ]);
+
+        // Process regular templates
+        if (templatesRes.ok) {
+          const data = await templatesRes.json();
           const mappedTemplates = (data.templates || []).map((t: {
             id: string;
             name: string;
@@ -65,6 +74,12 @@ export default function TemplateLibrary() {
           }));
           setTemplates(mappedTemplates);
         }
+
+        // Process AI templates
+        if (aiTemplatesRes.ok) {
+          const aiData = await aiTemplatesRes.json();
+          setAITemplates(aiData.templates || []);
+        }
       } catch (error) {
         console.error('Error fetching templates:', error);
       } finally {
@@ -72,16 +87,39 @@ export default function TemplateLibrary() {
       }
     };
 
-    fetchTemplates();
+    fetchAllTemplates();
   }, [currentUser.id]);
 
-  // Filter templates
+  // Refresh AI templates
+  const refreshAITemplates = async () => {
+    try {
+      const res = await fetch('/api/ai-programs/templates');
+      if (res.ok) {
+        const data = await res.json();
+        setAITemplates(data.templates || []);
+      }
+    } catch (error) {
+      console.error('Error refreshing AI templates:', error);
+    }
+  };
+
+  // Filter regular templates
   const filteredTemplates = templates.filter((template) => {
     const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          template.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === 'all' || template.type === filterType;
+    const matchesType = filterType === 'all' || filterType === 'ai' || template.type === filterType;
     return matchesSearch && matchesType;
   });
+
+  // Filter AI templates
+  const filteredAITemplates = aiTemplates.filter((template) => {
+    const matchesSearch = template.program_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (template.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch && (filterType === 'all' || filterType === 'ai');
+  });
+
+  // Combined counts for display
+  const totalTemplates = filteredTemplates.length + filteredAITemplates.length;
 
   const handleDelete = async (templateId: string, templateName: string) => {
     if (confirm(`Are you sure you want to delete "${templateName}"? This action cannot be undone.`)) {
@@ -150,7 +188,7 @@ export default function TemplateLibrary() {
               onClick={() => setFilterType('all')}
               className="flex-shrink-0"
             >
-              All
+              All ({templates.length + aiTemplates.length})
             </Button>
             <Button
               variant={filterType === 'standard' ? 'default' : 'outline'}
@@ -168,93 +206,144 @@ export default function TemplateLibrary() {
             >
               Resistance Only
             </Button>
+            <Button
+              variant={filterType === 'ai' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilterType('ai')}
+              className="flex-shrink-0 gap-1"
+            >
+              <Sparkles size={14} />
+              AI Generated ({aiTemplates.length})
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Templates Grid */}
+      {/* Templates Content */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="w-8 h-8 border-4 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : filteredTemplates.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-          {filteredTemplates.map((template) => {
-            const totalExercises = template.blocks.reduce(
-              (total, block) => total + block.exercises.length,
-              0
-            );
+      ) : totalTemplates > 0 ? (
+        <div className="space-y-8">
+          {/* AI Generated Templates Section */}
+          {filteredAITemplates.length > 0 && (filterType === 'all' || filterType === 'ai') && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles size={20} className="text-wondrous-magenta" />
+                <h2 className="text-xl font-heading font-semibold text-gray-900 dark:text-gray-100">
+                  AI Generated Templates
+                </h2>
+                <Badge variant="secondary" className="ml-2">
+                  {filteredAITemplates.length}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+                {filteredAITemplates.map((template) => (
+                  <AITemplateCard
+                    key={template.id}
+                    template={template}
+                    onUpdate={refreshAITemplates}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-            return (
-              <Card key={template.id} className="flex flex-col dark:bg-gray-800 dark:border-gray-700">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <CardTitle className="text-base lg:text-lg flex-1 dark:text-gray-100">
-                      {template.name}
-                    </CardTitle>
-                    <Badge
-                      variant={template.type === 'standard' ? 'default' : 'secondary'}
-                      className="flex-shrink-0 text-xs"
-                    >
-                      {template.type === 'standard' ? '3-Block' : 'Resistance'}
-                    </Badge>
-                  </div>
-                  <p className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                    {template.description}
-                  </p>
-                </CardHeader>
+          {/* Manual Templates Section */}
+          {filteredTemplates.length > 0 && filterType !== 'ai' && (
+            <div>
+              {filteredAITemplates.length > 0 && (filterType === 'all') && (
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText size={20} className="text-gray-600 dark:text-gray-400" />
+                  <h2 className="text-xl font-heading font-semibold text-gray-900 dark:text-gray-100">
+                    Manual Templates
+                  </h2>
+                  <Badge variant="secondary" className="ml-2">
+                    {filteredTemplates.length}
+                  </Badge>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+                {filteredTemplates.map((template) => {
+                  const totalExercises = template.blocks.reduce(
+                    (total, block) => total + block.exercises.length,
+                    0
+                  );
 
-                <CardContent className="flex-1 py-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-600 dark:text-gray-400">
-                      <FileText size={14} className="flex-shrink-0" />
-                      <span>{template.blocks.length} blocks</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-600 dark:text-gray-400">
-                      <Dumbbell size={14} className="flex-shrink-0" />
-                      <span>{totalExercises} exercises</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-600 dark:text-gray-400">
-                      <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 rounded">
-                        {template.assignedStudios.length} studios
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
+                  return (
+                    <Card key={template.id} className="flex flex-col dark:bg-gray-800 dark:border-gray-700">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <CardTitle className="text-base lg:text-lg flex-1 dark:text-gray-100">
+                            {template.name}
+                          </CardTitle>
+                          <Badge
+                            variant={template.type === 'standard' ? 'default' : 'secondary'}
+                            className="flex-shrink-0 text-xs"
+                          >
+                            {template.type === 'standard' ? '3-Block' : 'Resistance'}
+                          </Badge>
+                        </div>
+                        <p className="text-xs lg:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                          {template.description}
+                        </p>
+                      </CardHeader>
 
-                <CardFooter className="flex gap-2 border-t dark:border-gray-700 pt-3">
-                  <Link href={`/studio-owner/templates/builder?id=${template.id}`} className="flex-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-1.5 text-xs lg:text-sm dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                    >
-                      <Edit size={14} />
-                      <span>Edit</span>
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDuplicate(template.id)}
-                    className="gap-1.5 px-3 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                    title="Duplicate"
-                  >
-                    <Copy size={14} />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(template.id, template.name)}
-                    className="gap-1.5 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                    title="Delete"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
+                      <CardContent className="flex-1 py-3">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-600 dark:text-gray-400">
+                            <FileText size={14} className="flex-shrink-0" />
+                            <span>{template.blocks.length} blocks</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-600 dark:text-gray-400">
+                            <Dumbbell size={14} className="flex-shrink-0" />
+                            <span>{totalExercises} exercises</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-600 dark:text-gray-400">
+                            <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 rounded">
+                              {template.assignedStudios.length} studios
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+
+                      <CardFooter className="flex gap-2 border-t dark:border-gray-700 pt-3">
+                        <Link href={`/studio-owner/templates/builder?id=${template.id}`} className="flex-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-1.5 text-xs lg:text-sm dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            <Edit size={14} />
+                            <span>Edit</span>
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDuplicate(template.id)}
+                          className="gap-1.5 px-3 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                          title="Duplicate"
+                        >
+                          <Copy size={14} />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(template.id, template.name)}
+                          className="gap-1.5 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <EmptyState

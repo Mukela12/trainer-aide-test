@@ -8,6 +8,11 @@ import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FileText, CheckCircle, Dumbbell, TrendingUp, Plus, Inbox } from 'lucide-react';
+import { format } from 'date-fns';
+
+// Format today's date
+const today = new Date();
+const dateString = format(today, 'EEEE, MMMM d');
 
 interface DashboardStats {
   totalTemplates: number;
@@ -108,14 +113,39 @@ export default function StudioOwnerDashboard() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="mb-6 lg:mb-8">
-        <h1 className="text-2xl lg:text-heading-1 font-bold text-gray-900 dark:text-gray-100 mb-2">
-          Hey {currentUser.firstName}! 👋
-        </h1>
-        <p className="text-sm lg:text-body-sm text-gray-600 dark:text-gray-400">
-          Manage templates and track sessions across all studios
-        </p>
+      {/* Welcome Banner */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A71075] via-[#8a0d60] to-[#0A1466] p-6 md:p-8 mb-6 lg:mb-8">
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 opacity-[0.05]" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }} />
+
+        {/* Decorative circles */}
+        <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-[#A71075]/20 rounded-full blur-3xl" />
+
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <p className="text-white/70 text-sm font-medium mb-1">{dateString}</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+              Welcome back, {currentUser.firstName}
+            </h1>
+            <p className="text-white/70">
+              This week: <span className="text-white font-medium">{isLoading ? '...' : stats.totalSessions} sessions completed</span>
+            </p>
+          </div>
+
+          {/* Quick Stat Display */}
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-white/70 text-sm">Total Templates</p>
+              <p className="text-3xl font-bold text-white">{isLoading ? '...' : stats.totalTemplates}</p>
+            </div>
+            <div className="h-16 w-16 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20">
+              <FileText className="h-7 w-7 text-white" />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}

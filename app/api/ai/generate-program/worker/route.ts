@@ -24,6 +24,7 @@ import {
 import { getClientProfileById } from '@/lib/services/client-profile-service';
 import { extractWorkoutConstraints, GoalType, ExperienceLevel } from '@/lib/types/client-profile';
 import type { GenerateProgramRequest, SessionType } from '@/lib/types/ai-program';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 
 /**
  * Worker Request (includes program_id and generation params)
@@ -153,6 +154,44 @@ export async function POST(request: NextRequest) {
       }
 
       const constraints = extractWorkoutConstraints(clientProfile);
+
+      // Fetch client goals from ta_client_goals table
+      // These provide specific targets like "lose 10kg by March" that inform the program
+      let clientGoals: GenerateProgramRequest['client_goals'] = [];
+      try {
+        const serviceClient = createServiceRoleClient();
+        const { data: goalsData } = await serviceClient
+          .from('ta_client_goals')
+          .select('goal_type, description, target_value, target_unit, current_value, target_date, priority')
+          .eq('client_id', body.client_profile_id)
+          .eq('status', 'active')
+          .order('priority', { ascending: true });
+
+        if (goalsData && goalsData.length > 0) {
+          clientGoals = goalsData.map((g: {
+            goal_type: string;
+            description: string;
+            target_value: number | null;
+            target_unit: string | null;
+            current_value: number | null;
+            target_date: string | null;
+            priority: number;
+          }) => ({
+            goal_type: g.goal_type,
+            description: g.description,
+            target_value: g.target_value,
+            target_unit: g.target_unit,
+            current_value: g.current_value,
+            target_date: g.target_date,
+            priority: g.priority,
+          }));
+          console.log(`📋 Found ${clientGoals?.length || 0} active client goals to incorporate`);
+        }
+      } catch (goalsError) {
+        console.warn('Could not fetch client goals (non-critical):', goalsError);
+        // Continue without goals - they're optional enhancement
+      }
+
       generationRequest = {
         client_profile_id: body.client_profile_id,
         trainer_id: body.trainer_id,
@@ -169,6 +208,7 @@ export async function POST(request: NextRequest) {
         exercise_aversions: constraints.exerciseAversions,
         preferred_exercise_types: constraints.preferredExerciseTypes,
         preferred_movement_patterns: constraints.preferredMovementPatterns,
+        client_goals: clientGoals && clientGoals.length > 0 ? clientGoals : undefined,
       };
     } else {
       generationRequest = {
