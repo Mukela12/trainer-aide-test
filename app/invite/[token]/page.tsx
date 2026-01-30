@@ -5,8 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   CheckCircle2,
   XCircle,
@@ -128,32 +126,31 @@ export default function InvitationPage() {
 
     setPageState('accepting');
     try {
-      const supabase = getSupabaseBrowserClient();
+      // Call the server-side API to accept the invitation
+      // This creates the staff record and updates the user's profile
+      const response = await fetch(`/api/invitations/${token}/accept`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      // Update invitation status
-      const { error: updateError } = await supabase
-        .from('ta_invitations')
-        .update({
-          status: 'accepted',
-          accepted_at: new Date().toISOString(),
-          accepted_by: currentUser.id,
-        })
-        .eq('id', invitation.id);
+      const data = await response.json();
 
-      if (updateError) throw updateError;
-
-      // Note: The actual staff record creation would typically be handled
-      // by a database trigger or server-side function
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to accept invitation');
+      }
 
       setPageState('accepted');
 
-      // Redirect to dashboard after a short delay
+      // Redirect to the appropriate dashboard based on role
+      const redirectUrl = data.redirectUrl || '/trainer';
       setTimeout(() => {
-        router.push('/trainer');
+        router.push(redirectUrl);
       }, 2000);
     } catch (err) {
       console.error('Error accepting invitation:', err);
-      setError('Failed to accept invitation. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to accept invitation. Please try again.');
       setPageState('valid');
     }
   };
