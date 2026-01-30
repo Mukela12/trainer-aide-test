@@ -16,6 +16,7 @@ import {
   MoreVertical
 } from 'lucide-react';
 import { InviteTrainerDialog } from '@/components/studio-owner/InviteTrainerDialog';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface StaffMember {
   id: string;
@@ -133,26 +134,23 @@ export default function TeamPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="mb-6 lg:mb-8">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-          <div>
-            <h1 className="text-2xl lg:text-heading-1 font-bold text-gray-900 dark:text-gray-100 mb-2">
-              Team Management
-            </h1>
-            <p className="text-sm lg:text-body-sm text-gray-600 dark:text-gray-400">
-              Manage your studio team and send invitations
-            </p>
-          </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Manage your studio team and send invitations"
+        stats={[
+          { label: 'team members', value: loadingStaff ? '...' : staff.length, color: 'primary' },
+          { label: 'pending invites', value: loadingInvitations ? '...' : pendingInvitations.length, color: 'warning' },
+        ]}
+        actions={
           <Button
             onClick={() => setInviteDialogOpen(true)}
-            className="w-full lg:w-auto gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
+            className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
           >
             <UserPlus size={20} />
-            <span>Invite Team Member</span>
+            <span className="hidden sm:inline">Invite Member</span>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Pending Invitations Section */}
       {pendingInvitations.length > 0 && (

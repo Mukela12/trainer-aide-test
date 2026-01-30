@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface ClientPackage {
   id: string;
@@ -125,13 +126,14 @@ export default function ClientPackagesPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-heading-1 dark:text-gray-100 mb-2">My Credits</h1>
-        <p className="text-body-sm text-gray-600 dark:text-gray-400">
-          View your session credits and packages
-        </p>
-      </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="View your session credits and packages"
+        stats={[
+          { label: 'credits', value: isLoading ? '...' : totalCredits, color: creditStatus === 'low' ? 'warning' : 'success' },
+          { label: 'active packages', value: isLoading ? '...' : activePackages.length, color: 'primary' },
+        ]}
+      />
 
       {/* Credits Summary */}
       <Card className="mb-8 border-2 border-wondrous-primary/20">

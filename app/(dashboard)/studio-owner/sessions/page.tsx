@@ -11,6 +11,7 @@ import { formatDuration } from '@/lib/utils/generators';
 import { Dumbbell, Search, Calendar, Clock, TrendingUp, User, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils/cn';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 type FilterType = 'all' | 'completed' | 'in_progress';
 
@@ -50,11 +51,15 @@ export default function AllSessionsPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 font-heading mb-2">All Sessions</h1>
-        <p className="text-gray-600">Monitor all training sessions across your studios</p>
-      </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Monitor all training sessions across your studios"
+        stats={[
+          { label: 'total', value: stats.total, color: 'primary' },
+          { label: 'completed', value: stats.completed, color: 'success' },
+          { label: 'in progress', value: stats.inProgress, color: 'warning' },
+        ]}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

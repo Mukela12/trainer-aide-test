@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useUserStore } from '@/lib/stores/user-store';
 import { cn } from '@/lib/utils/cn';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface PackageData {
   id: string;
@@ -131,25 +132,23 @@ export default function PackagesPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-5xl mx-auto pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-heading-1 dark:text-gray-100 mb-2">
-            Session Packages
-          </h1>
-          <p className="text-body-sm text-gray-600 dark:text-gray-400">
-            Create bundles of sessions for clients to purchase
-          </p>
-        </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Create bundles of sessions for clients to purchase"
+        stats={[
+          { label: 'packages', value: isLoading ? '...' : packages.length, color: 'primary' },
+          { label: 'active', value: isLoading ? '...' : packages.filter(p => p.isActive).length, color: 'success' },
+        ]}
+        actions={
+          <Button className="gap-2" onClick={() => setIsDialogOpen(true)}>
+            <Plus size={18} />
+            <span className="hidden sm:inline">Create Package</span>
+          </Button>
+        }
+      />
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2" size={18} />
-              Create Package
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Create Session Package</DialogTitle>
             </DialogHeader>
@@ -262,7 +261,6 @@ export default function PackagesPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
 
       {/* Packages List */}
       {isLoading ? (

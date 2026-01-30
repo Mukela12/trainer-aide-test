@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Search, FileText, ChevronDown, ChevronUp, Play, Sparkles } from 'lucide-react';
 import { WorkoutTemplate } from '@/lib/types';
 import type { AIProgram } from '@/lib/types/ai-program';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 export default function TrainerTemplates() {
   const { toast } = useToast();
@@ -128,13 +129,14 @@ export default function TrainerTemplates() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-heading-1 mb-2 dark:text-gray-100">Workout Templates</h1>
-        <p className="text-body-sm text-gray-600 dark:text-gray-400">
-          Browse assigned workout templates. Contact your studio owner to request changes.
-        </p>
-      </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Browse assigned workout templates"
+        stats={[
+          { label: 'templates', value: isLoading ? '...' : filteredTemplates.length, color: 'primary' },
+          { label: 'AI generated', value: loadingAITemplates ? '...' : aiTemplates.length, color: 'magenta' },
+        ]}
+      />
 
       {/* Search and Filters */}
       <div className="mb-6 space-y-4">

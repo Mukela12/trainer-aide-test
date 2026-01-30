@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { ServiceFormDialog } from '@/components/studio-owner/ServiceFormDialog';
 import { Clock, Plus, Edit, Power, PowerOff, Users, User, UsersRound } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 export default function ServicesPage() {
   const { services, addService, updateService } = useServiceStore();
@@ -78,26 +79,26 @@ export default function ServicesPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="mb-6 lg:mb-8">
-        {/* Title Section */}
-        <div className="mb-4">
-          <h1 className="text-2xl lg:text-heading-1 font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Services
-          </h1>
-          <p className="text-sm lg:text-body-sm text-gray-600 dark:text-gray-400">
-            Manage session types that trainers can book
-          </p>
-        </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Manage session types that trainers can book"
+        stats={[
+          { label: 'services', value: services.length, color: 'primary' },
+          { label: 'active', value: activeServices.length, color: 'success' },
+          { label: 'inactive', value: inactiveServices.length, color: 'default' },
+        ]}
+        actions={
+          <Button
+            onClick={handleAddNew}
+            className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
+          >
+            <Plus size={20} />
+            <span className="hidden sm:inline">Add Service</span>
+          </Button>
+        }
+      />
 
-        {/* Action Button - Full width on mobile */}
-        <Button
-          onClick={handleAddNew}
-          className="w-full lg:w-auto mb-4 gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
-        >
-          <Plus size={20} />
-          <span>Add New Service</span>
-        </Button>
+      <div className="mb-6 lg:mb-8">
 
         {/* Info Card */}
         <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">

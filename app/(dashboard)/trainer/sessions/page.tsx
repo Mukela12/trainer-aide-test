@@ -12,6 +12,7 @@ import { formatDuration } from '@/lib/utils/generators';
 import { Dumbbell, Play, Trash2, Calendar, Clock, TrendingUp, Plus, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils/cn';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 type TabType = 'in_progress' | 'upcoming' | 'completed';
 
@@ -55,21 +56,23 @@ export default function MySessions() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-heading-1 mb-2 dark:text-gray-100">My Sessions</h1>
-            <p className="text-body-sm text-gray-600 dark:text-gray-400">View and manage your training sessions</p>
-          </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="View and manage your training sessions"
+        stats={[
+          { label: 'in progress', value: inProgressSessions.length, color: 'warning' },
+          { label: 'upcoming', value: upcomingSessions.length, color: 'primary' },
+          { label: 'completed', value: completedSessions.length, color: 'success' },
+        ]}
+        actions={
           <Link href="/trainer/sessions/new">
             <Button className="gap-2">
               <Plus size={20} />
               <span className="hidden sm:inline">New Session</span>
             </Button>
           </Link>
-        </div>
-      </div>
+        }
+      />
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700">

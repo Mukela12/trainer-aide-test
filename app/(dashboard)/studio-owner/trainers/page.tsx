@@ -10,6 +10,7 @@ import { Search, Users, Mail, UserPlus, MoreVertical } from 'lucide-react';
 import { InviteTrainerDialog } from '@/components/studio-owner/InviteTrainerDialog';
 import { TrainerProfileDialog } from '@/components/studio-owner/TrainerProfileDialog';
 import { AssignTemplateDialog } from '@/components/studio-owner/AssignTemplateDialog';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface Trainer {
   id: string;
@@ -59,27 +60,26 @@ export default function TrainersPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="mb-6 lg:mb-8">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-          <div>
-            <h1 className="text-2xl lg:text-heading-1 font-bold text-gray-900 dark:text-gray-100 mb-2">
-              Trainers
-            </h1>
-            <p className="text-sm lg:text-body-sm text-gray-600 dark:text-gray-400">
-              Manage your studio trainers and their assignments
-            </p>
-          </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Manage your studio trainers and their assignments"
+        stats={[
+          { label: 'trainers', value: loading ? '...' : trainers.length, color: 'primary' },
+          { label: 'onboarded', value: loading ? '...' : trainers.filter(t => t.is_onboarded).length, color: 'success' },
+        ]}
+        actions={
           <Button
             onClick={() => setInviteDialogOpen(true)}
-            className="w-full lg:w-auto gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
+            className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
           >
             <UserPlus size={20} />
-            <span>Invite Trainer</span>
+            <span className="hidden sm:inline">Invite Trainer</span>
           </Button>
-        </div>
+        }
+      />
 
-        {/* Search */}
+      {/* Search */}
+      <div className="mb-6 lg:mb-8">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
           <Input

@@ -9,6 +9,7 @@ import { ProgramCard } from '@/components/ai-programs/ProgramCard';
 import { useToast } from '@/hooks/use-toast';
 import { useUserStore } from '@/lib/stores/user-store';
 import type { AIProgram } from '@/lib/types/ai-program';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 type FilterType = 'all' | 'draft' | 'active' | 'completed' | 'archived';
 
@@ -84,24 +85,24 @@ export default function ProgramsListPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-heading font-bold text-gray-900 dark:text-gray-100">
-              AI Training Programs
-            </h1>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Create and manage AI-generated workout programs
-            </p>
-          </div>
-          <Button
-            onClick={() => router.push('/trainer/programs/new')}
-            className="bg-wondrous-primary hover:bg-purple-700 text-white"
-          >
-            <Plus size={20} className="mr-2" />
-            New Program
-          </Button>
-        </div>
+        {/* Content Header */}
+        <ContentHeader
+          context="Create and manage AI-generated workout programs"
+          stats={[
+            { label: 'total', value: loading ? '...' : programs.length, color: 'primary' },
+            { label: 'active', value: loading ? '...' : programs.filter(p => p.status === 'active').length, color: 'success' },
+            { label: 'draft', value: loading ? '...' : programs.filter(p => p.status === 'draft').length, color: 'warning' },
+          ]}
+          actions={
+            <Button
+              onClick={() => router.push('/trainer/programs/new')}
+              className="bg-wondrous-primary hover:bg-purple-700 text-white gap-2"
+            >
+              <Plus size={20} />
+              <span className="hidden sm:inline">New Program</span>
+            </Button>
+          }
+        />
 
         {/* Filters */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">

@@ -30,6 +30,7 @@ import { AddClientDialog } from '@/components/studio-owner/AddClientDialog';
 import { InviteClientDialog } from '@/components/studio-owner/InviteClientDialog';
 import { EditClientDialog } from '@/components/studio-owner/EditClientDialog';
 import { format } from 'date-fns';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface Client {
   id: string;
@@ -109,17 +110,15 @@ export default function ClientsPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="mb-6 lg:mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl lg:text-heading-1 font-bold text-gray-900 dark:text-gray-100 mb-2">
-              Clients
-            </h1>
-            <p className="text-sm lg:text-body-sm text-gray-600 dark:text-gray-400">
-              Manage your client roster and track their progress
-            </p>
-          </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Manage your client roster and track their progress"
+        stats={[
+          { label: 'total', value: isLoading ? '...' : totalClients, color: 'primary' },
+          { label: 'active', value: isLoading ? '...' : activeClients, color: 'success' },
+          { label: 'new this month', value: isLoading ? '...' : newThisMonth, color: 'magenta' },
+        ]}
+        actions={
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -127,7 +126,7 @@ export default function ClientsPage() {
               className="gap-2"
             >
               <Send size={18} />
-              <span className="hidden sm:inline">Invite Client</span>
+              <span className="hidden sm:inline">Invite</span>
             </Button>
             <Button
               onClick={() => setAddDialogOpen(true)}
@@ -137,7 +136,10 @@ export default function ClientsPage() {
               <span className="hidden sm:inline">Add Client</span>
             </Button>
           </div>
-        </div>
+        }
+      />
+
+      <div className="mb-6 lg:mb-8">
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6">

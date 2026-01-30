@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Search, Package, Plus, MoreVertical, Users, CreditCard, Loader2 } from 'lucide-react';
+import ContentHeader from '@/components/shared/ContentHeader';
 
 interface TrainingPackage {
   id: string;
@@ -130,27 +131,26 @@ export default function PackagesPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="mb-6 lg:mb-8">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-          <div>
-            <h1 className="text-2xl lg:text-heading-1 font-bold text-gray-900 dark:text-gray-100 mb-2">
-              Packages
-            </h1>
-            <p className="text-sm lg:text-body-sm text-gray-600 dark:text-gray-400">
-              Create and manage training packages for your clients
-            </p>
-          </div>
+      {/* Content Header */}
+      <ContentHeader
+        context="Create and manage training packages for your clients"
+        stats={[
+          { label: 'packages', value: loading ? '...' : packages.length, color: 'primary' },
+          { label: 'active', value: loading ? '...' : packages.filter(p => p.isActive).length, color: 'success' },
+        ]}
+        actions={
           <Button
             onClick={() => setIsDialogOpen(true)}
-            className="w-full lg:w-auto gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
+            className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
           >
             <Plus size={20} />
-            <span>Create Package</span>
+            <span className="hidden sm:inline">Create Package</span>
           </Button>
-        </div>
+        }
+      />
 
-        {/* Search */}
+      {/* Search */}
+      <div className="mb-6 lg:mb-8">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
           <Input

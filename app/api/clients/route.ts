@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { lookupUserProfile } from '@/lib/services/profile-service';
+import { sendClientInvitationEmail } from '@/lib/notifications/email-service';
+import crypto from 'crypto';
 
 interface DbClient {
   id: string;
@@ -249,7 +251,80 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ client: data }, { status: 201 });
+    // Send welcome email if requested
+    let emailSent = false;
+    let emailError: string | null = null;
+
+    if (body.sendWelcomeEmail) {
+      try {
+        // Generate secure token for invitation
+        const token = crypto.randomBytes(32).toString('base64url');
+
+        // Set expiry (7 days from now)
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        // Create invitation record
+        const { data: invitation, error: invError } = await serviceClient
+          .from('ta_client_invitations')
+          .insert({
+            studio_id: studioId,
+            invited_by: user.id,
+            email: body.email.toLowerCase(),
+            first_name: body.firstName || body.first_name || null,
+            last_name: body.lastName || body.last_name || null,
+            token,
+            status: 'pending',
+            expires_at: expiresAt.toISOString(),
+          })
+          .select()
+          .single();
+
+        if (invError) {
+          // If table doesn't exist, continue without email
+          if (invError.code === '42P01') {
+            console.warn('Client invitations table not set up. Skipping welcome email.');
+            emailError = 'Invitation system not configured';
+          } else {
+            console.error('Error creating invitation:', invError);
+            emailError = invError.message;
+          }
+        } else if (invitation) {
+          // Send the welcome email
+          const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/client-invite/${token}`;
+
+          // Get inviter's name and studio info
+          const inviterName = profile.firstName
+            ? `${profile.firstName} ${profile.lastName || ''}`.trim()
+            : 'Your trainer';
+
+          const { data: studio } = await serviceClient
+            .from('bs_studios')
+            .select('name')
+            .eq('id', studioId)
+            .maybeSingle();
+
+          const result = await sendClientInvitationEmail({
+            recipientEmail: body.email.toLowerCase(),
+            recipientName: body.firstName || body.first_name || undefined,
+            inviterName,
+            studioName: studio?.name || undefined,
+            inviteUrl,
+            invitationId: invitation.id,
+          });
+
+          emailSent = result.success;
+          if (!result.success) {
+            emailError = result.error || 'Unknown email error';
+          }
+        }
+      } catch (err) {
+        console.error('Error sending welcome email:', err);
+        emailError = err instanceof Error ? err.message : 'Unknown error';
+      }
+    }
+
+    return NextResponse.json({ client: data, emailSent, emailError }, { status: 201 });
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json(
