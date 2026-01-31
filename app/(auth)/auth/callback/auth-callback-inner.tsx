@@ -83,6 +83,13 @@ export function AuthCallbackInner() {
         const newProfile = await createUserProfile(supabase, user)
         if (newProfile) {
           setUserFromProfile(newProfile)
+
+          // New users always need onboarding
+          if (!newProfile.isOnboarded) {
+            router.push('/onboarding')
+            return
+          }
+
           const dashboard = ROLE_DASHBOARDS[newProfile.role as UserRole] || '/solo'
           router.push(dashboard)
         } else {
@@ -232,7 +239,7 @@ async function lookupUserProfile(
 async function createUserProfile(
   supabase: ReturnType<typeof getSupabaseBrowserClient>,
   user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
-): Promise<{ id: string; email: string; firstName: string; lastName: string; role: string } | null> {
+): Promise<{ id: string; email: string; firstName: string; lastName: string; role: string; isOnboarded: boolean } | null> {
   const metadata = user.user_metadata || {}
 
   const firstName = (metadata.given_name as string) || (metadata.first_name as string) || (metadata.full_name as string)?.split(' ')[0] || ''
@@ -265,5 +272,6 @@ async function createUserProfile(
     firstName: data.first_name || '',
     lastName: data.last_name || '',
     role: data.role || 'solo_practitioner',
+    isOnboarded: data.is_onboarded === true,
   }
 }
