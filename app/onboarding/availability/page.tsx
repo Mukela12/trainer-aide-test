@@ -46,7 +46,10 @@ const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => i).flatMap((hour) =>
 );
 
 const DEFAULT_AVAILABILITY: WeekAvailability = {
-  0: { enabled: false, slots: [] },
+  0: {
+    enabled: true,
+    slots: [{ id: '0', startHour: 9, startMinute: 0, endHour: 17, endMinute: 0 }],
+  }, // Sunday
   1: {
     enabled: true,
     slots: [{ id: '1', startHour: 9, startMinute: 0, endHour: 17, endMinute: 0 }],
@@ -67,7 +70,10 @@ const DEFAULT_AVAILABILITY: WeekAvailability = {
     enabled: true,
     slots: [{ id: '5', startHour: 9, startMinute: 0, endHour: 17, endMinute: 0 }],
   },
-  6: { enabled: false, slots: [] },
+  6: {
+    enabled: true,
+    slots: [{ id: '6', startHour: 9, startMinute: 0, endHour: 17, endMinute: 0 }],
+  }, // Saturday
 };
 
 export default function OnboardingAvailabilityPage() {
