@@ -144,3 +144,5 @@ This demo is successful when:
 **Ready to build something amazing! 💪**
 
 For complete specifications, see: [TRAINER_AIDE_DEMO_REQUIREMENTS.md](./TRAINER_AIDE_DEMO_REQUIREMENTS.md)
+
+.
