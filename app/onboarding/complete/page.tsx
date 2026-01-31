@@ -23,11 +23,21 @@ export default function OnboardingCompletePage() {
 
   const [businessSlug, setBusinessSlug] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isCompleting, setIsCompleting] = useState(false);
 
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadProfileAndMarkOnboarded = async () => {
       const supabase = getSupabaseBrowserClient();
+
+      // Mark onboarding as complete immediately so booking page works
+      await supabase
+        .from('profiles')
+        .update({
+          is_onboarded: true,
+          onboarding_step: 6,
+        })
+        .eq('id', currentUser.id);
+
+      // Load business slug for booking URL
       const { data } = await supabase
         .from('profiles')
         .select('business_slug')
@@ -38,7 +48,7 @@ export default function OnboardingCompletePage() {
         setBusinessSlug(data.business_slug);
       }
     };
-    loadProfile();
+    loadProfileAndMarkOnboarded();
   }, [currentUser.id]);
 
   const bookingUrl = businessSlug
@@ -53,30 +63,10 @@ export default function OnboardingCompletePage() {
     }
   };
 
-  const handleComplete = async () => {
-    setIsCompleting(true);
-    try {
-      const supabase = getSupabaseBrowserClient();
-
-      // Mark onboarding as complete
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          is_onboarded: true,
-          onboarding_step: 6,
-        })
-        .eq('id', currentUser.id);
-
-      if (error) throw error;
-
-      // Navigate to appropriate dashboard
-      const dashboard = ROLE_DASHBOARDS[currentRole as UserRole] || '/solo';
-      router.push(dashboard);
-    } catch (error) {
-      console.error('Error completing onboarding:', error);
-    } finally {
-      setIsCompleting(false);
-    }
+  const handleComplete = () => {
+    // Navigate to appropriate dashboard (onboarding already marked complete on page load)
+    const dashboard = ROLE_DASHBOARDS[currentRole as UserRole] || '/solo';
+    router.push(dashboard);
   };
 
   return (
@@ -202,10 +192,9 @@ export default function OnboardingCompletePage() {
         <Button
           size="lg"
           onClick={handleComplete}
-          disabled={isCompleting}
           className="w-full"
         >
-          {isCompleting ? 'Setting up...' : 'Go to Dashboard'}
+          Go to Dashboard
           <ArrowRight className="ml-2" size={18} />
         </Button>
       </div>
