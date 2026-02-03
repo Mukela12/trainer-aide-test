@@ -15,7 +15,7 @@ interface SessionState {
   fetchSessions: (trainerId: string) => Promise<void>;
 
   // Session management (with database persistence)
-  startSession: (session: Omit<Session, 'id' | 'startedAt' | 'completed' | 'trainerDeclaration'>) => Promise<string>;
+  startSession: (session: Omit<Session, 'id' | 'startedAt' | 'completed' | 'trainerDeclaration'> & { workoutId?: string }) => Promise<string>;
   updateSession: (sessionId: string, updates: Partial<Session>) => Promise<void>;
   completeSession: (sessionId: string, overallRpe: number, privateNotes: string, publicNotes: string, trainerDeclaration: boolean) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;

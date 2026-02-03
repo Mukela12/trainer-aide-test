@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Calendar, Clock, Dumbbell, Sparkles, User, ChevronDown, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ interface AITemplateCardProps {
 }
 
 export function AITemplateCard({ template, onUpdate }: AITemplateCardProps) {
+  const router = useRouter();
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignMode, setAssignMode] = useState<'client' | 'trainer'>('client');
   const [showWorkoutSelector, setShowWorkoutSelector] = useState(false);
@@ -207,6 +209,10 @@ export function AITemplateCard({ template, onUpdate }: AITemplateCardProps) {
         <WorkoutSelectorModal
           program={template}
           onClose={() => setShowWorkoutSelector(false)}
+          onSelectWorkout={(workout) => {
+            setShowWorkoutSelector(false);
+            router.push(`/trainer/sessions/new?programId=${template.id}&workoutId=${workout.id}`);
+          }}
         />
       )}
     </>
