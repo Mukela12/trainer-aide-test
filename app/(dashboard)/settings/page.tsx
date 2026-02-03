@@ -8,14 +8,50 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { User, Bell, Shield, Palette, LogOut } from 'lucide-react';
+import { User, Bell, Shield, Palette, LogOut, Building2 } from 'lucide-react';
 import ContentHeader from '@/components/shared/ContentHeader';
+import { LogoUpload } from '@/components/shared/LogoUpload';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { currentUser, currentRole } = useUserStore();
   const { signOut } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
+  const [businessLogo, setBusinessLogo] = useState<string | null>(null);
+  const [isLoadingLogo, setIsLoadingLogo] = useState(true);
+
+  // Check if user can edit business branding (studio owners and solo practitioners only)
+  const canEditBranding = currentRole === 'studio_owner' || currentRole === 'solo_practitioner';
+
+  // Load current business logo
+  useEffect(() => {
+    const loadBusinessLogo = async () => {
+      if (!canEditBranding) {
+        setIsLoadingLogo(false);
+        return;
+      }
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('business_logo_url')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (profile?.business_logo_url) {
+          setBusinessLogo(profile.business_logo_url);
+        }
+      } catch (error) {
+        console.error('Error loading business logo:', error);
+      } finally {
+        setIsLoadingLogo(false);
+      }
+    };
+
+    loadBusinessLogo();
+  }, [canEditBranding, currentUser.id]);
 
   const handleLogout = async () => {
     await signOut();
@@ -111,6 +147,46 @@ export default function SettingsPage() {
             </p>
           </CardContent>
         </Card>
+
+        {/* Business Branding - Only for studio owners and solo practitioners */}
+        {canEditBranding && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                  <Building2 className="text-pink-600" size={20} />
+                </div>
+                <div>
+                  <CardTitle>Business Branding</CardTitle>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Customize your business logo for public booking and emails
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Business Logo</Label>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  Your logo will appear on your public booking page and in emails sent to clients
+                </p>
+                {isLoadingLogo ? (
+                  <div className="w-40 h-40 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-gray-300 border-t-wondrous-magenta rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <LogoUpload
+                    currentLogo={businessLogo}
+                    onLogoChange={setBusinessLogo}
+                  />
+                )}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                Recommended: Square image, PNG or JPG, max 5MB
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Notifications */}
         <Card>

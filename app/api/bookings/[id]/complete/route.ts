@@ -62,18 +62,22 @@ export async function POST(
 
     // If session data is provided, create a training session
     if (sessionData && sessionData.createSession !== false) {
+      // id is omitted - Supabase will auto-generate UUID
       const sessionRecord = {
-        id: sessionData.id || `session_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-        studio_id: studioId,
         trainer_id: existingBooking.trainer_id,
         client_id: existingBooking.client_id,
         template_id: existingBooking.template_id || sessionData.templateId || null,
-        status: 'completed',
-        sign_off_mode: existingBooking.sign_off_mode || 'full_session',
+        workout_id: sessionData.workoutId || existingBooking.template_id || null,
+        session_name: sessionData.sessionName || 'Completed Session',
+        json_definition: {
+          blocks: sessionData.blocks || [],
+          sign_off_mode: existingBooking.sign_off_mode || 'full_session',
+        },
         started_at: sessionData.startedAt || existingBooking.scheduled_at,
         completed_at: sessionData.completedAt || new Date().toISOString(),
         notes: sessionData.notes || existingBooking.notes || null,
-        blocks: sessionData.blocks || [],
+        completed: true,
+        trainer_declaration: false,
       };
 
       const { data: session, error: sessionError } = await serviceClient

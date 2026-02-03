@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { X, Dumbbell, CheckCircle2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,10 +9,10 @@ import type { AIProgram, AIWorkout } from '@/lib/types/ai-program';
 interface WorkoutSelectorModalProps {
   program: AIProgram;
   onClose: () => void;
+  onSelectWorkout: (workout: AIWorkout) => void;
 }
 
-export function WorkoutSelectorModal({ program, onClose }: WorkoutSelectorModalProps) {
-  const router = useRouter();
+export function WorkoutSelectorModal({ program, onClose, onSelectWorkout }: WorkoutSelectorModalProps) {
   const [workouts, setWorkouts] = useState<AIWorkout[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
@@ -44,8 +43,11 @@ export function WorkoutSelectorModal({ program, onClose }: WorkoutSelectorModalP
   const handleCreateSession = () => {
     if (!selectedWorkoutId) return;
 
-    // Navigate to session creation with AI workout source
-    router.push(`/trainer/sessions/new?source=ai-template&programId=${program.id}&workoutId=${selectedWorkoutId}`);
+    // Find the selected workout and pass it to parent
+    const selectedWorkout = workouts.find(w => w.id === selectedWorkoutId);
+    if (selectedWorkout) {
+      onSelectWorkout(selectedWorkout);
+    }
   };
 
   // Group workouts by week

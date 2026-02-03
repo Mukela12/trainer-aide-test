@@ -14,9 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { SignOffMode, Client, WorkoutTemplate, SessionBlock } from '@/lib/types';
-import type { AIWorkout } from '@/lib/types/ai-program';
+import type { AIProgram, AIWorkout } from '@/lib/types/ai-program';
 import { Play, FileText, User, Settings, ChevronRight, Search, Sparkles, Building2, UserCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { WorkoutSelectorModal } from '@/components/templates/WorkoutSelectorModal';
 
 interface ApiClient {
   id: string;
@@ -90,6 +91,11 @@ function StartNewSessionContent() {
   const [loadingAvailableTemplates, setLoadingAvailableTemplates] = useState(false);
   const [selectedAvailableTemplate, setSelectedAvailableTemplate] = useState<AvailableTemplate | null>(null);
 
+  // AI Programs state
+  const [aiPrograms, setAIPrograms] = useState<AIProgram[]>([]);
+  const [selectedAIProgram, setSelectedAIProgram] = useState<AIProgram | null>(null);
+  const [showWorkoutSelector, setShowWorkoutSelector] = useState(false);
+
   // Fetch real clients from API
   useEffect(() => {
     const fetchClients = async () => {
@@ -142,6 +148,7 @@ function StartNewSessionContent() {
             clientSpecific: [],
             ownTemplates: [],
           });
+          setAIPrograms(data.aiPrograms || []);
         } else {
           // Fallback to templates from store
           setGroupedTemplates({
@@ -153,9 +160,11 @@ function StartNewSessionContent() {
               source: 'own_template' as const,
             })),
           });
+          setAIPrograms([]);
         }
       } catch (error) {
         console.error('Error fetching available templates:', error);
+        setAIPrograms([]);
       } finally {
         setLoadingAvailableTemplates(false);
       }
@@ -235,7 +244,16 @@ function StartNewSessionContent() {
     `${client.first_name} ${client.last_name}`.toLowerCase().includes(clientSearch.toLowerCase())
   );
 
-  const handleStart = () => {
+  // Handle workout selection from AI Program modal
+  const handleWorkoutSelected = (workout: AIWorkout) => {
+    setAiWorkout(workout);
+    setSourceType('ai');
+    setShowWorkoutSelector(false);
+    setSelectedAIProgram(null);
+    setStep(3); // Move directly to sign-off mode step
+  };
+
+  const handleStart = async () => {
     let sessionBlocks: SessionBlock[];
     let sessionName: string;
     let templateId: string;
@@ -260,11 +278,12 @@ function StartNewSessionContent() {
         template = undefined; // AI workouts don't have a manual template
 
         // Start session with planned duration from AI workout
-        const sessionId = startSession({
+        const sessionId = await startSession({
           trainerId: currentUser.id,
           clientId: selectedClient?.id,
           client: selectedClient || undefined,
           templateId,
+          workoutId: aiWorkout.id, // AI workout ID - triggers template_id = NULL in API
           template,
           sessionName,
           signOffMode: selectedSignOffMode,
@@ -313,7 +332,7 @@ function StartNewSessionContent() {
 
       // Start manual template session
       try {
-        const sessionId = startSession({
+        const sessionId = await startSession({
           trainerId: currentUser.id,
           clientId: selectedClient?.id,
           client: selectedClient || undefined,
@@ -448,6 +467,52 @@ function StartNewSessionContent() {
             </div>
           ) : (
             <>
+              {/* AI Programs Section */}
+              {aiPrograms.length > 0 && (
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={18} className="text-wondrous-magenta" />
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">AI Programs</h3>
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                      Assigned to you
+                    </Badge>
+                  </div>
+                  {aiPrograms.map((program) => (
+                    <Card
+                      key={program.id}
+                      className="cursor-pointer transition-all hover:border-wondrous-magenta dark:hover:border-purple-400"
+                      onClick={() => {
+                        setSelectedAIProgram(program);
+                        setShowWorkoutSelector(true);
+                      }}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-wondrous-magenta/20 to-wondrous-blue/20 flex items-center justify-center flex-shrink-0">
+                            <Sparkles size={18} className="text-wondrous-magenta" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">{program.program_name}</h3>
+                              <Badge variant="secondary" className="text-xs bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200">AI</Badge>
+                            </div>
+                            {program.description && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{program.description}</p>
+                            )}
+                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                              <span>{program.total_weeks} weeks</span>
+                              <span>{program.sessions_per_week}x/week</span>
+                              <span className="capitalize">{program.experience_level}</span>
+                            </div>
+                          </div>
+                          <ChevronRight size={20} className="text-gray-400 flex-shrink-0" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
               {/* Studio Workout Plans (Trainer Toolkit) */}
               {groupedTemplates.trainerToolkit.length > 0 && (
                 <div className="space-y-3">
@@ -634,7 +699,8 @@ function StartNewSessionContent() {
               {/* Empty state */}
               {groupedTemplates.trainerToolkit.length === 0 &&
                groupedTemplates.clientSpecific.length === 0 &&
-               groupedTemplates.ownTemplates.length === 0 && (
+               groupedTemplates.ownTemplates.length === 0 &&
+               aiPrograms.length === 0 && (
                 <Card className="p-8 text-center">
                   <FileText className="mx-auto mb-4 text-gray-400" size={48} />
                   <p className="text-gray-600 dark:text-gray-400">No templates available</p>
@@ -856,6 +922,18 @@ function StartNewSessionContent() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Workout Selector Modal for AI Programs */}
+      {showWorkoutSelector && selectedAIProgram && (
+        <WorkoutSelectorModal
+          program={selectedAIProgram}
+          onClose={() => {
+            setShowWorkoutSelector(false);
+            setSelectedAIProgram(null);
+          }}
+          onSelectWorkout={handleWorkoutSelected}
+        />
       )}
     </div>
   );

@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useUserStore } from '@/lib/stores/user-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Calendar,
+  CalendarPlus,
   Clock,
   MapPin,
   X,
@@ -36,12 +39,24 @@ interface Booking {
 
 export default function ClientBookingsPage() {
   const { currentUser } = useUserStore();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  // Check for success redirect from booking
+  useEffect(() => {
+    if (searchParams.get('booked') === 'true') {
+      setShowSuccess(true);
+      // Hide after 5 seconds
+      const timer = setTimeout(() => setShowSuccess(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
 
   const fetchBookings = async () => {
     setIsLoading(true);
@@ -180,6 +195,26 @@ export default function ClientBookingsPage() {
           { label: 'past', value: pastBookings.length, color: 'default' },
         ]}
       />
+
+      {/* Success Banner */}
+      {showSuccess && (
+        <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-3">
+          <CheckCircle2 className="text-green-600 dark:text-green-400" size={20} />
+          <p className="text-green-700 dark:text-green-300 font-medium">
+            Your session has been booked successfully!
+          </p>
+        </div>
+      )}
+
+      {/* Book New Session Button */}
+      <div className="mb-6">
+        <Link href="/client/book">
+          <Button className="bg-wondrous-blue hover:bg-wondrous-blue/90">
+            <CalendarPlus size={16} className="mr-2" />
+            Book New Session
+          </Button>
+        </Link>
+      </div>
 
       {/* Upcoming Bookings */}
       <div className="mb-8">

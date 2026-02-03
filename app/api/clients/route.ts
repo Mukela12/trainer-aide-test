@@ -14,6 +14,7 @@ interface DbClient {
   studio_id: string;
   invited_by: string | null;
   is_onboarded: boolean;
+  is_archived: boolean;
   self_booking_allowed: boolean;
   credits: number | null;
   notification_preferences: unknown;
@@ -105,6 +106,7 @@ export async function GET(request: NextRequest) {
       studio_id: client.studio_id,
       invited_by: client.invited_by,
       is_onboarded: client.is_onboarded,
+      is_archived: client.is_archived || false,
       credits: client.credits,
       created_at: client.created_at,
       // Default values for profile fields (fc_clients doesn't have these)
@@ -114,7 +116,60 @@ export async function GET(request: NextRequest) {
       available_equipment: [] as string[],
       injuries: [] as Array<{ body_part: string; description: string; restrictions: string[] }>,
       is_active: true,
+      invitation_status: null as string | null, // Not from invitation
     }));
+
+    // Also fetch pending invitations that haven't been accepted yet
+    // These show up as "pending" clients in the UI
+    const effectiveStudioId = role === 'solo_practitioner' ? user.id : studioId;
+
+    if (effectiveStudioId) {
+      const { data: pendingInvitations } = await serviceClient
+        .from('ta_client_invitations')
+        .select('*')
+        .eq('studio_id', effectiveStudioId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      // Add pending invitations as "virtual" clients with is_onboarded = false
+      // Only add if not already in clients list (by email)
+      const existingEmails = new Set(transformedClients.map(c => c.email.toLowerCase()));
+
+      const pendingClients = ((pendingInvitations || []) as Array<{
+        id: string;
+        email: string;
+        first_name: string | null;
+        last_name: string | null;
+        studio_id: string;
+        invited_by: string;
+        created_at: string;
+        status: string;
+        expires_at: string;
+      }>)
+        .filter(inv => !existingEmails.has(inv.email.toLowerCase()))
+        .map(inv => ({
+          id: `invitation_${inv.id}`, // Prefix to distinguish from real clients
+          first_name: inv.first_name || '',
+          last_name: inv.last_name || '',
+          email: inv.email,
+          phone: null,
+          studio_id: inv.studio_id,
+          invited_by: inv.invited_by,
+          is_onboarded: false, // Not yet onboarded - shows as "Pending"
+          is_archived: false,
+          credits: 0,
+          created_at: inv.created_at,
+          experience_level: 'intermediate' as const,
+          primary_goal: 'general_fitness' as const,
+          available_equipment: [] as string[],
+          injuries: [] as Array<{ body_part: string; description: string; restrictions: string[] }>,
+          is_active: true,
+          invitation_status: inv.status, // Track invitation status
+          invitation_expires_at: inv.expires_at,
+        }));
+
+      transformedClients.push(...pendingClients);
+    }
 
     return NextResponse.json({ clients: transformedClients });
   } catch (error) {
@@ -166,7 +221,7 @@ export async function POST(request: NextRequest) {
     // Get or create studio_id for the user
     let studioId = profile.studio_id;
 
-    // For solo practitioners without a studio, create one on-the-fly
+    // For users without a studio, create one on-the-fly
     if (!studioId) {
       // Check if a studio already exists for this user
       const { data: existingStudio } = await serviceClient
@@ -177,33 +232,51 @@ export async function POST(request: NextRequest) {
 
       if (existingStudio) {
         studioId = existingStudio.id;
-      } else if (role === 'solo_practitioner') {
-        // Create a new studio for the solo practitioner
+
+        // Also update bs_staff to link to this studio if not already linked
+        await serviceClient
+          .from('bs_staff')
+          .update({ studio_id: existingStudio.id })
+          .eq('id', user.id)
+          .is('studio_id', null);
+      } else if (role === 'solo_practitioner' || role === 'studio_owner') {
+        // Create a new studio for solo practitioners or studio owners missing a studio
+        // Note: Use 'fitness' studio_type which doesn't require studio_mode constraint
+        const studioConfig = {
+          name: profile?.firstName ? `${profile.firstName}'s Studio` : 'My Studio',
+          studio_type: 'fitness',
+          license_level: role === 'solo_practitioner' ? 'single-site' : 'starter',
+        };
+
         const { data: newStudio, error: studioError } = await serviceClient
           .from('bs_studios')
           .insert({
-            name: profile?.firstName ? `${profile.firstName}'s Studio` : 'My Studio',
+            ...studioConfig,
             owner_id: user.id,
             plan: 'free',
-            license_level: 'single-site',
-            studio_type: 'personal_training',
-            studio_mode: 'single-site',
             platform_version: 'v2',
           })
           .select()
           .single();
 
         if (studioError) {
-          console.error('Error creating studio for solo practitioner:', studioError);
+          console.error(`Error creating studio for ${role}:`, studioError);
           return NextResponse.json(
-            { error: 'Failed to create client', details: 'Could not create studio for solo practitioner' },
+            { error: 'Failed to create client', details: `Could not create studio for ${role}` },
             { status: 500 }
           );
         }
 
         studioId = newStudio.id;
+
+        // Update bs_staff to link to the new studio
+        await serviceClient
+          .from('bs_staff')
+          .update({ studio_id: newStudio.id })
+          .eq('id', user.id)
+          .is('studio_id', null);
       } else {
-        // Non-solo practitioners need to have a studio_id
+        // Other roles (trainers, managers) need to have a studio_id assigned
         return NextResponse.json(
           { error: 'Failed to create client', details: 'No studio associated with your account' },
           { status: 400 }
@@ -212,6 +285,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create client data - let database generate UUID if not provided
+    // Note: is_onboarded should be TRUE for clients because the onboarding flow
+    // is only for solo practitioners and studio owners, not for clients.
+    // Clients don't need to go through onboarding - they can access the dashboard immediately.
     const clientData: Record<string, unknown> = {
       first_name: body.firstName || body.first_name || null,
       last_name: body.lastName || body.last_name || null,
@@ -220,9 +296,11 @@ export async function POST(request: NextRequest) {
       phone: body.phone || null,
       studio_id: studioId,
       invited_by: user.id,
-      is_onboarded: false,
+      is_onboarded: true, // Clients are considered "onboarded" - they don't need to go through onboarding
+      is_guest: true, // Mark as guest until they accept invitation and create auth account
       self_booking_allowed: body.selfBookingAllowed || false,
       credits: body.credits || 0,
+      source: 'manual',
     };
 
     // Only include id if it's a valid UUID
@@ -403,6 +481,102 @@ export async function PUT(request: NextRequest) {
 
     if (!data) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ client: data });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH /api/clients
+ * Partially updates a client by ID (passed as query param)
+ * Supports archiving/restoring clients
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    // Verify authentication
+    const supabase = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user profile to determine role
+    const serviceClient = createServiceRoleClient();
+    const profile = await lookupUserProfile(serviceClient, user);
+
+    if (!profile) {
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
+    }
+
+    const role = profile.role || 'client';
+
+    // Only certain roles can update clients
+    const allowedRoles = ['solo_practitioner', 'studio_owner', 'studio_manager', 'trainer', 'super_admin'];
+    if (!allowedRoles.includes(role)) {
+      return NextResponse.json({ error: 'Forbidden: You do not have permission to update clients' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const clientId = searchParams.get('id');
+
+    if (!clientId) {
+      return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
+    }
+
+    const body = await request.json();
+
+    // Build update data - only include allowed fields
+    const updateData: Record<string, unknown> = {};
+
+    if (body.is_archived !== undefined) updateData.is_archived = body.is_archived;
+    if (body.first_name !== undefined) updateData.first_name = body.first_name;
+    if (body.last_name !== undefined) updateData.last_name = body.last_name;
+    if (body.email !== undefined) updateData.email = body.email;
+    if (body.phone !== undefined) updateData.phone = body.phone;
+    if (body.credits !== undefined) updateData.credits = body.credits;
+    if (body.is_onboarded !== undefined) updateData.is_onboarded = body.is_onboarded;
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    }
+
+    // Check if client exists and belongs to user's studio
+    const studioId = profile.studio_id || user.id;
+    const { data: existing } = await serviceClient
+      .from('fc_clients')
+      .select('id, studio_id')
+      .eq('id', clientId)
+      .maybeSingle();
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
+
+    if (existing.studio_id !== studioId && role !== 'super_admin') {
+      return NextResponse.json({ error: 'Forbidden: Client does not belong to your studio' }, { status: 403 });
+    }
+
+    const { data, error } = await serviceClient
+      .from('fc_clients')
+      .update(updateData)
+      .eq('id', clientId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating client:', error);
+      return NextResponse.json(
+        { error: 'Failed to update client', details: error.message },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ client: data });

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils/cn';
 export interface ContentHeaderStat {
   label: string;
   value: string | number;
-  color?: 'default' | 'success' | 'warning' | 'danger' | 'primary' | 'magenta';
+  color?: 'default' | 'success' | 'warning' | 'danger' | 'primary' | 'magenta' | 'slate';
 }
 
 export interface ContentHeaderProps {
@@ -31,6 +31,7 @@ const statColorMap: Record<string, string> = {
   danger: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   primary: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   magenta: 'bg-pink-50 text-[#A71075] dark:bg-pink-900/30 dark:text-pink-400',
+  slate: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
 };
 
 export default function ContentHeader({

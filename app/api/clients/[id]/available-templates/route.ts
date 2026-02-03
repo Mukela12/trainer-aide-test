@@ -75,9 +75,53 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    // Also fetch AI programs assigned to the trainer
+    const { data: aiAssignments, error: aiError } = await serviceClient
+      .from('ai_program_trainer_assignments')
+      .select(`
+        ai_programs (
+          id,
+          program_name,
+          description,
+          primary_goal,
+          experience_level,
+          total_weeks,
+          sessions_per_week,
+          status,
+          generation_status
+        )
+      `)
+      .eq('trainer_id', trainerId);
+
+    if (aiError) {
+      console.error('Error fetching AI program assignments:', aiError);
+    }
+
+    // Filter to only include AI programs that have finished generating
+    interface AIProgram {
+      id: string;
+      program_name: string;
+      description?: string | null;
+      primary_goal: string;
+      experience_level: string;
+      total_weeks: number;
+      sessions_per_week: number;
+      status: string;
+      generation_status: string;
+    }
+
+    const aiPrograms = (aiAssignments || [])
+      .map((a: { ai_programs: AIProgram | null }) => a.ai_programs)
+      .filter((p: AIProgram | null): p is AIProgram =>
+        p != null &&
+        p.generation_status === 'completed'
+        // Removed: p.status === 'active' - programs may have 'draft' status
+      );
+
     return NextResponse.json({
       templates: templates || [],
       grouped,
+      aiPrograms,
       trainerId,
       clientId,
     });
@@ -158,9 +202,53 @@ async function getFallbackTemplates(
     ownTemplates: deduped.filter((t) => t.source === 'own_template'),
   };
 
+  // Also fetch AI programs assigned to the trainer
+  const { data: aiAssignments, error: aiError } = await serviceClient
+    .from('ai_program_trainer_assignments')
+    .select(`
+      ai_programs (
+        id,
+        program_name,
+        description,
+        primary_goal,
+        experience_level,
+        total_weeks,
+        sessions_per_week,
+        status,
+        generation_status
+      )
+    `)
+    .eq('trainer_id', trainerId);
+
+  if (aiError) {
+    console.error('Error fetching AI program assignments (fallback):', aiError);
+  }
+
+  // Filter to only include AI programs that have finished generating
+  interface AIProgram {
+    id: string;
+    program_name: string;
+    description?: string | null;
+    primary_goal: string;
+    experience_level: string;
+    total_weeks: number;
+    sessions_per_week: number;
+    status: string;
+    generation_status: string;
+  }
+
+  const aiPrograms = (aiAssignments || [])
+    .map((a: { ai_programs: AIProgram | null }) => a.ai_programs)
+    .filter((p: AIProgram | null): p is AIProgram =>
+      p != null &&
+      p.generation_status === 'completed'
+      // Removed: p.status === 'active' - programs may have 'draft' status
+    );
+
   return NextResponse.json({
     templates: deduped,
     grouped,
+    aiPrograms,
     trainerId,
     clientId,
   });

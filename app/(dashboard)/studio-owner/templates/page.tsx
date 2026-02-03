@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTemplateStore } from '@/lib/stores/template-store';
 import { useUserStore } from '@/lib/stores/user-store';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,10 @@ import {
   FileText,
   Dumbbell,
   Sparkles,
+  X,
+  PenTool,
+  Wand2,
+  ChevronRight,
 } from 'lucide-react';
 import type { AIProgram } from '@/lib/types/ai-program';
 import ContentHeader from '@/components/shared/ContentHeader';
@@ -33,6 +38,7 @@ interface Template {
 }
 
 export default function TemplateLibrary() {
+  const router = useRouter();
   const { deleteTemplate, duplicateTemplate } = useTemplateStore();
   const { currentUser } = useUserStore();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -40,6 +46,7 @@ export default function TemplateLibrary() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'standard' | 'resistance_only' | 'ai'>('all');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Fetch templates from API on mount
   useEffect(() => {
@@ -48,10 +55,11 @@ export default function TemplateLibrary() {
 
       setIsLoading(true);
       try {
-        // Fetch both regular templates and AI templates in parallel
-        const [templatesRes, aiTemplatesRes] = await Promise.all([
+        // Fetch regular templates, AI templates, and all AI programs in parallel
+        const [templatesRes, aiTemplatesRes, aiProgramsRes] = await Promise.all([
           fetch('/api/templates'),
           fetch('/api/ai-programs/templates'),
+          fetch('/api/ai-programs'),
         ]);
 
         // Process regular templates
@@ -76,11 +84,24 @@ export default function TemplateLibrary() {
           setTemplates(mappedTemplates);
         }
 
-        // Process AI templates
+        // Process AI templates (flagged as template)
+        let aiTemplatesList: AIProgram[] = [];
         if (aiTemplatesRes.ok) {
           const aiData = await aiTemplatesRes.json();
-          setAITemplates(aiData.templates || []);
+          aiTemplatesList = aiData.templates || [];
         }
+
+        // Also include AI programs that aren't flagged as templates
+        if (aiProgramsRes.ok) {
+          const programsData = await aiProgramsRes.json();
+          const programs = programsData.programs || [];
+          // Merge with templates, avoiding duplicates
+          const templateIds = new Set(aiTemplatesList.map((t: AIProgram) => t.id));
+          const uniquePrograms = programs.filter((p: AIProgram) => !templateIds.has(p.id));
+          aiTemplatesList = [...aiTemplatesList, ...uniquePrograms];
+        }
+
+        setAITemplates(aiTemplatesList);
       } catch (error) {
         console.error('Error fetching templates:', error);
       } finally {
@@ -94,11 +115,26 @@ export default function TemplateLibrary() {
   // Refresh AI templates
   const refreshAITemplates = async () => {
     try {
-      const res = await fetch('/api/ai-programs/templates');
-      if (res.ok) {
-        const data = await res.json();
-        setAITemplates(data.templates || []);
+      const [aiTemplatesRes, aiProgramsRes] = await Promise.all([
+        fetch('/api/ai-programs/templates'),
+        fetch('/api/ai-programs'),
+      ]);
+
+      let aiTemplatesList: AIProgram[] = [];
+      if (aiTemplatesRes.ok) {
+        const data = await aiTemplatesRes.json();
+        aiTemplatesList = data.templates || [];
       }
+
+      if (aiProgramsRes.ok) {
+        const programsData = await aiProgramsRes.json();
+        const programs = programsData.programs || [];
+        const templateIds = new Set(aiTemplatesList.map((t: AIProgram) => t.id));
+        const uniquePrograms = programs.filter((p: AIProgram) => !templateIds.has(p.id));
+        aiTemplatesList = [...aiTemplatesList, ...uniquePrograms];
+      }
+
+      setAITemplates(aiTemplatesList);
     } catch (error) {
       console.error('Error refreshing AI templates:', error);
     }
@@ -155,13 +191,14 @@ export default function TemplateLibrary() {
           { label: 'AI generated', value: aiTemplates.length, color: 'magenta' },
         ]}
         actions={
-          <Link href="/studio-owner/templates/builder">
-            <Button className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">
-              <Plus size={20} />
-              <span className="hidden sm:inline">Create Template</span>
-              <span className="sm:hidden">New</span>
-            </Button>
-          </Link>
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
+          >
+            <Plus size={20} />
+            <span className="hidden sm:inline">Create Template</span>
+            <span className="sm:hidden">New</span>
+          </Button>
         }
       />
 
@@ -353,8 +390,92 @@ export default function TemplateLibrary() {
               : 'Create your first workout template to get started'
           }
           actionLabel={!searchQuery ? 'Create Template' : undefined}
-          onAction={!searchQuery ? () => window.location.href = '/studio-owner/templates/builder' : undefined}
+          onAction={!searchQuery ? () => setShowCreateModal(true) : undefined}
         />
+      )}
+
+      {/* Create Template Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowCreateModal(false)}
+          />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-lg w-full p-6 animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setShowCreateModal(false)}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-heading font-bold text-gray-900 dark:text-gray-100 mb-2">
+                Create Template
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                Choose how you want to create your workout template
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {/* Manual Option */}
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  router.push('/studio-owner/templates/builder');
+                }}
+                className="w-full p-4 flex items-start gap-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-600 transition-all group"
+              >
+                <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-slate-200 dark:group-hover:bg-slate-700 transition-colors">
+                  <PenTool size={24} className="text-slate-600 dark:text-slate-300" />
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                      Build Manually
+                    </h3>
+                    <ChevronRight size={16} className="text-gray-400 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Use the template builder to create custom workout blocks and exercises
+                  </p>
+                </div>
+              </button>
+
+              {/* AI Option */}
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  router.push('/trainer/programs/new');
+                }}
+                className="w-full p-4 flex items-start gap-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl border-2 border-transparent hover:border-purple-300 dark:hover:border-purple-600 transition-all group"
+              >
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                  <Wand2 size={24} className="text-white" />
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                      Generate with AI
+                    </h3>
+                    <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full">
+                      Recommended
+                    </span>
+                    <ChevronRight size={16} className="text-gray-400 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Let AI create a complete program based on client goals and experience level
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
+              Both options create templates you can use for client sessions
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -11,7 +11,7 @@ interface StatCardProps {
     label: string;
   };
   className?: string;
-  color?: 'blue' | 'magenta' | 'orange' | 'green';
+  color?: 'blue' | 'magenta' | 'orange' | 'green' | 'slate';
 }
 
 const colorStyles = {
@@ -38,6 +38,12 @@ const colorStyles = {
     iconColor: 'text-green-600',
     border: 'border-green-200/50',
     accentGradient: 'from-green-500/10 to-transparent',
+  },
+  slate: {
+    iconBg: 'bg-slate-100 dark:bg-slate-700',
+    iconColor: 'text-slate-600 dark:text-slate-300',
+    border: 'border-slate-200/50 dark:border-slate-600/50',
+    accentGradient: 'from-slate-500/5 to-transparent',
   },
 };
 

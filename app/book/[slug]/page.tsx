@@ -26,6 +26,7 @@ interface TrainerProfile {
   yearsExperience: number | null;
   specializations: string[] | null;
   profileImageUrl: string | null;
+  businessLogoUrl: string | null;
 }
 
 interface Service {
@@ -57,7 +58,7 @@ export default function TrainerBookingPage() {
       // Load trainer profile by slug
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, business_name, bio, location, years_experience, specializations, profile_image_url')
+        .select('id, first_name, last_name, business_name, bio, location, years_experience, specializations, profile_image_url, business_logo_url')
         .eq('business_slug', slug)
         .eq('is_onboarded', true)
         .single();
@@ -78,6 +79,7 @@ export default function TrainerBookingPage() {
         yearsExperience: profile.years_experience,
         specializations: profile.specializations,
         profileImageUrl: profile.profile_image_url,
+        businessLogoUrl: profile.business_logo_url,
       });
 
       // Load public services
@@ -161,9 +163,15 @@ export default function TrainerBookingPage() {
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="flex items-start gap-6">
-            {/* Avatar */}
-            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-wondrous-blue to-purple-600 flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
-              {trainer.profileImageUrl ? (
+            {/* Avatar / Business Logo */}
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-wondrous-blue to-purple-600 flex items-center justify-center text-white text-3xl font-bold flex-shrink-0 overflow-hidden">
+              {trainer.businessLogoUrl ? (
+                <img
+                  src={trainer.businessLogoUrl}
+                  alt={`${displayName} logo`}
+                  className="w-full h-full rounded-2xl object-contain bg-white p-2"
+                />
+              ) : trainer.profileImageUrl ? (
                 <img
                   src={trainer.profileImageUrl}
                   alt={displayName}

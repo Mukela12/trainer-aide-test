@@ -98,10 +98,24 @@ export default function ClientInvitePage() {
 
       setStatus('accepted');
 
+      // Sign the user in with their new credentials
+      const { getSupabaseBrowserClient } = await import('@/lib/supabase/client');
+      const supabase = getSupabaseBrowserClient();
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: invitation?.email || '',
+        password: formData.password,
+      });
+
+      if (signInError) {
+        console.error('Error signing in after invitation:', signInError);
+        // Still redirect - they can sign in manually
+      }
+
       // Redirect to client dashboard after a short delay
       setTimeout(() => {
         router.push('/client');
-      }, 3000);
+      }, 2000);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to accept invitation');
     } finally {

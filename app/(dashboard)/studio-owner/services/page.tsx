@@ -1,290 +1,650 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useServiceStore } from '@/lib/stores/service-store';
 import { useUserStore } from '@/lib/stores/user-store';
-import { Service, ServiceDuration, ServiceType } from '@/lib/types/service';
+import { Service, ServiceType } from '@/lib/types/service';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ServiceFormDialog } from '@/components/studio-owner/ServiceFormDialog';
-import { Clock, Plus, Edit, Power, PowerOff, Users, User, UsersRound } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Clock,
+  Plus,
+  Edit,
+  Power,
+  PowerOff,
+  Users,
+  User,
+  UsersRound,
+  Package,
+  CreditCard,
+  Gift,
+  Trash2,
+  X,
+} from 'lucide-react';
 import ContentHeader from '@/components/shared/ContentHeader';
 
+// Types
+interface CreditBundle {
+  id: string;
+  name: string;
+  credit_count: number;
+  total_price: number;
+  price_per_credit: number;
+  expiry_days: number | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface Offer {
+  id: string;
+  title: string;
+  description: string | null;
+  payment_amount: number;
+  currency: string;
+  max_referrals: number | null;
+  current_referrals: number;
+  expires_at: string | null;
+  credits: number;
+  expiry_days: number | null;
+  is_gift: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+// Helper functions
+const getTypeIcon = (type: ServiceType) => {
+  switch (type) {
+    case '1-2-1': return <User size={16} />;
+    case 'duet': return <Users size={16} />;
+    case 'group': return <UsersRound size={16} />;
+  }
+};
+
+const getTypeLabel = (type: ServiceType) => {
+  switch (type) {
+    case '1-2-1': return '1-on-1';
+    case 'duet': return 'Duet';
+    case 'group': return 'Group';
+  }
+};
+
 export default function ServicesPage() {
-  const { services, addService, updateService } = useServiceStore();
+  const { services, addService, updateService, fetchServices } = useServiceStore();
   const { currentUser } = useUserStore();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('services');
+
+  // Services state
+  const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+
+  // Packages state
+  const [bundles, setBundles] = useState<CreditBundle[]>([]);
+  const [bundlesLoading, setBundlesLoading] = useState(false);
+  const [showBundleModal, setShowBundleModal] = useState(false);
+  const [editingBundle, setEditingBundle] = useState<CreditBundle | null>(null);
+  const [bundleForm, setBundleForm] = useState({
+    name: '',
+    credit_count: 10,
+    total_price: 100,
+    expiry_days: 90,
+  });
+
+  // Offers state
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [offersLoading, setOffersLoading] = useState(false);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
+  const [offerForm, setOfferForm] = useState({
+    title: '',
+    description: '',
+    payment_amount: 0,
+    max_referrals: 10,
+    credits: 1,
+    expiry_days: 90,
+    is_gift: false,
+  });
 
   const activeServices = services.filter(s => s.isActive);
   const inactiveServices = services.filter(s => !s.isActive);
 
-  const getTypeIcon = (type: ServiceType) => {
-    switch (type) {
-      case '1-2-1':
-        return <User size={16} />;
-      case 'duet':
-        return <Users size={16} />;
-      case 'group':
-        return <UsersRound size={16} />;
+  // Fetch bundles
+  const fetchBundles = async () => {
+    setBundlesLoading(true);
+    try {
+      const response = await fetch('/api/credit-bundles');
+      if (response.ok) {
+        const data = await response.json();
+        setBundles(data.bundles || []);
+      }
+    } catch (error) {
+      console.error('Error fetching bundles:', error);
+    } finally {
+      setBundlesLoading(false);
     }
   };
 
-  const getTypeLabel = (type: ServiceType) => {
-    switch (type) {
-      case '1-2-1':
-        return '1-on-1';
-      case 'duet':
-        return 'Duet';
-      case 'group':
-        return 'Group';
+  // Fetch offers
+  const fetchOffers = async () => {
+    setOffersLoading(true);
+    try {
+      const response = await fetch('/api/offers');
+      if (response.ok) {
+        const data = await response.json();
+        setOffers(data.offers || []);
+      }
+    } catch (error) {
+      console.error('Error fetching offers:', error);
+    } finally {
+      setOffersLoading(false);
     }
   };
 
+  // Fetch services on mount
+  useEffect(() => {
+    fetchServices(undefined, false); // Fetch all services including inactive
+  }, [fetchServices]);
+
+  useEffect(() => {
+    if (activeTab === 'packages') {
+      fetchBundles();
+    } else if (activeTab === 'offers') {
+      fetchOffers();
+    }
+  }, [activeTab]);
+
+  // Service handlers
   const toggleServiceStatus = (serviceId: string, currentStatus: boolean) => {
     updateService(serviceId, { isActive: !currentStatus });
   };
 
-  const handleAddNew = () => {
+  const handleAddService = () => {
     setSelectedService(null);
-    setIsDialogOpen(true);
+    setIsServiceDialogOpen(true);
   };
 
-  const handleEdit = (service: Service) => {
+  const handleEditService = (service: Service) => {
     setSelectedService(service);
-    setIsDialogOpen(true);
+    setIsServiceDialogOpen(true);
   };
 
   const handleSaveService = (service: Service) => {
-    // Update service with current user ID
     const serviceWithUser = {
       ...service,
       createdBy: service.createdBy === 'user_owner_1' ? currentUser.id : service.createdBy,
     };
 
     if (selectedService) {
-      // Editing existing service
       updateService(serviceWithUser.id, serviceWithUser);
     } else {
-      // Adding new service
       addService(serviceWithUser);
     }
 
-    setIsDialogOpen(false);
+    setIsServiceDialogOpen(false);
     setSelectedService(null);
+  };
+
+  // Bundle handlers
+  const openBundleModal = (bundle?: CreditBundle) => {
+    if (bundle) {
+      setEditingBundle(bundle);
+      setBundleForm({
+        name: bundle.name,
+        credit_count: bundle.credit_count,
+        total_price: bundle.total_price,
+        expiry_days: bundle.expiry_days || 90,
+      });
+    } else {
+      setEditingBundle(null);
+      setBundleForm({ name: '', credit_count: 10, total_price: 100, expiry_days: 90 });
+    }
+    setShowBundleModal(true);
+  };
+
+  const handleSaveBundle = async () => {
+    try {
+      const method = editingBundle ? 'PUT' : 'POST';
+      const body = editingBundle
+        ? { id: editingBundle.id, ...bundleForm }
+        : bundleForm;
+
+      const response = await fetch('/api/credit-bundles', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        setShowBundleModal(false);
+        fetchBundles();
+      }
+    } catch (error) {
+      console.error('Error saving bundle:', error);
+    }
+  };
+
+  const handleDeleteBundle = async (bundleId: string) => {
+    if (!confirm('Are you sure you want to delete this package?')) return;
+
+    try {
+      const response = await fetch(`/api/credit-bundles?id=${bundleId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        fetchBundles();
+      }
+    } catch (error) {
+      console.error('Error deleting bundle:', error);
+    }
+  };
+
+  // Offer handlers
+  const openOfferModal = (offer?: Offer) => {
+    if (offer) {
+      setEditingOffer(offer);
+      setOfferForm({
+        title: offer.title,
+        description: offer.description || '',
+        payment_amount: offer.payment_amount,
+        max_referrals: offer.max_referrals || 10,
+        credits: offer.credits,
+        expiry_days: offer.expiry_days || 90,
+        is_gift: offer.is_gift,
+      });
+    } else {
+      setEditingOffer(null);
+      setOfferForm({
+        title: '',
+        description: '',
+        payment_amount: 0,
+        max_referrals: 10,
+        credits: 1,
+        expiry_days: 90,
+        is_gift: false,
+      });
+    }
+    setShowOfferModal(true);
+  };
+
+  const handleSaveOffer = async () => {
+    try {
+      const method = editingOffer ? 'PUT' : 'POST';
+      const body = editingOffer
+        ? { id: editingOffer.id, ...offerForm }
+        : offerForm;
+
+      const response = await fetch('/api/offers', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        setShowOfferModal(false);
+        fetchOffers();
+      }
+    } catch (error) {
+      console.error('Error saving offer:', error);
+    }
+  };
+
+  const handleDeleteOffer = async (offerId: string) => {
+    if (!confirm('Are you sure you want to delete this offer?')) return;
+
+    try {
+      const response = await fetch(`/api/offers?id=${offerId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        fetchOffers();
+      }
+    } catch (error) {
+      console.error('Error deleting offer:', error);
+    }
   };
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
       {/* Content Header */}
       <ContentHeader
-        context="Manage session types that trainers can book"
+        context="Manage services, packages, memberships, and promotional offers"
         stats={[
           { label: 'services', value: services.length, color: 'primary' },
-          { label: 'active', value: activeServices.length, color: 'success' },
-          { label: 'inactive', value: inactiveServices.length, color: 'default' },
+          { label: 'packages', value: bundles.length, color: 'success' },
+          { label: 'offers', value: offers.length, color: 'magenta' },
         ]}
-        actions={
-          <Button
-            onClick={handleAddNew}
-            className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
-          >
-            <Plus size={20} />
-            <span className="hidden sm:inline">Add Service</span>
-          </Button>
-        }
       />
 
-      <div className="mb-6 lg:mb-8">
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-3 gap-1">
+          <TabsTrigger value="services" className="gap-2">
+            <Clock size={16} className="hidden sm:inline" />
+            Services
+          </TabsTrigger>
+          <TabsTrigger value="packages" className="gap-2">
+            <Package size={16} className="hidden sm:inline" />
+            Packages
+          </TabsTrigger>
+          <TabsTrigger value="offers" className="gap-2">
+            <Gift size={16} className="hidden sm:inline" />
+            Offers
+          </TabsTrigger>
+        </TabsList>
 
-        {/* Info Card */}
-        <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-          <CardContent className="p-3 lg:p-4">
-            <div className="flex items-start gap-2 lg:gap-3">
-              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-100 dark:bg-blue-800 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Clock className="text-blue-600 dark:text-blue-400" size={18} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm lg:text-base text-gray-900 dark:text-gray-100 mb-1">
-                  What are Services?
-                </h3>
-                <p className="text-xs lg:text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                  Services define session types (e.g., &quot;30min PT Session&quot;). They specify duration, type (1-on-1, duet, group), and credits.
-                  Different from <span className="font-medium">Templates</span>, which are workout programs with exercises.
-                </p>
+        {/* Services Tab */}
+        <TabsContent value="services" className="mt-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Session Types</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Define the types of sessions you offer</p>
+            </div>
+            <Button onClick={handleAddService} className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">
+              <Plus size={18} />
+              <span className="hidden sm:inline">Add Service</span>
+            </Button>
+          </div>
+
+          {activeServices.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeServices.map((service) => (
+                <Card key={service.id} className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: service.color }} />
+                      <CardTitle className="text-base dark:text-gray-100">{service.name}</CardTitle>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{service.description}</p>
+                  </CardHeader>
+                  <CardContent className="py-3">
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Duration</span>
+                        <Badge variant="outline">{service.duration} min</Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Type</span>
+                        <Badge variant="outline">{getTypeIcon(service.type)}<span className="ml-1">{getTypeLabel(service.type)}</span></Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Credits</span>
+                        <span className="font-medium text-wondrous-magenta">{service.creditsRequired}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleEditService(service)} className="flex-1">
+                        <Edit size={14} className="mr-1" />Edit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => toggleServiceStatus(service.id, service.isActive)} className="flex-1 text-orange-600">
+                        <PowerOff size={14} className="mr-1" />Disable
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={Clock} title="No active services" description="Create your first service to get started" actionLabel="Add Service" onAction={handleAddService} />
+          )}
+
+          {inactiveServices.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Inactive Services ({inactiveServices.length})</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {inactiveServices.map((service) => (
+                  <Card key={service.id} className="opacity-60 hover:opacity-100 transition-opacity">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: service.color }} />
+                        <CardTitle className="text-base">{service.name}</CardTitle>
+                      </div>
+                      <Badge variant="secondary">Inactive</Badge>
+                    </CardHeader>
+                    <CardContent className="py-3">
+                      <Button variant="outline" size="sm" onClick={() => toggleServiceStatus(service.id, service.isActive)} className="w-full text-green-600">
+                        <Power size={14} className="mr-1" />Enable
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </TabsContent>
 
-      {/* Active Services */}
-      <div className="mb-6 lg:mb-8">
-        <h2 className="text-lg lg:text-heading-2 font-bold text-gray-900 dark:text-gray-100 mb-3 lg:mb-4">
-          Active Services ({activeServices.length})
-        </h2>
-
-        {activeServices.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-            {activeServices.map((service) => (
-              <Card
-                key={service.id}
-                className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <div
-                          className="w-2.5 h-2.5 lg:w-3 lg:h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: service.color }}
-                        />
-                        <CardTitle className="text-base lg:text-lg dark:text-gray-100 truncate">
-                          {service.name}
-                        </CardTitle>
-                      </div>
-                      <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                        {service.description}
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="py-3">
-                  {/* Service Details */}
-                  <div className="space-y-2 lg:space-y-3 mb-3 lg:mb-4">
-                    <div className="flex items-center justify-between text-xs lg:text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Duration</span>
-                      <Badge variant="outline" className="dark:border-gray-600 text-xs">
-                        <Clock size={12} className="mr-1" />
-                        {service.duration} min
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-xs lg:text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Type</span>
-                      <Badge variant="outline" className="dark:border-gray-600 text-xs">
-                        {getTypeIcon(service.type)}
-                        <span className="ml-1">{getTypeLabel(service.type)}</span>
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-xs lg:text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Max Capacity</span>
-                      <span className="font-medium dark:text-gray-200">{service.maxCapacity}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs lg:text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Credits</span>
-                      <span className="font-medium text-wondrous-magenta">{service.creditsRequired}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(service)}
-                      className="flex-1 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 text-xs"
-                    >
-                      <Edit size={14} className="mr-1" />
-                      <span>Edit</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleServiceStatus(service.id, service.isActive)}
-                      className="flex-1 border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-900/20 text-xs"
-                    >
-                      <PowerOff size={14} className="mr-1" />
-                      <span>Disable</span>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        {/* Packages Tab */}
+        <TabsContent value="packages" className="mt-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Credit Packages</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Create bundles of credits for clients to purchase</p>
+            </div>
+            <Button onClick={() => openBundleModal()} className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">
+              <Plus size={18} />
+              <span className="hidden sm:inline">Create Package</span>
+            </Button>
           </div>
-        ) : (
-          <EmptyState
-            icon={Clock}
-            title="No active services"
-            description="Create your first service to get started"
-          />
-        )}
-      </div>
 
-      {/* Inactive Services */}
-      {inactiveServices.length > 0 && (
-        <div>
-          <h2 className="text-lg lg:text-heading-2 font-bold text-gray-900 dark:text-gray-100 mb-3 lg:mb-4">
-            Inactive Services ({inactiveServices.length})
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-            {inactiveServices.map((service) => (
-              <Card
-                key={service.id}
-                className="opacity-60 hover:opacity-100 transition-opacity dark:bg-gray-800 dark:border-gray-700"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <div
-                          className="w-2.5 h-2.5 lg:w-3 lg:h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: service.color }}
-                        />
-                        <CardTitle className="text-base lg:text-lg dark:text-gray-100 truncate">
-                          {service.name}
-                        </CardTitle>
+          {bundlesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-4 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : bundles.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {bundles.map((bundle) => (
+                <Card key={bundle.id} className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Package className="w-5 h-5 text-wondrous-blue" />
+                      <CardTitle className="text-base dark:text-gray-100">{bundle.name}</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="py-3">
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Credits</span>
+                        <span className="font-semibold">{bundle.credit_count}</span>
                       </div>
-                      <Badge variant="secondary" className="mb-2 text-xs">Inactive</Badge>
-                      <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                        {service.description}
-                      </p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Price</span>
+                        <span className="font-semibold text-wondrous-magenta">${bundle.total_price.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Per Credit</span>
+                        <span className="text-gray-500">${bundle.price_per_credit.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Expires</span>
+                        <span className="text-gray-500">{bundle.expiry_days || 90} days</span>
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="py-3">
-                  {/* Service Details */}
-                  <div className="space-y-2 mb-3 lg:mb-4 text-xs lg:text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Duration</span>
-                      <span className="font-medium dark:text-gray-300">{service.duration} min</span>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openBundleModal(bundle)} className="flex-1">
+                        <Edit size={14} className="mr-1" />Edit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteBundle(bundle.id)} className="flex-1 text-red-600">
+                        <Trash2 size={14} className="mr-1" />Delete
+                      </Button>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Type</span>
-                      <span className="font-medium dark:text-gray-300">{getTypeLabel(service.type)}</span>
-                    </div>
-                  </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={Package} title="No packages yet" description="Create your first credit package to offer bundled deals" actionLabel="Create Package" onAction={() => openBundleModal()} />
+          )}
+        </TabsContent>
 
-                  {/* Actions */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleServiceStatus(service.id, service.isActive)}
-                    className="w-full border-green-200 text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20 text-xs"
-                  >
-                    <Power size={14} className="mr-1" />
-                    <span>Enable</span>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+        {/* Offers Tab */}
+        <TabsContent value="offers" className="mt-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Promotional Offers</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Create special offers and referral incentives</p>
+            </div>
+            <Button onClick={() => openOfferModal()} className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">
+              <Plus size={18} />
+              <span className="hidden sm:inline">Create Offer</span>
+            </Button>
           </div>
-        </div>
-      )}
+
+          {offersLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-4 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : offers.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {offers.map((offer) => (
+                <Card key={offer.id} className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Gift className="w-5 h-5 text-wondrous-magenta" />
+                      <CardTitle className="text-base dark:text-gray-100">{offer.title}</CardTitle>
+                    </div>
+                    {offer.is_gift && <Badge className="bg-purple-100 text-purple-700">Gift</Badge>}
+                  </CardHeader>
+                  <CardContent className="py-3">
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Credits</span>
+                        <span className="font-semibold">{offer.credits}</span>
+                      </div>
+                      {offer.payment_amount > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">Price</span>
+                          <span className="font-semibold">${offer.payment_amount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Redemptions</span>
+                        <span className="text-gray-500">{offer.current_referrals}/{offer.max_referrals || 'Unlimited'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Status</span>
+                        <Badge variant={offer.is_active ? 'default' : 'secondary'}>{offer.is_active ? 'Active' : 'Inactive'}</Badge>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openOfferModal(offer)} className="flex-1">
+                        <Edit size={14} className="mr-1" />Edit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteOffer(offer.id)} className="flex-1 text-red-600">
+                        <Trash2 size={14} className="mr-1" />Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={Gift} title="No offers yet" description="Create your first promotional offer" actionLabel="Create Offer" onAction={() => openOfferModal()} />
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Service Form Dialog */}
       <ServiceFormDialog
-        open={isDialogOpen}
+        open={isServiceDialogOpen}
         onClose={() => {
-          setIsDialogOpen(false);
+          setIsServiceDialogOpen(false);
           setSelectedService(null);
         }}
         onSave={handleSaveService}
         service={selectedService}
       />
+
+      {/* Bundle Modal */}
+      {showBundleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowBundleModal(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6">
+            <button onClick={() => setShowBundleModal(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold mb-4">{editingBundle ? 'Edit Package' : 'Create Package'}</h2>
+            <div className="space-y-4">
+              <div>
+                <Label>Package Name</Label>
+                <Input value={bundleForm.name} onChange={(e) => setBundleForm({ ...bundleForm, name: e.target.value })} placeholder="e.g., Starter Pack" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Credits</Label>
+                  <Input type="number" value={bundleForm.credit_count} onChange={(e) => setBundleForm({ ...bundleForm, credit_count: parseInt(e.target.value) || 0 })} />
+                </div>
+                <div>
+                  <Label>Total Price ($)</Label>
+                  <Input type="number" step="0.01" value={bundleForm.total_price} onChange={(e) => setBundleForm({ ...bundleForm, total_price: parseFloat(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div>
+                <Label>Expiry Days</Label>
+                <Input type="number" value={bundleForm.expiry_days} onChange={(e) => setBundleForm({ ...bundleForm, expiry_days: parseInt(e.target.value) || 90 })} />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button variant="outline" onClick={() => setShowBundleModal(false)} className="flex-1">Cancel</Button>
+                <Button onClick={handleSaveBundle} className="flex-1 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">{editingBundle ? 'Update' : 'Create'}</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Offer Modal */}
+      {showOfferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowOfferModal(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6">
+            <button onClick={() => setShowOfferModal(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold mb-4">{editingOffer ? 'Edit Offer' : 'Create Offer'}</h2>
+            <div className="space-y-4">
+              <div>
+                <Label>Offer Title</Label>
+                <Input value={offerForm.title} onChange={(e) => setOfferForm({ ...offerForm, title: e.target.value })} placeholder="e.g., First Session Free" />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Input value={offerForm.description} onChange={(e) => setOfferForm({ ...offerForm, description: e.target.value })} placeholder="Optional description" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Credits Awarded</Label>
+                  <Input type="number" value={offerForm.credits} onChange={(e) => setOfferForm({ ...offerForm, credits: parseInt(e.target.value) || 0 })} />
+                </div>
+                <div>
+                  <Label>Price ($)</Label>
+                  <Input type="number" step="0.01" value={offerForm.payment_amount} onChange={(e) => setOfferForm({ ...offerForm, payment_amount: parseFloat(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Max Redemptions</Label>
+                  <Input type="number" value={offerForm.max_referrals} onChange={(e) => setOfferForm({ ...offerForm, max_referrals: parseInt(e.target.value) || 10 })} />
+                </div>
+                <div>
+                  <Label>Expiry Days</Label>
+                  <Input type="number" value={offerForm.expiry_days} onChange={(e) => setOfferForm({ ...offerForm, expiry_days: parseInt(e.target.value) || 90 })} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="is_gift" checked={offerForm.is_gift} onChange={(e) => setOfferForm({ ...offerForm, is_gift: e.target.checked })} className="w-4 h-4" />
+                <Label htmlFor="is_gift">This is a gift (no payment required)</Label>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button variant="outline" onClick={() => setShowOfferModal(false)} className="flex-1">Cancel</Button>
+                <Button onClick={handleSaveOffer} className="flex-1 bg-wondrous-magenta hover:bg-wondrous-magenta-dark">{editingOffer ? 'Update' : 'Create'}</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

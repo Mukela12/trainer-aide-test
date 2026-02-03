@@ -88,16 +88,36 @@ export async function PUT(
     // Convert camelCase to snake_case for database
     const updateData: Record<string, unknown> = {};
 
-    if (body.blocks !== undefined) updateData.blocks = body.blocks;
+    // First, fetch existing session to merge json_definition
+    const { data: existingSession } = await serviceClient
+      .from('ta_sessions')
+      .select('json_definition')
+      .eq('id', id)
+      .single();
+
+    const existingJsonDef = (existingSession?.json_definition as Record<string, unknown>) || {};
+
+    // Build updated json_definition by merging with existing
+    const jsonDefinition: Record<string, unknown> = { ...existingJsonDef };
+    if (body.blocks !== undefined) jsonDefinition.blocks = body.blocks;
+    if (body.signOffMode !== undefined) jsonDefinition.sign_off_mode = body.signOffMode;
+    if (body.privateNotes !== undefined) jsonDefinition.private_notes = body.privateNotes;
+    if (body.publicNotes !== undefined) jsonDefinition.public_notes = body.publicNotes;
+    if (body.recommendations !== undefined) jsonDefinition.recommendations = body.recommendations;
+
+    // Set json_definition if any nested fields were updated
+    if (body.blocks !== undefined || body.signOffMode !== undefined ||
+        body.privateNotes !== undefined || body.publicNotes !== undefined ||
+        body.recommendations !== undefined) {
+      updateData.json_definition = jsonDefinition;
+    }
+
+    // Direct column updates
     if (body.completedAt !== undefined) updateData.completed_at = body.completedAt;
-    if (body.duration !== undefined) updateData.duration = body.duration;
     if (body.overallRpe !== undefined) updateData.overall_rpe = body.overallRpe;
-    if (body.privateNotes !== undefined) updateData.private_notes = body.privateNotes;
-    if (body.publicNotes !== undefined) updateData.public_notes = body.publicNotes;
-    if (body.recommendations !== undefined) updateData.recommendations = body.recommendations;
+    if (body.privateNotes !== undefined) updateData.notes = body.privateNotes;
     if (body.trainerDeclaration !== undefined) updateData.trainer_declaration = body.trainerDeclaration;
     if (body.completed !== undefined) updateData.completed = body.completed;
-    if (body.signOffMode !== undefined) updateData.sign_off_mode = body.signOffMode;
     if (body.sessionName !== undefined) updateData.session_name = body.sessionName;
     if (body.clientId !== undefined) updateData.client_id = body.clientId;
 

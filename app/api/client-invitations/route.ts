@@ -105,8 +105,12 @@ export async function POST(request: NextRequest) {
 
     // Get or create studio ID
     let studioId = profile.studio_id;
-    if (!studioId && profile.role === 'solo_practitioner') {
-      studioId = user.id;
+    if (!studioId) {
+      // For owners without a linked studio, use their user ID as studio identifier
+      const rolesWithFallback = ['solo_practitioner', 'studio_owner', 'studio_manager'];
+      if (rolesWithFallback.includes(profile.role || '')) {
+        studioId = user.id;
+      }
     }
 
     if (!studioId) {

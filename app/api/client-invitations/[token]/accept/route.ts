@@ -78,7 +78,7 @@ export async function POST(
       userId = newUser.user.id;
     }
 
-    // Create or update profile for the user
+    // Create or update profile for the user (profiles table doesn't have studio_id)
     const { error: profileError } = await serviceClient
       .from('profiles')
       .upsert({
@@ -87,7 +87,6 @@ export async function POST(
         first_name: invitation.first_name || null,
         last_name: invitation.last_name || null,
         role: 'client',
-        studio_id: invitation.studio_id,
         is_onboarded: true,
       }, { onConflict: 'id' });
 
@@ -96,16 +95,21 @@ export async function POST(
     }
 
     // Create client record in fc_clients
+    const clientName = [invitation.first_name, invitation.last_name].filter(Boolean).join(' ') || invitation.email;
     const { error: clientError } = await serviceClient
       .from('fc_clients')
       .upsert({
         id: userId,
+        name: clientName, // Required NOT NULL column
         studio_id: invitation.studio_id,
         email: invitation.email,
         first_name: invitation.first_name || null,
         last_name: invitation.last_name || null,
         is_onboarded: true,
+        self_booking_allowed: true,
         credits: 0,
+        invited_by: invitation.invited_by,
+        source: 'invitation',
       }, { onConflict: 'id' });
 
     if (clientError) {

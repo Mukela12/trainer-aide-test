@@ -73,9 +73,16 @@ export function convertAIExerciseToSessionExercise(
     ? 'bodyweight'
     : 'weight';
 
-  // Get reps from AI format
-  const repsMin = aiExercise.reps_min || 0;
-  const repsMax = aiExercise.reps_max || aiExercise.reps_min || 0;
+  // Get reps from AI format - parse reps_target string if reps_min/max not set
+  let repsMin = aiExercise.reps_min || 0;
+  let repsMax = aiExercise.reps_max || 0;
+
+  // If reps_min/max are 0 but we have reps_target string (e.g., "8-12"), parse it
+  if (repsMin === 0 && repsMax === 0 && aiExercise.reps_target) {
+    const parsed = parseReps(String(aiExercise.reps_target));
+    repsMin = parsed.repsMin;
+    repsMax = parsed.repsMax;
+  }
 
   return {
     id: `ai_ex_${aiExercise.id}`,
@@ -144,13 +151,17 @@ function determineMuscleGroup(exerciseName: string): 'chest' | 'back' | 'legs' |
 /**
  * Parses reps string (e.g., "10-12" or "10") into min/max values
  */
-function parseReps(reps: string): { repsMin: number; repsMax: number } {
-  if (reps.includes('-')) {
-    const [min, max] = reps.split('-').map(s => parseInt(s.trim(), 10));
-    return { repsMin: min || 0, repsMax: max || 0 };
+function parseReps(reps: string | number | null | undefined): { repsMin: number; repsMax: number } {
+  if (!reps) return { repsMin: 0, repsMax: 0 };
+
+  const repsStr = String(reps).trim();
+
+  if (repsStr.includes('-')) {
+    const [min, max] = repsStr.split('-').map(s => parseInt(s.trim(), 10));
+    return { repsMin: min || 0, repsMax: max || min || 0 };
   }
 
-  const repCount = parseInt(reps, 10) || 0;
+  const repCount = parseInt(repsStr, 10) || 0;
   return { repsMin: repCount, repsMax: repCount };
 }
 

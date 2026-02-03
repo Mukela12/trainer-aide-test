@@ -23,8 +23,10 @@ export async function POST(
 
     const { data: updatedProgram, error } = await updateAIProgram(id, {
       is_template,
-      // When converting to template, also set client_profile_id to null
-      ...(is_template && { client_profile_id: null }),
+      // When converting to template, also publish it and remove client association
+      ...(is_template && { client_profile_id: null, is_published: true }),
+      // When unmarking as template, unpublish it
+      ...(!is_template && { is_published: false }),
     });
 
     if (error || !updatedProgram) {

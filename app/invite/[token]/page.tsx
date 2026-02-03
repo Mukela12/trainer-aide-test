@@ -5,13 +5,15 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   CheckCircle2,
   XCircle,
   Building2,
   Mail,
   User,
-  ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useUserStore } from '@/lib/stores/user-store';
@@ -40,6 +42,8 @@ export default function InvitationPage() {
   const [pageState, setPageState] = useState<PageState>('loading');
   const [invitation, setInvitation] = useState<InvitationDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     const loadInvitation = async () => {
@@ -117,40 +121,63 @@ export default function InvitationPage() {
   const handleAccept = async () => {
     if (!invitation) return;
 
-    // If not authenticated, redirect to login with return URL
+    // For unauthenticated users, validate password
     if (!isAuthenticated) {
-      const returnUrl = `/invite/${token}`;
-      router.push(`/login?returnTo=${encodeURIComponent(returnUrl)}&email=${encodeURIComponent(invitation.email)}`);
-      return;
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
     }
 
     setPageState('accepting');
+    setError(null);
+
     try {
-      // Call the server-side API to accept the invitation
-      // This creates the staff record and updates the user's profile
       const response = await fetch(`/api/invitations/${token}/accept`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: isAuthenticated ? undefined : password,
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.requiresLogin) {
+          // Existing user needs to sign in first
+          const returnUrl = `/invite/${token}`;
+          router.push(`/login?returnTo=${encodeURIComponent(returnUrl)}&email=${encodeURIComponent(invitation.email)}`);
+          return;
+        }
         throw new Error(data.error || 'Failed to accept invitation');
+      }
+
+      // Sign in the new user
+      if (!isAuthenticated && password) {
+        const supabase = getSupabaseBrowserClient();
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: invitation.email,
+          password,
+        });
+        if (signInError) {
+          console.error('Error signing in:', signInError);
+        }
       }
 
       setPageState('accepted');
 
-      // Redirect to the appropriate dashboard based on role
-      const redirectUrl = data.redirectUrl || '/trainer';
+      // Redirect to dashboard
       setTimeout(() => {
-        router.push(redirectUrl);
+        router.push(data.redirectUrl || '/trainer');
       }, 2000);
     } catch (err) {
       console.error('Error accepting invitation:', err);
-      setError(err instanceof Error ? err.message : 'Failed to accept invitation. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to accept invitation');
       setPageState('valid');
     }
   };
@@ -282,6 +309,35 @@ export default function InvitationPage() {
             )}
           </div>
 
+          {/* Password setup for new users */}
+          {!isAuthenticated && (
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="password">Create Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  required
+                  minLength={8}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
@@ -295,14 +351,14 @@ export default function InvitationPage() {
             disabled={pageState === 'accepting'}
           >
             {pageState === 'accepting' ? (
-              'Accepting...'
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                {isAuthenticated ? 'Accepting...' : 'Creating Account...'}
+              </>
             ) : isAuthenticated ? (
               'Accept Invitation'
             ) : (
-              <>
-                Sign In to Accept
-                <ArrowRight className="ml-2" size={18} />
-              </>
+              'Accept & Create Account'
             )}
           </Button>
 

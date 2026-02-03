@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     let studioId: string | null = null;
 
-    if (staff?.studio_id && ['owner', 'admin'].includes(staff.staff_type)) {
+    if (staff?.studio_id && ['owner', 'studio_owner', 'admin', 'manager'].includes(staff.staff_type)) {
       studioId = staff.studio_id;
     } else {
       // Fallback: check profiles for studio_owner or solo_practitioner
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     let studioId: string | null = null;
 
-    if (staff?.studio_id && ['owner', 'admin'].includes(staff.staff_type)) {
+    if (staff?.studio_id && ['owner', 'studio_owner', 'admin', 'manager'].includes(staff.staff_type)) {
       studioId = staff.studio_id;
     } else {
       // Fallback: check profiles for studio_owner or solo_practitioner

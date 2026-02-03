@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Calendar, Clock, Dumbbell, Sparkles, User } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Calendar, Clock, Dumbbell, Sparkles, User, ChevronDown, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AssignClientModal } from '../ai-programs/AssignClientModal';
+import { AssignAIProgramModal } from '../ai-programs/AssignAIProgramModal';
 import { WorkoutSelectorModal } from './WorkoutSelectorModal';
 import type { AIProgram } from '@/lib/types/ai-program';
 
@@ -15,7 +15,27 @@ interface AITemplateCardProps {
 
 export function AITemplateCard({ template, onUpdate }: AITemplateCardProps) {
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignMode, setAssignMode] = useState<'client' | 'trainer'>('client');
   const [showWorkoutSelector, setShowWorkoutSelector] = useState(false);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowAssignDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleAssignClick = (mode: 'client' | 'trainer') => {
+    setAssignMode(mode);
+    setShowAssignModal(true);
+    setShowAssignDropdown(false);
+  };
 
   const getGoalLabel = (goal: string) => {
     const labels: Record<string, string> = {
@@ -137,22 +157,44 @@ export function AITemplateCard({ template, onUpdate }: AITemplateCardProps) {
             >
               Use for Session
             </Button>
-            <Button
-              size="sm"
-              onClick={() => setShowAssignModal(true)}
-              className="flex-1 bg-wondrous-primary hover:bg-purple-700 text-white"
-            >
-              Assign to Client
-            </Button>
+            <div className="relative flex-1" ref={dropdownRef}>
+              <Button
+                size="sm"
+                onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                className="w-full bg-wondrous-primary hover:bg-purple-700 text-white"
+              >
+                Assign
+                <ChevronDown size={16} className="ml-1" />
+              </Button>
+              {showAssignDropdown && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 overflow-hidden">
+                  <button
+                    onClick={() => handleAssignClick('client')}
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <Users size={16} className="text-wondrous-magenta" />
+                    Assign to Client
+                  </button>
+                  <button
+                    onClick={() => handleAssignClick('trainer')}
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <Dumbbell size={16} className="text-blue-600" />
+                    Assign to Trainer
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Modals */}
       {showAssignModal && (
-        <AssignClientModal
+        <AssignAIProgramModal
           programId={template.id}
           programName={template.program_name}
+          initialMode={assignMode}
           onClose={() => setShowAssignModal(false)}
           onAssigned={() => {
             setShowAssignModal(false);

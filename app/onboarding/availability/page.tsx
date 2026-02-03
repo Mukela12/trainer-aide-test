@@ -244,10 +244,10 @@ export default function OnboardingAvailabilityPage() {
       {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-          Set your availability
+          When do you typically train clients?
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">
-          Define when clients can book sessions with you
+          Set your default hours. You can always adjust this later.
         </p>
       </div>
 

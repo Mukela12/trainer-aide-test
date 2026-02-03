@@ -167,6 +167,7 @@ export default function OnboardingServicesPage() {
       await supabase.from('ta_services').delete().eq('created_by', currentUser.id);
 
       // Insert all services
+      // For solo practitioners/studio owners, user_id serves as studio_id during onboarding
       const servicesToInsert = services.map((s) => ({
         name: s.name,
         description: s.description || null,
@@ -179,6 +180,7 @@ export default function OnboardingServicesPage() {
         is_public: s.isPublic,
         is_active: true,
         created_by: currentUser.id,
+        studio_id: currentUser.id, // Use user_id as studio_id for solo practitioners
       }));
 
       const { error } = await supabase.from('ta_services').insert(servicesToInsert);
@@ -204,10 +206,10 @@ export default function OnboardingServicesPage() {
       {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-          Set up your services
+          Let&apos;s set up your first service
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">
-          Define the types of sessions you offer to clients
+          Services are what clients book. Start with one — you can add more anytime.
         </p>
       </div>
 

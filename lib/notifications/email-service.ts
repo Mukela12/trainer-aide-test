@@ -11,6 +11,7 @@ import {
   getBookingRequestAcceptedEmail,
   getBookingRequestDeclinedEmail,
   getClientInvitationEmail,
+  getCustomEmail,
 } from './email-templates';
 
 // Lazy initialization of Resend client to avoid build-time errors when API key is not set
@@ -534,6 +535,57 @@ Powered by allwondrous
     return { success: true, messageId: data?.id };
   } catch (error) {
     console.error('Error sending invitation:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Send custom email from trainer/studio owner to client
+ */
+export async function sendCustomEmail(params: {
+  recipientEmail: string;
+  recipientName: string;
+  senderName: string;
+  studioName: string;
+  subject: string;
+  message: string;
+  clientId?: string;
+}): Promise<SendEmailResult> {
+  try {
+    const email = getCustomEmail({
+      recipientName: params.recipientName,
+      senderName: params.senderName,
+      studioName: params.studioName,
+      subject: params.subject,
+      message: params.message,
+    });
+
+    const { data, error } = await getResendClient().emails.send({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: params.recipientEmail,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (params.clientId) {
+      await logNotification({
+        type: 'custom_email',
+        recipientEmail: params.recipientEmail,
+        clientId: params.clientId,
+        status: 'sent',
+        messageId: data?.id,
+      });
+    }
+
+    return { success: true, messageId: data?.id };
+  } catch (error) {
+    console.error('Error sending custom email:', error);
     return { success: false, error: String(error) };
   }
 }

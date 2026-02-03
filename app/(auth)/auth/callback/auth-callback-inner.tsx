@@ -70,7 +70,10 @@ export function AuthCallbackInner() {
         setUserFromProfile(profile)
 
         // Check if user needs onboarding
-        if (!profile.isOnboarded) {
+        // IMPORTANT: Clients (role = 'client') NEVER need onboarding
+        // The onboarding flow is only for solo practitioners and studio owners
+        const isClient = profile.role === 'client'
+        if (!profile.isOnboarded && !isClient) {
           router.push('/onboarding')
           return
         }
@@ -79,12 +82,47 @@ export function AuthCallbackInner() {
         const dashboard = ROLE_DASHBOARDS[profile.role as UserRole] || '/solo'
         router.push(dashboard)
       } else {
+        // Check if user might be a client (via server API to bypass RLS)
+        const clientCheck = await fetch(`/api/auth/check-client?email=${encodeURIComponent(user.email || '')}`)
+        if (clientCheck.ok) {
+          const clientData = await clientCheck.json()
+          if (clientData.isClient) {
+            // User is a client - create profile and redirect to client dashboard
+            const clientProfile = {
+              id: user.id,
+              email: user.email || '',
+              firstName: clientData.firstName || '',
+              lastName: clientData.lastName || '',
+              role: 'client' as const,
+              isOnboarded: true,
+            }
+            setUserFromProfile(clientProfile)
+
+            // Create profile record for the client
+            await supabase.from('profiles').upsert({
+              id: user.id,
+              email: user.email,
+              first_name: clientData.firstName || null,
+              last_name: clientData.lastName || null,
+              role: 'client',
+              is_onboarded: true,
+            }, { onConflict: 'id' })
+
+            router.push('/client')
+            return
+          }
+        }
+
         // New user - create profile
         const newProfile = await createUserProfile(supabase, user)
+        if ((newProfile as any)?.error === 'EMAIL_EXISTS') {
+          setError('This email is already registered. Please sign in instead.')
+          return
+        }
         if (newProfile) {
           setUserFromProfile(newProfile)
 
-          // New users always need onboarding
+          // New users need onboarding (except clients, but clients already handled above)
           if (!newProfile.isOnboarded) {
             router.push('/onboarding')
             return
@@ -170,7 +208,7 @@ async function lookupUserProfile(
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   if (profile) {
     return {
@@ -183,12 +221,32 @@ async function lookupUserProfile(
     }
   }
 
+  // 1b. Fallback: Check profiles by email (handles auth provider switch)
+  if (user.email) {
+    const { data: profileByEmail } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', user.email)
+      .maybeSingle()
+
+    if (profileByEmail) {
+      return {
+        id: profileByEmail.id,
+        email: profileByEmail.email || user.email || '',
+        firstName: profileByEmail.first_name || '',
+        lastName: profileByEmail.last_name || '',
+        role: mapRole(profileByEmail.role),
+        isOnboarded: profileByEmail.is_onboarded === true,
+      }
+    }
+  }
+
   // 2. Check bs_staff table
   const { data: staff } = await supabase
     .from('bs_staff')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   if (staff) {
     const roleMap: Record<string, string> = {
@@ -209,12 +267,40 @@ async function lookupUserProfile(
     }
   }
 
+  // 2b. Fallback: Check bs_staff by email
+  if (user.email) {
+    const { data: staffByEmail } = await supabase
+      .from('bs_staff')
+      .select('*')
+      .eq('email', user.email)
+      .maybeSingle()
+
+    if (staffByEmail) {
+      const roleMap: Record<string, string> = {
+        owner: 'studio_owner',
+        manager: 'studio_manager',
+        instructor: 'trainer',
+        trainer: 'trainer',
+        receptionist: 'receptionist',
+        finance: 'finance_manager',
+      }
+      return {
+        id: user.id,
+        email: staffByEmail.email || user.email || '',
+        firstName: staffByEmail.first_name || '',
+        lastName: staffByEmail.last_name || '',
+        role: staffByEmail.is_solo ? 'solo_practitioner' : (roleMap[staffByEmail.staff_type] || 'trainer'),
+        studioId: staffByEmail.studio_id,
+      }
+    }
+  }
+
   // 3. Check instructors table
   const { data: instructor } = await supabase
     .from('instructors')
     .select('*')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
   if (instructor) {
     return {
@@ -223,6 +309,25 @@ async function lookupUserProfile(
       firstName: instructor.first_name || '',
       lastName: instructor.last_name || '',
       role: instructor.role || 'trainer',
+    }
+  }
+
+  // 3b. Fallback: Check instructors by email
+  if (user.email) {
+    const { data: instructorByEmail } = await supabase
+      .from('instructors')
+      .select('*')
+      .eq('email', user.email)
+      .maybeSingle()
+
+    if (instructorByEmail) {
+      return {
+        id: user.id,
+        email: instructorByEmail.email || user.email || '',
+        firstName: instructorByEmail.first_name || '',
+        lastName: instructorByEmail.last_name || '',
+        role: instructorByEmail.role || 'trainer',
+      }
     }
   }
 
@@ -245,9 +350,12 @@ async function createUserProfile(
   const firstName = (metadata.given_name as string) || (metadata.first_name as string) || (metadata.full_name as string)?.split(' ')[0] || ''
   const lastName = (metadata.family_name as string) || (metadata.last_name as string) || (metadata.full_name as string)?.split(' ').slice(1).join(' ') || ''
 
+  // Use upsert with onConflict: 'id' to handle double-execution gracefully
+  // (e.g., if auth callback runs twice due to redirects or re-renders)
+  // If a DIFFERENT user ID tries to use the same email, we'll get a unique constraint error
   const { data, error } = await supabase
     .from('profiles')
-    .insert({
+    .upsert({
       id: user.id,
       email: user.email,
       first_name: firstName,
@@ -257,12 +365,16 @@ async function createUserProfile(
       is_active: true,
       platform_version: 'v2',
       v2_active: true,
-    })
+    }, { onConflict: 'id' })
     .select()
     .single()
 
   if (error) {
     console.error('Error creating profile:', error)
+    // Check if it's a duplicate email error (different user ID has this email)
+    if (error.code === '23505' && error.message?.includes('profiles_email_key')) {
+      return { error: 'EMAIL_EXISTS' } as any  // Special marker for duplicate email
+    }
     return null
   }
 

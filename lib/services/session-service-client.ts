@@ -13,6 +13,7 @@ export interface CreateSessionInput {
   trainerId: string;
   clientId?: string;
   templateId: string;
+  workoutId?: string; // AI workout ID - when provided, template_id should be NULL
   sessionName?: string;
   signOffMode?: SignOffMode;
   blocks: SessionBlock[];
@@ -194,6 +195,7 @@ export async function createSessionClient(input: CreateSessionInput): Promise<Se
         trainerId: input.trainerId,
         clientId: input.clientId,
         templateId: input.templateId,
+        workoutId: input.workoutId, // AI workout ID
         sessionName: input.sessionName || 'Training Session',
         signOffMode: input.signOffMode || 'full_session',
         blocks: input.blocks,

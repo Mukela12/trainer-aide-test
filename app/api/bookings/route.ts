@@ -18,6 +18,14 @@ export async function GET(request: NextRequest) {
     }
 
     const serviceClient = createServiceRoleClient();
+
+    // Clean up expired soft-holds before fetching bookings
+    await serviceClient
+      .from('ta_bookings')
+      .update({ status: 'cancelled' })
+      .eq('status', 'soft-hold')
+      .lt('hold_expiry', new Date().toISOString());
+
     const profile = await lookupUserProfile(serviceClient, user);
     const studioId = profile?.studio_id || user.id;
 
@@ -135,6 +143,31 @@ export async function POST(request: NextRequest) {
       const expiry = new Date();
       expiry.setMinutes(expiry.getMinutes() + 15);
       bookingData.hold_expiry = expiry.toISOString();
+    }
+
+    // Check for booking conflicts
+    const scheduledDate = new Date(bookingData.scheduled_at);
+    const endTime = new Date(scheduledDate.getTime() + bookingData.duration * 60 * 1000);
+
+    const { data: existingBookings } = await serviceClient
+      .from('ta_bookings')
+      .select('id, scheduled_at, duration')
+      .eq('trainer_id', bookingData.trainer_id)
+      .in('status', ['confirmed', 'soft-hold', 'checked-in'])
+      .gte('scheduled_at', new Date(scheduledDate.getTime() - 120 * 60 * 1000).toISOString())
+      .lte('scheduled_at', endTime.toISOString());
+
+    // Check for overlaps
+    for (const existing of existingBookings || []) {
+      const existingStart = new Date(existing.scheduled_at);
+      const existingEnd = new Date(existingStart.getTime() + existing.duration * 60 * 1000);
+
+      if (scheduledDate < existingEnd && endTime > existingStart) {
+        return NextResponse.json(
+          { error: 'Time slot conflict with existing booking' },
+          { status: 409 }
+        );
+      }
     }
 
     const { data, error } = await serviceClient

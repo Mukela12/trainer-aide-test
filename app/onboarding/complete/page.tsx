@@ -37,15 +37,54 @@ export default function OnboardingCompletePage() {
         })
         .eq('id', currentUser.id);
 
-      // Load business slug for booking URL
-      const { data } = await supabase
+      // Load profile data for business slug and role
+      const { data: profile } = await supabase
         .from('profiles')
-        .select('business_slug')
+        .select('business_slug, role, first_name, last_name, email')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
 
-      if (data?.business_slug) {
-        setBusinessSlug(data.business_slug);
+      if (profile?.business_slug) {
+        setBusinessSlug(profile.business_slug);
+      }
+
+      // Create bs_studios and bs_staff records for solo practitioners/studio owners
+      // This enables the RLS policies for ta_invitations to work correctly
+      if (profile && ['solo_practitioner', 'studio_owner'].includes(profile.role || '')) {
+        // Use upsert to create or update bs_studios record (may have been created in role selection)
+        // This satisfies the foreign key constraint on ta_invitations.studio_id
+        const displayName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'My Studio';
+        await supabase.from('bs_studios').upsert({
+          id: currentUser.id,
+          owner_id: currentUser.id,
+          name: displayName,
+          studio_type: profile.role === 'solo_practitioner' ? 'solo' : 'studio',
+          studio_mode: 'trainer-led',
+          plan: 'free',
+          license_level: 'starter',
+          platform_version: 'v2',
+        }, { onConflict: 'id' });
+
+        // Check if bs_staff record already exists
+        const { data: existingStaff } = await supabase
+          .from('bs_staff')
+          .select('id')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+        if (!existingStaff) {
+          // Create bs_staff record with owner staff_type and studio_id = user.id
+          await supabase.from('bs_staff').insert({
+            id: currentUser.id,
+            email: profile.email || '',
+            first_name: profile.first_name || '',
+            last_name: profile.last_name || '',
+            studio_id: currentUser.id, // For solo practitioners, user.id is the studio
+            staff_type: 'owner',
+            is_solo: profile.role === 'solo_practitioner',
+            is_onboarded: true,
+          });
+        }
       }
     };
     loadProfileAndMarkOnboarded();

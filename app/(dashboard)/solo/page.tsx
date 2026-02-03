@@ -7,12 +7,59 @@ import { useCalendarStore } from '@/lib/stores/booking-store';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dumbbell, Calendar, Plus, Users, DollarSign, Clock, TrendingUp, Package, Inbox, FileText, UserPlus } from 'lucide-react';
+import { Dumbbell, Calendar, Plus, Users, DollarSign, Clock, TrendingUp, Package, Inbox, FileText, UserPlus, Sparkles, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
+import { PublicBookingLink } from '@/components/shared/PublicBookingLink';
 
 // Format today's date
 const today = new Date();
 const dateString = format(today, 'EEEE, MMMM d');
+
+// Tier 2 collapsible actions component
+function TierTwoActions() {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+      >
+        <span className="font-medium">Build & Setup</span>
+        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+
+      {isExpanded && (
+        <div className="grid grid-cols-3 gap-3 mt-2">
+          <Link href="/solo/packages" className="group">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:shadow-sm transition-all">
+              <div className="flex items-center gap-2">
+                <Package className="text-gray-400" size={16} />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Packages</span>
+              </div>
+            </div>
+          </Link>
+          <Link href="/solo/templates" className="group">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:shadow-sm transition-all">
+              <div className="flex items-center gap-2">
+                <FileText className="text-gray-400" size={16} />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Templates</span>
+              </div>
+            </div>
+          </Link>
+          <Link href="/settings" className="group">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:shadow-sm transition-all">
+              <div className="flex items-center gap-2">
+                <Settings className="text-gray-400" size={16} />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Settings</span>
+              </div>
+            </div>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface DashboardStats {
   earningsThisWeek: number;
@@ -43,7 +90,7 @@ interface RecentClient {
 }
 
 export default function SoloPractitionerDashboard() {
-  const { currentUser } = useUserStore();
+  const { currentUser, businessSlug } = useUserStore();
   const { sessions: calendarSessions } = useCalendarStore();
 
   const [stats, setStats] = useState<DashboardStats>({
@@ -270,82 +317,108 @@ export default function SoloPractitionerDashboard() {
         </div>
       )}
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Tiered Structure */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-heading-2 dark:text-gray-100">Quick Actions</h2>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          <Link href="/solo/sessions/new" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-blue-200/50 dark:border-blue-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-blue-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Plus className="text-wondrous-blue dark:text-blue-400" size={22} strokeWidth={2.5} />
+        {/* TIER 1: Core Daily Actions (Always visible, prominent) */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-heading-2 dark:text-gray-100">Quick Actions</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <Link href="/solo/sessions/new" className="group">
+              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
+                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Plus className="text-purple-600 dark:text-purple-400" size={22} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Start Session</span>
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Start Session</span>
               </div>
-            </div>
-          </Link>
-          <Link href="/solo/calendar" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-purple-200/50 dark:border-purple-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-purple-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Calendar className="text-purple-600 dark:text-purple-400" size={22} strokeWidth={2.5} />
+            </Link>
+            <Link href="/solo/calendar" className="group">
+              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
+                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Calendar className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">View Calendar</span>
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">View Calendar</span>
               </div>
-            </div>
-          </Link>
-          <Link href="/solo/packages" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-green-200/50 dark:border-green-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-green-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Package className="text-green-600 dark:text-green-400" size={22} strokeWidth={2.5} />
+            </Link>
+            <Link href="/solo/clients" className="group">
+              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
+                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <UserPlus className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Add Client</span>
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Sell Package</span>
               </div>
-            </div>
-          </Link>
-          <Link href="/solo/templates/builder" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-pink-200/50 dark:border-pink-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-pink-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-pink-500/20 to-pink-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <FileText className="text-wondrous-magenta" size={22} strokeWidth={2.5} />
+            </Link>
+            <Link href="/solo/packages" className="group">
+              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
+                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Package className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Sell Package</span>
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Build Template</span>
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
         </div>
 
-        {/* Additional Quick Actions Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-4">
-          <Link href="/solo/clients" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-cyan-200/50 dark:border-cyan-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-cyan-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <UserPlus className="text-cyan-600 dark:text-cyan-400" size={22} strokeWidth={2.5} />
+        {/* TIER 2: Build & Setup (Collapsible) */}
+        <TierTwoActions />
+
+        {/* Public Booking Link */}
+        {businessSlug && (
+          <div className="mt-6">
+            <PublicBookingLink
+              businessSlug={businessSlug}
+              businessName={`${currentUser.firstName} ${currentUser.lastName}`}
+            />
+          </div>
+        )}
+
+        {/* TIER 3: AI Enhancements */}
+        <div className="mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="text-purple-500" size={16} />
+            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Enhance your workflow</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/solo/programs" className="group">
+              <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200/30 dark:border-purple-700/30 rounded-xl p-4 hover:shadow-md active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Sparkles className="text-purple-600 dark:text-purple-400" size={18} />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">AI Programs</span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Generate training plans</p>
+                  </div>
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Manage Clients</span>
               </div>
-            </div>
-          </Link>
-          <Link href="/solo/requests" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-indigo-200/50 dark:border-indigo-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-indigo-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Inbox className="text-indigo-600 dark:text-indigo-400" size={22} strokeWidth={2.5} />
+            </Link>
+            <Link href="/solo/templates/builder" className="group">
+              <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200/30 dark:border-purple-700/30 rounded-xl p-4 hover:shadow-md active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <FileText className="text-purple-600 dark:text-purple-400" size={18} />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">AI Templates</span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Create workout templates</p>
+                  </div>
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Booking Requests</span>
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
         </div>
       </div>
 

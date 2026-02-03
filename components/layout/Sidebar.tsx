@@ -9,6 +9,7 @@ import {
   FileText,
   Dumbbell,
   Calendar,
+  CalendarPlus,
   Settings,
   Home,
   BookOpen,
@@ -31,46 +32,100 @@ interface NavLink {
   href: string;
   label: string;
   icon: React.ReactNode;
+  badge?: string;
 }
 
-const studioOwnerLinks: NavLink[] = [
-  { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-  { href: '/studio-owner/clients', label: 'Clients', icon: <Users size={20} /> },
-  { href: '/studio-owner/programs', label: 'AI Programs', icon: <Sparkles size={20} /> },
-  { href: '/studio-owner/trainers', label: 'Trainers', icon: <UserPlus size={20} /> },
-  { href: '/studio-owner/team', label: 'Team', icon: <UserPlus size={20} /> },
-  { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
-  { href: '/studio-owner/packages', label: 'Packages', icon: <Package size={20} /> },
-  { href: '/studio-owner/templates', label: 'Templates', icon: <FileText size={20} /> },
-  { href: '/studio-owner/sessions', label: 'All Sessions', icon: <Dumbbell size={20} /> },
-  { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+interface NavGroup {
+  title: string;
+  links: NavLink[];
+}
+
+// Grouped navigation for solo practitioners
+const soloPractitionerGroups: NavGroup[] = [
+  {
+    title: 'OPERATE',
+    links: [
+      { href: '/solo', label: 'Dashboard', icon: <Home size={20} /> },
+      { href: '/solo/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
+      { href: '/solo/sessions', label: 'Services', icon: <Clock size={20} /> },
+      { href: '/solo/clients', label: 'Clients', icon: <Users size={20} /> },
+    ],
+  },
+  {
+    title: 'GROW',
+    links: [
+      { href: '/solo/packages', label: 'Packages', icon: <Package size={20} /> },
+      { href: '/solo/templates', label: 'Templates', icon: <FileText size={20} />, badge: 'AI' },
+    ],
+  },
+  {
+    title: 'SETTINGS',
+    links: [
+      { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+    ],
+  },
 ];
 
-const trainerLinks: NavLink[] = [
-  { href: '/trainer', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-  { href: '/trainer/templates', label: 'Templates', icon: <FileText size={20} /> },
-  { href: '/trainer/sessions', label: 'My Sessions', icon: <Dumbbell size={20} /> },
-  { href: '/trainer/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
-  { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+// Grouped navigation for studio owners
+const studioOwnerGroups: NavGroup[] = [
+  {
+    title: 'OPERATE',
+    links: [
+      { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+      { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
+      { href: '/studio-owner/clients', label: 'Clients', icon: <Users size={20} /> },
+      { href: '/studio-owner/sessions', label: 'All Sessions', icon: <Dumbbell size={20} /> },
+    ],
+  },
+  {
+    title: 'GROW',
+    links: [
+      { href: '/studio-owner/packages', label: 'Packages', icon: <Package size={20} /> },
+      { href: '/studio-owner/templates', label: 'Templates', icon: <FileText size={20} />, badge: 'AI' },
+      { href: '/studio-owner/trainers', label: 'Trainers', icon: <UserPlus size={20} /> },
+      { href: '/studio-owner/team', label: 'Team', icon: <UserPlus size={20} /> },
+    ],
+  },
+  {
+    title: 'SETTINGS',
+    links: [
+      { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+    ],
+  },
 ];
 
-const clientLinks: NavLink[] = [
-  { href: '/client', label: 'Home', icon: <Home size={20} /> },
-  { href: '/client/bookings', label: 'My Bookings', icon: <Calendar size={20} /> },
-  { href: '/client/packages', label: 'My Credits', icon: <CreditCard size={20} /> },
-  { href: '/client/sessions', label: 'Session History', icon: <Dumbbell size={20} /> },
-  { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+// Flat navigation for trainers (simpler structure)
+const trainerGroups: NavGroup[] = [
+  {
+    title: 'WORK',
+    links: [
+      { href: '/trainer', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+      { href: '/trainer/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
+      { href: '/trainer/sessions', label: 'My Sessions', icon: <Dumbbell size={20} /> },
+    ],
+  },
+  {
+    title: 'TOOLS',
+    links: [
+      { href: '/trainer/templates', label: 'Templates', icon: <FileText size={20} /> },
+      { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+    ],
+  },
 ];
 
-const soloPractitionerLinks: NavLink[] = [
-  { href: '/solo', label: 'Dashboard', icon: <Home size={20} /> },
-  { href: '/solo/clients', label: 'Clients', icon: <Users size={20} /> },
-  { href: '/solo/programs', label: 'AI Programs', icon: <Sparkles size={20} /> },
-  { href: '/solo/sessions', label: 'Sessions', icon: <Dumbbell size={20} /> },
-  { href: '/solo/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
-  { href: '/solo/packages', label: 'Packages', icon: <Package size={20} /> },
-  { href: '/solo/templates', label: 'Templates', icon: <FileText size={20} /> },
-  { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+// Flat navigation for clients
+const clientGroups: NavGroup[] = [
+  {
+    title: 'MY STUDIO',
+    links: [
+      { href: '/client', label: 'Home', icon: <Home size={20} /> },
+      { href: '/client/book', label: 'Book Session', icon: <CalendarPlus size={20} /> },
+      { href: '/client/bookings', label: 'My Bookings', icon: <Calendar size={20} /> },
+      { href: '/client/packages', label: 'My Credits', icon: <CreditCard size={20} /> },
+      { href: '/client/sessions', label: 'Session History', icon: <Dumbbell size={20} /> },
+      { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+    ],
+  },
 ];
 
 export function Sidebar() {
@@ -85,11 +140,11 @@ export function Sidebar() {
     router.push('/login');
   };
 
-  const links =
-    currentRole === 'studio_owner' ? studioOwnerLinks :
-    currentRole === 'trainer' ? trainerLinks :
-    currentRole === 'solo_practitioner' ? soloPractitionerLinks :
-    clientLinks;
+  const navGroups =
+    currentRole === 'studio_owner' ? studioOwnerGroups :
+    currentRole === 'trainer' ? trainerGroups :
+    currentRole === 'solo_practitioner' ? soloPractitionerGroups :
+    clientGroups;
 
   return (
     <aside
@@ -142,35 +197,62 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className={cn("p-4 space-y-1", collapsed ? "px-2" : "")}>
-        {links.map((link) => {
-          const isActive = pathname === link.href;
+      <nav className={cn("p-4 space-y-4", collapsed ? "px-2" : "")}>
+        {navGroups.map((group) => (
+          <div key={group.title}>
+            {/* Section Header */}
+            {!collapsed && (
+              <div className="px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                {group.title}
+              </div>
+            )}
+            <div className="space-y-1">
+              {group.links.map((link) => {
+                const isActive = pathname === link.href;
 
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "relative group flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200",
-                collapsed ? "px-2 py-3 justify-center" : "px-4 py-3",
-                isActive
-                  ? "bg-wondrous-magenta text-white shadow-md"
-                  : "text-gray-700 hover:bg-wondrous-magenta/10 hover:text-wondrous-magenta"
-              )}
-              title={collapsed ? link.label : undefined}
-            >
-              {link.icon}
-              {!collapsed && link.label}
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      "relative group flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200",
+                      collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
+                      isActive
+                        ? "bg-slate-100 dark:bg-slate-800 text-gray-900 dark:text-gray-100"
+                        : "text-gray-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-gray-200"
+                    )}
+                    title={collapsed ? link.label : undefined}
+                  >
+                    {/* Subtle accent indicator for active state */}
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full" />
+                    )}
+                    <span className={cn(
+                      "transition-colors",
+                      isActive ? "text-gray-900 dark:text-gray-100" : "text-gray-500 dark:text-gray-400"
+                    )}>
+                      {link.icon}
+                    </span>
+                    {!collapsed && (
+                      <span className="flex-1">{link.label}</span>
+                    )}
+                    {!collapsed && link.badge && (
+                      <span className="text-xs">{link.badge}</span>
+                    )}
 
-              {/* Tooltip for collapsed state */}
-              {collapsed && (
-                <div className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-lg z-50">
-                  {link.label}
-                </div>
-              )}
-            </Link>
-          );
-        })}
+                    {/* Tooltip for collapsed state */}
+                    {collapsed && (
+                      <div className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-lg z-50">
+                        {link.label}
+                        {link.badge && <span className="ml-1">{link.badge}</span>}
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* User Info (Bottom) */}

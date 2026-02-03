@@ -10,6 +10,7 @@ import { ArrowLeft, ArrowRight, Globe, Check, AlertCircle } from 'lucide-react';
 import { useUserStore } from '@/lib/stores/user-store';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils/cn';
+import { LogoUpload } from '@/components/shared/LogoUpload';
 
 export default function OnboardingBusinessPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function OnboardingBusinessPage() {
     businessName: '',
     customSlug: '',
   });
+  const [businessLogo, setBusinessLogo] = useState<string | null>(null);
   const [generatedSlug, setGeneratedSlug] = useState('');
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [isCheckingSlug, setIsCheckingSlug] = useState(false);
@@ -32,7 +34,7 @@ export default function OnboardingBusinessPage() {
       .replace(/^-|-$/g, '');
   };
 
-  // Check slug availability
+  // Check slug availability via server API to bypass RLS restrictions
   const checkSlugAvailability = async (slug: string) => {
     if (!slug) {
       setSlugAvailable(null);
@@ -41,17 +43,21 @@ export default function OnboardingBusinessPage() {
 
     setIsCheckingSlug(true);
     try {
-      const supabase = getSupabaseBrowserClient();
-      const { data } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('business_slug', slug)
-        .neq('id', currentUser.id)
-        .single();
+      const response = await fetch(
+        `/api/onboarding/check-slug?slug=${encodeURIComponent(slug)}&userId=${currentUser.id}`
+      );
 
-      setSlugAvailable(!data);
+      if (!response.ok) {
+        // On error, assume available to not block the user
+        console.error('Error checking slug availability');
+        setSlugAvailable(true);
+        return;
+      }
+
+      const data = await response.json();
+      setSlugAvailable(data.available);
     } catch {
-      // No match found means slug is available
+      // On error, assume available to not block the user
       setSlugAvailable(true);
     } finally {
       setIsCheckingSlug(false);
@@ -135,6 +141,18 @@ export default function OnboardingBusinessPage() {
           <CardTitle>Business Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Business Logo */}
+          <div className="space-y-2">
+            <Label>Business Logo (Optional)</Label>
+            <p className="text-sm text-gray-500 mb-3">
+              Add a logo to personalize your booking page and emails
+            </p>
+            <LogoUpload
+              currentLogo={businessLogo}
+              onLogoChange={setBusinessLogo}
+            />
+          </div>
+
           {/* Business Name */}
           <div className="space-y-2">
             <Label htmlFor="businessName">Business Name (Optional)</Label>

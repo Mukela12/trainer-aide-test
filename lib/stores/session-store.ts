@@ -83,8 +83,8 @@ export const useSessionStore = create<SessionState>()(
           throw new Error('Cannot start a new session. Please complete or cancel the current active session first.');
         }
 
-        // Generate session ID
-        const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        // Generate session ID using proper UUID format
+        const sessionId = crypto.randomUUID();
         const startedAt = new Date().toISOString();
 
         const newSession: Session = {
@@ -109,6 +109,7 @@ export const useSessionStore = create<SessionState>()(
             trainerId: sessionData.trainerId,
             clientId: sessionData.clientId,
             templateId: sessionData.templateId,
+            workoutId: (sessionData as { workoutId?: string }).workoutId, // AI workout ID
             sessionName: sessionData.sessionName,
             signOffMode: sessionData.signOffMode,
             blocks: sessionData.blocks,
@@ -126,15 +127,26 @@ export const useSessionStore = create<SessionState>()(
             }));
             return created.id;
           } else {
-            console.error('Failed to persist session to database');
-            set({ isSaving: false });
+            // Remove the optimistically added session on failure
+            set((state) => ({
+              sessions: state.sessions.filter(s => s.id !== sessionId),
+              activeSessionId: null,
+              isSaving: false,
+              error: 'Failed to create session in database',
+            }));
+            throw new Error('Failed to persist session to database');
           }
         } catch (error) {
           console.error('Error persisting session:', error);
-          set({ isSaving: false });
+          // Remove the optimistically added session on error
+          set((state) => ({
+            sessions: state.sessions.filter(s => s.id !== sessionId),
+            activeSessionId: null,
+            isSaving: false,
+            error: error instanceof Error ? error.message : 'Failed to create session',
+          }));
+          throw error;
         }
-
-        return sessionId;
       },
 
       updateSession: async (sessionId, updates) => {

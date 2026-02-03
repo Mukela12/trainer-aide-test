@@ -13,13 +13,18 @@ export async function POST(
       return NextResponse.json({ error: 'Token is required' }, { status: 400 });
     }
 
-    // Get the authenticated user
-    const supabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized - Please sign in first' }, { status: 401 });
+    // Parse request body for password (for new users)
+    let password: string | undefined;
+    try {
+      const body = await request.json();
+      password = body.password;
+    } catch {
+      // No body or invalid JSON - that's okay for authenticated users
     }
+
+    // Try to get authenticated user (may be null for new signups)
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
     // Use service role client for database operations (bypasses RLS)
     const serviceClient = createServiceRoleClient();
@@ -59,6 +64,47 @@ export async function POST(
       return NextResponse.json({ error: 'Invitation has expired' }, { status: 400 });
     }
 
+    // Check if user already exists with this email
+    const { data: existingUsers } = await serviceClient.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(
+      (u: { email?: string }) => u.email?.toLowerCase() === invitation.email.toLowerCase()
+    );
+
+    let userId: string;
+
+    if (existingUser) {
+      // User exists - they must be logged in to accept
+      if (!user || user.id !== existingUser.id) {
+        return NextResponse.json({
+          error: 'An account with this email already exists. Please sign in first.',
+          requiresLogin: true
+        }, { status: 401 });
+      }
+      userId = existingUser.id;
+    } else {
+      // New user - create account with password
+      if (!password || password.length < 8) {
+        return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
+      }
+
+      const { data: newUser, error: createError } = await serviceClient.auth.admin.createUser({
+        email: invitation.email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          first_name: invitation.first_name,
+          last_name: invitation.last_name,
+        },
+      });
+
+      if (createError || !newUser.user) {
+        console.error('Error creating user:', createError);
+        return NextResponse.json({ error: 'Failed to create account' }, { status: 500 });
+      }
+
+      userId = newUser.user.id;
+    }
+
     // Map invitation role to staff_type
     const roleToStaffType: Record<string, string> = {
       'trainer': 'trainer',
@@ -73,7 +119,7 @@ export async function POST(
     const { data: existingStaff } = await serviceClient
       .from('bs_staff')
       .select('id, studio_id')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     if (existingStaff) {
@@ -90,7 +136,7 @@ export async function POST(
             is_onboarded: true,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', user.id);
+          .eq('id', userId);
 
         if (updateStaffError) {
           console.error('Error updating staff record:', updateStaffError);
@@ -106,7 +152,7 @@ export async function POST(
             is_onboarded: true,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', user.id);
+          .eq('id', userId);
 
         if (updateStaffError) {
           console.error('Error updating staff record:', updateStaffError);
@@ -118,8 +164,8 @@ export async function POST(
       const { error: createStaffError } = await serviceClient
         .from('bs_staff')
         .insert({
-          id: user.id,
-          email: invitation.email || user.email,
+          id: userId,
+          email: invitation.email,
           first_name: invitation.first_name,
           last_name: invitation.last_name,
           studio_id: invitation.studio_id,
@@ -148,7 +194,7 @@ export async function POST(
     const { data: existingProfile } = await serviceClient
       .from('profiles')
       .select('id')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     if (existingProfile) {
@@ -161,7 +207,7 @@ export async function POST(
           is_onboarded: true,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', user.id);
+        .eq('id', userId);
 
       if (updateProfileError) {
         console.error('Error updating profile:', updateProfileError);
@@ -172,8 +218,8 @@ export async function POST(
       const { error: createProfileError } = await serviceClient
         .from('profiles')
         .insert({
-          id: user.id,
-          email: invitation.email || user.email,
+          id: userId,
+          email: invitation.email,
           first_name: invitation.first_name,
           last_name: invitation.last_name,
           role: profileRole,
@@ -193,7 +239,7 @@ export async function POST(
       .update({
         status: 'accepted',
         accepted_at: new Date().toISOString(),
-        accepted_by: user.id,
+        accepted_by: userId,
       })
       .eq('id', invitation.id);
 

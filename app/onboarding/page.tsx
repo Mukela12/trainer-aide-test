@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Building2, Check } from 'lucide-react';
+import { User, Building2, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useUserStore } from '@/lib/stores/user-store';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -16,16 +16,18 @@ export default function OnboardingRolePage() {
   const { currentUser, setRole } = useUserStore();
   const [selectedRole, setSelectedRole] = useState<RoleOption | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleContinue = async () => {
     if (!selectedRole) return;
 
     setIsLoading(true);
+    setError(null);
     try {
       const supabase = getSupabaseBrowserClient();
 
       // Update profile with selected role
-      const { error } = await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({
           role: selectedRole,
@@ -33,15 +35,40 @@ export default function OnboardingRolePage() {
         })
         .eq('id', currentUser.id);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // Create bs_studios record via server API to bypass RLS restrictions
+      // This prevents FK constraint errors when seeding services and availability
+      const displayName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ') || 'My Studio';
+
+      const studioResponse = await fetch('/api/onboarding/studio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          name: displayName,
+          studioType: selectedRole === 'solo_practitioner' ? 'solo' : 'studio',
+          role: selectedRole,
+        }),
+      });
+
+      if (!studioResponse.ok) {
+        const errorData = await studioResponse.json();
+        console.error('Error creating studio:', errorData);
+        // Show error to user instead of silently continuing
+        setError('Failed to set up your studio. Please try again.');
+        setIsLoading(false);
+        return; // Block navigation
+      }
 
       // Update local store
       setRole(selectedRole);
 
       // Navigate to next step
       router.push('/onboarding/profile');
-    } catch (error) {
-      console.error('Error saving role:', error);
+    } catch (err) {
+      console.error('Error saving role:', err);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -56,26 +83,26 @@ export default function OnboardingRolePage() {
   }> = [
     {
       id: 'solo_practitioner',
-      title: 'Solo Personal Trainer',
-      description: 'I work independently with my own clients',
+      title: 'Independent Trainer',
+      description: 'You train clients directly and manage your own schedule',
       icon: User,
       features: [
-        'Manage your own calendar & bookings',
-        'Create workout templates',
-        'Track client progress',
-        'Accept payments directly',
+        'Your calendar, your way',
+        'Professional workout templates',
+        'Client progress tracking',
+        'Direct payments & packages',
       ],
     },
     {
       id: 'studio_owner',
-      title: 'Studio Owner',
-      description: 'I run a gym or studio with trainers',
+      title: 'Studio Operator',
+      description: 'You run a studio with one or more trainers',
       icon: Building2,
       features: [
-        'Everything in Solo, plus:',
-        'Invite and manage team members',
-        'Set trainer commissions',
-        'View studio-wide analytics',
+        'Multi-trainer scheduling',
+        'Team management & permissions',
+        'Studio-wide analytics',
+        'Centralised client management',
       ],
     },
   ];
@@ -85,10 +112,10 @@ export default function OnboardingRolePage() {
       {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-          Welcome to allwondrous!
+          What best describes you?
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">
-          Let&apos;s get you set up. First, tell us how you work.
+          This helps us configure the right tools for how you operate.
         </p>
       </div>
 
@@ -159,6 +186,14 @@ export default function OnboardingRolePage() {
           );
         })}
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300">
+          <AlertCircle size={20} />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Continue Button */}
       <div className="flex justify-end">

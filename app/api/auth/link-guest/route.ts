@@ -10,7 +10,7 @@ const supabase = createClient(
 /**
  * POST /api/auth/link-guest
  * Links a guest client record to a newly created auth account
- * Since fc_clients doesn't have user_id, we link by email and set is_guest=false
+ * Updates fc_clients.id to match the auth user's ID for proper API access
  */
 export async function POST(request: NextRequest) {
   try {
@@ -24,14 +24,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the client exists and is a guest
-    const { data: client, error: clientError } = await supabase
+    // Get full client details
+    const { data: clientDetails, error: clientError } = await supabase
       .from('fc_clients')
-      .select('id, is_guest, email')
+      .select('*')
       .eq('id', clientId)
       .single();
 
-    if (clientError || !client) {
+    if (clientError || !clientDetails) {
       return NextResponse.json(
         { error: 'Client not found' },
         { status: 404 }
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the email matches
-    if (client.email?.toLowerCase() !== email.toLowerCase()) {
+    if (clientDetails.email?.toLowerCase() !== email.toLowerCase()) {
       return NextResponse.json(
         { error: 'Email mismatch' },
         { status: 400 }
@@ -47,27 +47,62 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if client is already converted
-    if (!client.is_guest) {
+    if (!clientDetails.is_guest) {
       return NextResponse.json(
         { error: 'This client already has an account' },
         { status: 409 }
       );
     }
 
-    // Update the client record to mark as not a guest
-    const { error: updateError } = await supabase
+    // Delete the old guest record
+    const { error: deleteError } = await supabase
       .from('fc_clients')
-      .update({
-        is_guest: false,
-      })
+      .delete()
       .eq('id', clientId);
 
-    if (updateError) {
-      console.error('Error linking guest to account:', updateError);
+    if (deleteError) {
+      console.error('Error removing old client record:', deleteError);
+      // Continue anyway - the upsert below might still work
+    }
+
+    // Create new client record with user's ID
+    // This ensures fc_clients.id matches auth.users.id for proper API access
+    const { error: insertError } = await supabase
+      .from('fc_clients')
+      .upsert({
+        id: userId, // Use the auth user's ID
+        name: clientDetails.name,
+        email: clientDetails.email,
+        phone: clientDetails.phone,
+        first_name: clientDetails.first_name,
+        last_name: clientDetails.last_name,
+        studio_id: clientDetails.studio_id,
+        invited_by: clientDetails.invited_by,
+        is_onboarded: true,
+        is_guest: false, // No longer a guest
+        self_booking_allowed: clientDetails.self_booking_allowed ?? true,
+        credits: clientDetails.credits ?? 0,
+        source: clientDetails.source || 'public_booking',
+        notification_preferences: clientDetails.notification_preferences || {},
+      }, { onConflict: 'id' });
+
+    if (insertError) {
+      console.error('Error creating linked client record:', insertError);
       return NextResponse.json(
         { error: 'Failed to link account' },
         { status: 500 }
       );
+    }
+
+    // Update any bookings to point to the new client ID
+    const { error: bookingError } = await supabase
+      .from('ta_bookings')
+      .update({ client_id: userId })
+      .eq('client_id', clientId);
+
+    if (bookingError) {
+      console.error('Error updating bookings:', bookingError);
+      // Non-fatal, continue
     }
 
     // Create a profile record for the user if it doesn't exist
@@ -75,54 +110,21 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('id')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (!existingProfile) {
-      // Get client details to create profile
-      const { data: clientDetails } = await supabase
-        .from('fc_clients')
-        .select('first_name, last_name, email')
-        .eq('id', clientId)
-        .single();
-
-      if (clientDetails) {
-        await supabase.from('profiles').insert({
-          id: userId,
-          first_name: clientDetails.first_name,
-          last_name: clientDetails.last_name,
-          email: clientDetails.email,
-          role: 'client',
-          is_onboarded: true,
-        });
-      }
+      await supabase.from('profiles').insert({
+        id: userId,
+        first_name: clientDetails.first_name,
+        last_name: clientDetails.last_name,
+        email: clientDetails.email,
+        role: 'client',
+        is_onboarded: true,
+      });
     }
 
-    // Create a bs_staff record with client role if it doesn't exist
-    const { data: existingStaff } = await supabase
-      .from('bs_staff')
-      .select('id')
-      .eq('id', userId)
-      .single();
-
-    if (!existingStaff) {
-      // Get client email for staff record
-      const { data: clientDetails } = await supabase
-        .from('fc_clients')
-        .select('first_name, last_name, email')
-        .eq('id', clientId)
-        .single();
-
-      if (clientDetails) {
-        await supabase.from('bs_staff').insert({
-          id: userId,
-          email: clientDetails.email,
-          first_name: clientDetails.first_name,
-          last_name: clientDetails.last_name,
-          staff_type: 'client',
-          is_onboarded: true,
-        });
-      }
-    }
+    // Note: We do NOT create bs_staff record for clients
+    // bs_staff is for trainers, managers, and studio staff - not clients
 
     return NextResponse.json({ success: true });
   } catch (error) {

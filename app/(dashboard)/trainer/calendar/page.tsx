@@ -178,8 +178,10 @@ export default function TrainerCalendar() {
 
   // Block time panel state
   const [showBlockTimePanel, setShowBlockTimePanel] = useState(false);
+
+  // Legend collapsed state (collapsed by default for experienced users)
+  const [showLegend, setShowLegend] = useState(false);
   const [blockRecurrence, setBlockRecurrence] = useState<RecurrenceType>('once');
-  const [blockMakeRecurring, setBlockMakeRecurring] = useState<boolean>(false);
   const [blockDate, setBlockDate] = useState<string>('');
   const [blockEndDate, setBlockEndDate] = useState<string>('');
   const [blockDayOfWeek, setBlockDayOfWeek] = useState<number>(1);
@@ -380,7 +382,7 @@ export default function TrainerCalendar() {
     }
 
     // Determine effective recurrence: if makeRecurring is enabled in one-time mode, treat as weekly
-    const effectiveRecurrence = (blockRecurrence === 'once' && blockMakeRecurring) ? 'weekly' : blockRecurrence;
+    const effectiveRecurrence = blockRecurrence;
     const blockDayFromDate = blockDate ? new Date(blockDate).getDay() : 1;
 
     const newBlock = {
@@ -862,32 +864,32 @@ export default function TrainerCalendar() {
               </div>
             </div>
 
-            <div className="flex gap-1.5 lg:gap-2">
+            <div className="flex gap-1">
               <button
                 onClick={() => setViewMode("day")}
                 className={cn(
-                  "flex-1 py-1.5 lg:py-2 rounded-lg text-[11px] lg:text-xs font-semibold transition-all active:scale-95",
+                  "px-3 py-1 text-[11px] lg:text-xs font-medium transition-all",
                   viewMode === "day"
-                    ? "bg-wondrous-blue text-white"
-                    : "bg-wondrous-grey-light text-wondrous-grey-dark"
+                    ? "text-gray-900 dark:text-gray-100 border-b-2 border-gray-900 dark:border-gray-100"
+                    : "text-gray-500 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-700 dark:hover:text-gray-300"
                 )}
                 aria-label="Day view"
                 aria-pressed={viewMode === "day"}
               >
-                Day View
+                Day
               </button>
               <button
                 onClick={() => setViewMode("week")}
                 className={cn(
-                  "flex-1 py-1.5 lg:py-2 rounded-lg text-[11px] lg:text-xs font-semibold transition-all active:scale-95",
+                  "px-3 py-1 text-[11px] lg:text-xs font-medium transition-all",
                   viewMode === "week"
-                    ? "bg-wondrous-blue text-white"
-                    : "bg-wondrous-grey-light text-wondrous-grey-dark"
+                    ? "text-gray-900 dark:text-gray-100 border-b-2 border-gray-900 dark:border-gray-100"
+                    : "text-gray-500 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-700 dark:hover:text-gray-300"
                 )}
                 aria-label="Week view"
                 aria-pressed={viewMode === "week"}
               >
-                Week View
+                Week
               </button>
             </div>
           </div>
@@ -952,10 +954,31 @@ export default function TrainerCalendar() {
             {/* Session List */}
             <div className="space-y-4">
               {todaysSessions.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 dark:text-gray-400 border-2 border-wondrous-grey-light dark:border-gray-700">
-                  <CalendarDays size={48} className="mx-auto mb-3 text-gray-300 dark:text-gray-600" />
-                  <div className="text-sm font-medium text-wondrous-grey-dark dark:text-gray-200">No sessions today</div>
-                  <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">Your schedule is clear</div>
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center border border-slate-200 dark:border-slate-700">
+                  <CalendarDays size={48} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                  <div className="text-base font-medium text-gray-900 dark:text-gray-100 mb-1">No sessions today</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">Would you like to open availability or book a client?</div>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button
+                      onClick={openBlockTimePanel}
+                      variant="outline"
+                      className="gap-2 border-slate-300 dark:border-slate-600"
+                    >
+                      <Clock size={16} />
+                      Open availability
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        const now = new Date();
+                        now.setMinutes(0, 0, 0);
+                        handleQuickSlotClick(now);
+                      }}
+                      className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    >
+                      <Plus size={16} />
+                      Book a session
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 todaysSessions.map((session) => {
@@ -1320,26 +1343,34 @@ export default function TrainerCalendar() {
               )}
             </div>
 
-            {/* Availability Legend */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-2 border-wondrous-grey-light dark:border-gray-700">
-              <div className="text-xs font-semibold mb-3 text-wondrous-grey-dark dark:text-gray-100 flex items-center gap-2">
-                <AlertCircle size={14} className="text-wondrous-blue dark:text-blue-400" />
-                Availability Legend
-              </div>
-              <div className="flex flex-wrap gap-4 text-xs">
+            {/* Availability Legend - Collapsible */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border-2 border-wondrous-grey-light dark:border-gray-700 overflow-hidden">
+              <button
+                onClick={() => setShowLegend(!showLegend)}
+                className="w-full p-3 text-xs font-semibold text-wondrous-grey-dark dark:text-gray-100 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              >
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded bg-white dark:bg-gray-700 border-2 border-wondrous-blue dark:border-blue-400 shadow-sm"></div>
-                  <span className="text-wondrous-grey-dark dark:text-gray-200 font-medium">Available</span>
+                  <AlertCircle size={14} className="text-wondrous-blue dark:text-blue-400" />
+                  Availability Legend
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded bg-red-50 border-2 border-red-300 shadow-sm"></div>
-                  <span className="text-wondrous-grey-dark dark:text-gray-200 font-medium">Conflict</span>
+                <ChevronRight size={14} className={cn("transition-transform", showLegend && "rotate-90")} />
+              </button>
+              {showLegend && (
+                <div className="px-3 pb-3 flex flex-wrap gap-4 text-xs border-t border-gray-100 dark:border-gray-700 pt-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded bg-white dark:bg-gray-700 border-2 border-wondrous-blue dark:border-blue-400 shadow-sm"></div>
+                    <span className="text-wondrous-grey-dark dark:text-gray-200 font-medium">Available</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded bg-red-50 border-2 border-red-300 shadow-sm"></div>
+                    <span className="text-wondrous-grey-dark dark:text-gray-200 font-medium">Conflict</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded bg-gray-100 border-2 border-gray-300 opacity-50 shadow-sm"></div>
+                    <span className="text-wondrous-grey-dark dark:text-gray-200 font-medium">Not Available</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded bg-gray-100 border-2 border-gray-300 opacity-50 shadow-sm"></div>
-                  <span className="text-wondrous-grey-dark dark:text-gray-200 font-medium">Not Available</span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Quick Time Selector - INLINE (NO MODAL) */}
@@ -2285,24 +2316,6 @@ export default function TrainerCalendar() {
                       min={blockDate}
                     />
                   </div>
-                  <div className="mb-4">
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg border-2 border-gray-300 dark:border-gray-600 hover:border-wondrous-magenta dark:hover:border-wondrous-magenta transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={blockMakeRecurring}
-                        onChange={(e) => setBlockMakeRecurring(e.target.checked)}
-                        className="w-5 h-5 rounded border-gray-300 text-wondrous-magenta focus:ring-wondrous-magenta"
-                      />
-                      <div className="flex-1">
-                        <div className="text-sm font-semibold text-wondrous-grey-dark dark:text-gray-200">
-                          Make Recurring
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          Repeat this block every week on the same day
-                        </div>
-                      </div>
-                    </label>
-                  </div>
                 </>
               )}
 
@@ -2434,24 +2447,46 @@ export default function TrainerCalendar() {
         )}
       </AnimatePresence>
 
-      {/* Floating Action Buttons */}
+      {/* Context-Aware Floating Action Button */}
       <div className="fixed bottom-24 right-6 lg:bottom-6 flex flex-col gap-3 z-30">
-        {/* Block Time Button */}
-        <button
-          onClick={openBlockTimePanel}
-          className="w-14 h-14 rounded-full bg-gray-300 text-gray-700 shadow-lg hover:shadow-xl hover:bg-gray-400 transition-all flex items-center justify-center"
-          aria-label="Block time"
-        >
-          <CalendarX size={24} />
-        </button>
-        {/* Book Session Button */}
-        <button
-          onClick={() => handleQuickSlotClick(new Date())}
-          className="w-14 h-14 rounded-full bg-wondrous-orange text-white shadow-lg hover:shadow-xl hover:bg-amber-500 transition-all flex items-center justify-center"
-          aria-label="Book session"
-        >
-          <Plus size={28} />
-        </button>
+        {/* Secondary Action - Protect Time (only show when there are sessions) */}
+        {todaysSessions.length > 0 && (
+          <button
+            onClick={openBlockTimePanel}
+            className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shadow-lg hover:shadow-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all flex items-center justify-center"
+            aria-label="Protect time"
+            title="Protect time"
+          >
+            <CalendarX size={20} />
+          </button>
+        )}
+        {/* Primary Action - Context aware based on day state */}
+        <div className="relative">
+          {todaysSessions.length === 0 ? (
+            // Empty day: Primary action is to open availability
+            <button
+              onClick={openBlockTimePanel}
+              className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-pink-600 transition-all flex items-center justify-center"
+              aria-label="Set availability"
+              title="Set availability"
+            >
+              <Clock size={24} />
+            </button>
+          ) : (
+            // Busy day: Primary action is to book a session
+            <button
+              onClick={() => handleQuickSlotClick(new Date())}
+              className="w-14 h-14 rounded-full bg-amber-400 text-amber-900 shadow-lg hover:shadow-xl hover:bg-amber-500 transition-all flex items-center justify-center"
+              aria-label="Quick book"
+              title="Quick book"
+            >
+              <Plus size={28} />
+            </button>
+          )}
+          <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            {todaysSessions.length === 0 ? "Set availability" : "Tap to book"}
+          </span>
+        </div>
       </div>
     </div>
   );

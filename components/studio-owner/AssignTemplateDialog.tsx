@@ -11,13 +11,23 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
-import { FileText, Check, Loader2, User, Users } from 'lucide-react';
+import { FileText, Check, Loader2, User, Users, Sparkles } from 'lucide-react';
 
 interface Template {
   id: string;
   name: string;
   description: string | null;
   type: string;
+}
+
+interface AIProgram {
+  id: string;
+  program_name: string;
+  description: string | null;
+  primary_goal: string;
+  experience_level: string;
+  total_weeks: number;
+  sessions_per_week: number;
 }
 
 type AssignmentMode = 'trainer' | 'client';
@@ -50,8 +60,11 @@ export function AssignTemplateDialog({
   const targetName = clientName || trainerName;
 
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [aiPrograms, setAIPrograms] = useState<AIProgram[]>([]);
   const [assignedTemplateIds, setAssignedTemplateIds] = useState<Set<string>>(new Set());
+  const [assignedAIProgramIds, setAssignedAIProgramIds] = useState<Set<string>>(new Set());
   const [selectedTemplates, setSelectedTemplates] = useState<Set<string>>(new Set());
+  const [selectedAIPrograms, setSelectedAIPrograms] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,14 +80,25 @@ export function AssignTemplateDialog({
     setError(null);
 
     try {
-      // Fetch available templates
+      // Fetch available regular templates
       const templatesResponse = await fetch('/api/templates');
       if (templatesResponse.ok) {
         const templatesData = await templatesResponse.json();
         setTemplates(templatesData.templates || []);
       }
 
-      // Fetch already assigned templates based on mode
+      // Fetch available AI programs (only for trainer mode)
+      if (mode === 'trainer') {
+        const aiResponse = await fetch('/api/ai-programs/templates');
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          setAIPrograms(aiData.templates || []);
+        }
+      } else {
+        setAIPrograms([]);
+      }
+
+      // Fetch already assigned regular templates based on mode
       const endpoint = mode === 'trainer'
         ? `/api/trainers/${targetId}/templates`
         : `/api/clients/${targetId}/templates`;
@@ -86,9 +110,25 @@ export function AssignTemplateDialog({
         setAssignedTemplateIds(assignedIds);
         setSelectedTemplates(new Set(assignedIds));
       } else {
-        // If endpoint doesn't exist yet, start with empty
         setAssignedTemplateIds(new Set());
         setSelectedTemplates(new Set());
+      }
+
+      // Fetch already assigned AI programs (only for trainer mode)
+      if (mode === 'trainer') {
+        const assignedAIResponse = await fetch(`/api/trainers/${targetId}/ai-programs`);
+        if (assignedAIResponse.ok) {
+          const assignedAIData = await assignedAIResponse.json();
+          const assignedAIIds = new Set<string>((assignedAIData.aiPrograms || []).map((p: { id: string }) => p.id));
+          setAssignedAIProgramIds(assignedAIIds);
+          setSelectedAIPrograms(new Set(assignedAIIds));
+        } else {
+          setAssignedAIProgramIds(new Set());
+          setSelectedAIPrograms(new Set());
+        }
+      } else {
+        setAssignedAIProgramIds(new Set());
+        setSelectedAIPrograms(new Set());
       }
     } catch (err) {
       console.error('Error loading data:', err);
@@ -108,21 +148,29 @@ export function AssignTemplateDialog({
     setSelectedTemplates(newSelected);
   };
 
+  const toggleAIProgram = (programId: string) => {
+    const newSelected = new Set(selectedAIPrograms);
+    if (newSelected.has(programId)) {
+      newSelected.delete(programId);
+    } else {
+      newSelected.add(programId);
+    }
+    setSelectedAIPrograms(newSelected);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
 
     try {
-      // Find templates to assign (selected but not already assigned)
+      // Find regular templates to assign/unassign
       const toAssign = [...selectedTemplates].filter(id => !assignedTemplateIds.has(id));
-
-      // Find templates to unassign (was assigned but not selected)
       const toUnassign = [...assignedTemplateIds].filter(id => !selectedTemplates.has(id));
 
       // Build the body based on mode
       const bodyKey = mode === 'trainer' ? 'trainerId' : 'clientId';
 
-      // Assign new templates
+      // Assign new regular templates
       for (const templateId of toAssign) {
         const response = await fetch(`/api/templates/${templateId}/assign`, {
           method: 'POST',
@@ -136,7 +184,7 @@ export function AssignTemplateDialog({
         }
       }
 
-      // Unassign removed templates
+      // Unassign removed regular templates
       for (const templateId of toUnassign) {
         const response = await fetch(`/api/templates/${templateId}/assign?${bodyKey}=${targetId}`, {
           method: 'DELETE',
@@ -145,6 +193,38 @@ export function AssignTemplateDialog({
         if (!response.ok) {
           const data = await response.json();
           throw new Error(data.error || 'Failed to unassign template');
+        }
+      }
+
+      // Handle AI program assignments (only for trainer mode)
+      if (mode === 'trainer') {
+        const aiToAssign = [...selectedAIPrograms].filter(id => !assignedAIProgramIds.has(id));
+        const aiToUnassign = [...assignedAIProgramIds].filter(id => !selectedAIPrograms.has(id));
+
+        // Assign new AI programs
+        for (const programId of aiToAssign) {
+          const response = await fetch(`/api/ai-programs/${programId}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trainer_id: targetId }),
+          });
+
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to assign AI program');
+          }
+        }
+
+        // Unassign removed AI programs
+        for (const programId of aiToUnassign) {
+          const response = await fetch(`/api/ai-programs/${programId}/assign?trainer_id=${targetId}`, {
+            method: 'DELETE',
+          });
+
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to unassign AI program');
+          }
         }
       }
 
@@ -159,12 +239,24 @@ export function AssignTemplateDialog({
   };
 
   const hasChanges = () => {
+    // Check regular template changes
     if (selectedTemplates.size !== assignedTemplateIds.size) return true;
     for (const id of selectedTemplates) {
       if (!assignedTemplateIds.has(id)) return true;
     }
+
+    // Check AI program changes (only in trainer mode)
+    if (mode === 'trainer') {
+      if (selectedAIPrograms.size !== assignedAIProgramIds.size) return true;
+      for (const id of selectedAIPrograms) {
+        if (!assignedAIProgramIds.has(id)) return true;
+      }
+    }
+
     return false;
   };
+
+  const totalSelected = selectedTemplates.size + selectedAIPrograms.size;
 
   const getModeInfo = () => {
     if (mode === 'trainer') {
@@ -219,7 +311,7 @@ export function AssignTemplateDialog({
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
             </div>
-          ) : templates.length === 0 ? (
+          ) : templates.length === 0 && aiPrograms.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -227,38 +319,104 @@ export function AssignTemplateDialog({
               </p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {templates.map((template) => (
-                <button
-                  key={template.id}
-                  onClick={() => toggleTemplate(template.id)}
-                  className={cn(
-                    'w-full p-3 rounded-lg border text-left transition-colors',
-                    selectedTemplates.has(template.id)
-                      ? 'border-wondrous-magenta bg-wondrous-magenta/10 dark:bg-wondrous-magenta/20'
-                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">
-                        {template.name}
-                      </p>
-                      {template.description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                          {template.description}
-                        </p>
-                      )}
-                      <span className="inline-block text-xs text-gray-400 dark:text-gray-500 mt-1 capitalize">
-                        {template.type}
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+              {/* AI Programs Section (only for trainer mode) */}
+              {mode === 'trainer' && aiPrograms.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-wondrous-magenta" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      AI Programs ({aiPrograms.length})
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {aiPrograms.map((program) => (
+                      <button
+                        key={program.id}
+                        onClick={() => toggleAIProgram(program.id)}
+                        className={cn(
+                          'w-full p-3 rounded-lg border text-left transition-colors',
+                          selectedAIPrograms.has(program.id)
+                            ? 'border-wondrous-magenta bg-wondrous-magenta/10 dark:bg-wondrous-magenta/20'
+                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-gray-900 dark:text-gray-100">
+                                {program.program_name}
+                              </p>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 text-wondrous-magenta text-xs rounded-full">
+                                <Sparkles className="w-3 h-3" />
+                                AI
+                              </span>
+                            </div>
+                            {program.description && (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                                {program.description}
+                              </p>
+                            )}
+                            <span className="inline-block text-xs text-gray-400 dark:text-gray-500 mt-1">
+                              {program.total_weeks} weeks • {program.sessions_per_week}x/week • {program.experience_level}
+                            </span>
+                          </div>
+                          {selectedAIPrograms.has(program.id) && (
+                            <Check className="w-5 h-5 text-wondrous-magenta flex-shrink-0" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Regular Templates Section */}
+              {templates.length > 0 && (
+                <div>
+                  {mode === 'trainer' && aiPrograms.length > 0 && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Manual Templates ({templates.length})
                       </span>
                     </div>
-                    {selectedTemplates.has(template.id) && (
-                      <Check className="w-5 h-5 text-wondrous-magenta flex-shrink-0" />
-                    )}
+                  )}
+                  <div className="space-y-2">
+                    {templates.map((template) => (
+                      <button
+                        key={template.id}
+                        onClick={() => toggleTemplate(template.id)}
+                        className={cn(
+                          'w-full p-3 rounded-lg border text-left transition-colors',
+                          selectedTemplates.has(template.id)
+                            ? 'border-wondrous-magenta bg-wondrous-magenta/10 dark:bg-wondrous-magenta/20'
+                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-gray-100">
+                              {template.name}
+                            </p>
+                            {template.description && (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                                {template.description}
+                              </p>
+                            )}
+                            <span className="inline-block text-xs text-gray-400 dark:text-gray-500 mt-1 capitalize">
+                              {template.type}
+                            </span>
+                          </div>
+                          {selectedTemplates.has(template.id) && (
+                            <Check className="w-5 h-5 text-wondrous-magenta flex-shrink-0" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </button>
-              ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -289,7 +447,7 @@ export function AssignTemplateDialog({
                 Saving...
               </>
             ) : (
-              `Save (${selectedTemplates.size} selected)`
+              `Save (${totalSelected} selected)`
             )}
           </Button>
         </DialogFooter>

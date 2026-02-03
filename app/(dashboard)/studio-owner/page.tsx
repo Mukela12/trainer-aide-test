@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FileText, CheckCircle, Dumbbell, TrendingUp, Plus, Inbox, Users, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
+import { PublicBookingLink } from '@/components/shared/PublicBookingLink';
 
 // Format today's date
 const today = new Date();
@@ -34,7 +35,7 @@ interface RecentClient {
 
 export default function StudioOwnerDashboard() {
   const templates = useTemplateStore((state) => state.templates);
-  const { currentUser } = useUserStore();
+  const { currentUser, businessSlug } = useUserStore();
 
   const [stats, setStats] = useState<DashboardStats>({
     totalTemplates: 0,
@@ -285,6 +286,16 @@ export default function StudioOwnerDashboard() {
             </div>
           </Link>
         </div>
+
+        {/* Public Booking Link */}
+        {businessSlug && (
+          <div className="mt-4">
+            <PublicBookingLink
+              businessSlug={businessSlug}
+              businessName={`${currentUser.firstName} ${currentUser.lastName}`}
+            />
+          </div>
+        )}
       </div>
 
       {/* Recent Templates */}

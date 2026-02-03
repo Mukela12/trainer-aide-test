@@ -79,26 +79,32 @@ export default function TrainerTemplates() {
     fetchTemplates();
   }, [currentUser.id]);
 
-  // Fetch AI templates (only for solo practitioners)
+  // Fetch AI templates (for solo practitioners: all templates; for trainers: assigned templates)
   useEffect(() => {
     async function fetchAITemplates() {
-      // AI templates are only available to solo practitioners
-      if (currentUser.role !== 'solo_practitioner') {
-        setLoadingAITemplates(false);
-        setAITemplates([]);
-        return;
-      }
-
       try {
         setLoadingAITemplates(true);
-        const response = await fetch('/api/ai-programs/templates');
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch AI templates');
+        if (currentUser.role === 'solo_practitioner') {
+          // Solo practitioners see all AI templates they created
+          const response = await fetch('/api/ai-programs/templates');
+          if (!response.ok) {
+            throw new Error('Failed to fetch AI templates');
+          }
+          const data = await response.json();
+          setAITemplates(data.templates || []);
+        } else if (currentUser.role === 'trainer') {
+          // Trainers see AI templates assigned to them
+          const response = await fetch('/api/ai-programs/assigned');
+          if (!response.ok) {
+            throw new Error('Failed to fetch assigned AI templates');
+          }
+          const data = await response.json();
+          setAITemplates(data.templates || []);
+        } else {
+          // Other roles don't see AI templates here
+          setAITemplates([]);
         }
-
-        const data = await response.json();
-        setAITemplates(data.templates || []);
       } catch (error) {
         console.error('Error fetching AI templates:', error);
         setAITemplates([]);
@@ -112,8 +118,10 @@ export default function TrainerTemplates() {
       }
     }
 
-    fetchAITemplates();
-  }, [toast, currentUser.role]);
+    if (currentUser.id) {
+      fetchAITemplates();
+    }
+  }, [toast, currentUser.role, currentUser.id]);
 
   // Filter templates
   const filteredTemplates = templates.filter((template) => {

@@ -1,13 +1,13 @@
 # Trainer-Aide Database Schema
 
-Last Updated: 2026-01-30T01:07:16.814Z
+Last Updated: 2026-02-03T08:16:08.120Z
 
 ---
 
 ## profiles
 
-- **Row Count:** 130
-- **Columns:** 58
+- **Row Count:** 145
+- **Columns:** 59
 
 ```
   id: string
@@ -68,11 +68,12 @@ Last Updated: 2026-01-30T01:07:16.814Z
   years_experience: NULL
   specializations: NULL
   profile_image_url: NULL
+  business_logo_url: NULL
 ```
 
 ## bs_studios
 
-- **Row Count:** 3
+- **Row Count:** 4
 - **Columns:** 24
 
 ```
@@ -104,7 +105,7 @@ Last Updated: 2026-01-30T01:07:16.814Z
 
 ## bs_staff
 
-- **Row Count:** 28
+- **Row Count:** 29
 - **Columns:** 18
 
 ```
@@ -130,12 +131,12 @@ Last Updated: 2026-01-30T01:07:16.814Z
 
 ## ta_services
 
-- **Row Count:** 28
+- **Row Count:** 41
 - **Columns:** 17
 
 ```
   id: string
-  studio_id: string
+  studio_id: NULL
   name: string
   description: string
   duration: number
@@ -148,14 +149,14 @@ Last Updated: 2026-01-30T01:07:16.814Z
   created_at: string
   updated_at: string
   is_public: boolean
-  price_cents: NULL
+  price_cents: number
   is_intro_session: boolean
   booking_buffer_minutes: number
 ```
 
 ## ta_bookings
 
-- **Row Count:** 3
+- **Row Count:** 4
 - **Columns:** 15
 
 ```
@@ -178,13 +179,13 @@ Last Updated: 2026-01-30T01:07:16.814Z
 
 ## ta_availability
 
-- **Row Count:** 17
+- **Row Count:** 91
 - **Columns:** 16
 
 ```
   id: string
   trainer_id: string
-  studio_id: string
+  studio_id: NULL
   block_type: string
   recurrence: string
   day_of_week: number
@@ -207,8 +208,8 @@ Last Updated: 2026-01-30T01:07:16.814Z
 
 ## fc_clients
 
-- **Row Count:** 95
-- **Columns:** 15
+- **Row Count:** 98
+- **Columns:** 16
 
 ```
   id: string
@@ -226,11 +227,12 @@ Last Updated: 2026-01-30T01:07:16.814Z
   studio_id: NULL
   is_guest: boolean
   source: string
+  is_archived: boolean
 ```
 
 ## ta_packages
 
-- **Row Count:** 2
+- **Row Count:** 3
 - **Columns:** 14
 
 ```
@@ -307,7 +309,7 @@ Last Updated: 2026-01-30T01:07:16.814Z
 
 ## ta_invitations
 
-- **Row Count:** 4
+- **Row Count:** 9
 - **Columns:** 17
 
 ```
@@ -356,7 +358,7 @@ Last Updated: 2026-01-30T01:07:16.814Z
 
 ## ta_workout_templates
 
-- **Row Count:** 4
+- **Row Count:** 2
 - **Columns:** 12
 
 ```
