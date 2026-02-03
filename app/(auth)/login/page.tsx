@@ -1,23 +1,35 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Read returnTo and email from query params (for invitation redirects)
+  const returnTo = searchParams.get('returnTo')
+  const prefillEmail = searchParams.get('email')
+
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
 
-  // Form state
-  const [email, setEmail] = useState('')
+  // Form state - pre-fill email if provided
+  const [email, setEmail] = useState(prefillEmail || '')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [confirmPassword, setConfirmPassword]  = useState('')
+
+  // Build callback URL with returnTo parameter
+  const getCallbackUrl = () => {
+    const base = '/auth/callback'
+    return returnTo ? `${base}?returnTo=${encodeURIComponent(returnTo)}` : base
+  }
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,12 +47,13 @@ export default function LoginPage() {
           return
         }
 
-        // Sign up with email
+        // Sign up with email - include returnTo in callback URL
+        const callbackUrl = `${window.location.origin}${getCallbackUrl()}`
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: callbackUrl,
           },
         })
 
@@ -57,9 +70,9 @@ export default function LoginPage() {
           return
         }
 
-        // If session exists, redirect
+        // If session exists, redirect with returnTo
         if (data.session) {
-          router.push('/auth/callback')
+          router.push(getCallbackUrl())
         }
       } else {
         // Sign in with email
@@ -74,8 +87,8 @@ export default function LoginPage() {
           return
         }
 
-        // Redirect to callback to handle profile loading
-        router.push('/auth/callback')
+        // Redirect to callback with returnTo to handle profile loading
+        router.push(getCallbackUrl())
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')
@@ -89,10 +102,12 @@ export default function LoginPage() {
 
     try {
       const supabase = getSupabaseBrowserClient()
+      // Include returnTo in the callback URL for Google OAuth
+      const callbackUrl = `${window.location.origin}${getCallbackUrl()}`
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -121,10 +136,12 @@ export default function LoginPage() {
 
     try {
       const supabase = getSupabaseBrowserClient()
+      // Include returnTo in the callback URL for magic link
+      const callbackUrl = `${window.location.origin}${getCallbackUrl()}`
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: callbackUrl,
         },
       })
 
@@ -339,5 +356,17 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   )
 }

@@ -242,9 +242,11 @@ export interface SessionExercise {
   // AI-specific fields (from AI-generated workouts)
   tempo?: string; // e.g., "3-1-1-0"
   restSeconds?: number; // Rest period between sets
+  targetRpe?: number; // Target RPE (Rate of Perceived Exertion) for the exercise
   rir?: number; // Reps in Reserve
   coachingCues?: string[]; // Array of coaching cues for this exercise
   notes?: string; // Exercise-specific notes
+  isBodyweight?: boolean; // Whether this is a bodyweight exercise
   // Tracking during session
   completed: boolean;
   actualResistance?: number;

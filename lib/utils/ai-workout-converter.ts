@@ -104,9 +104,11 @@ export function convertAIExerciseToSessionExercise(
     // Store AI-specific fields in a way that can be accessed during the session
     tempo: aiExercise.tempo ?? undefined,
     restSeconds: aiExercise.rest_seconds ?? undefined,
+    targetRpe: aiExercise.target_rpe ?? undefined, // AI-prescribed target RPE
     rir: aiExercise.target_rir ?? undefined,
     coachingCues: aiExercise.coaching_cues,
     notes: aiExercise.performance_notes ?? undefined,
+    isBodyweight: aiExercise.is_bodyweight ?? false,
   };
 }
 

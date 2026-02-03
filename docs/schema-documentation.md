@@ -1,12 +1,12 @@
 # Trainer-Aide Database Schema
 
-Last Updated: 2026-02-03T08:16:08.120Z
+Last Updated: 2026-02-03T14:17:21.151Z
 
 ---
 
 ## profiles
 
-- **Row Count:** 145
+- **Row Count:** 151
 - **Columns:** 59
 
 ```
@@ -73,7 +73,7 @@ Last Updated: 2026-02-03T08:16:08.120Z
 
 ## bs_studios
 
-- **Row Count:** 4
+- **Row Count:** 6
 - **Columns:** 24
 
 ```
@@ -105,7 +105,7 @@ Last Updated: 2026-02-03T08:16:08.120Z
 
 ## bs_staff
 
-- **Row Count:** 29
+- **Row Count:** 32
 - **Columns:** 18
 
 ```
@@ -131,7 +131,7 @@ Last Updated: 2026-02-03T08:16:08.120Z
 
 ## ta_services
 
-- **Row Count:** 41
+- **Row Count:** 43
 - **Columns:** 17
 
 ```
@@ -179,7 +179,7 @@ Last Updated: 2026-02-03T08:16:08.120Z
 
 ## ta_availability
 
-- **Row Count:** 91
+- **Row Count:** 126
 - **Columns:** 16
 
 ```
@@ -208,7 +208,7 @@ Last Updated: 2026-02-03T08:16:08.120Z
 
 ## fc_clients
 
-- **Row Count:** 98
+- **Row Count:** 102
 - **Columns:** 16
 
 ```
@@ -309,7 +309,7 @@ Last Updated: 2026-02-03T08:16:08.120Z
 
 ## ta_invitations
 
-- **Row Count:** 9
+- **Row Count:** 13
 - **Columns:** 17
 
 ```
@@ -334,8 +334,8 @@ Last Updated: 2026-02-03T08:16:08.120Z
 
 ## ta_sessions
 
-- **Row Count:** 10
-- **Columns:** 16
+- **Row Count:** 11
+- **Columns:** 17
 
 ```
   id: string
@@ -354,6 +354,7 @@ Last Updated: 2026-02-03T08:16:08.120Z
   completed_at: string
   created_at: string
   updated_at: string
+  ai_workout_id: NULL
 ```
 
 ## ta_workout_templates

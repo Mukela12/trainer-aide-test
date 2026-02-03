@@ -25,6 +25,7 @@ import {
   ArrowUpDown,
   MessageSquare,
   UserCheck,
+  Gift,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -36,6 +37,7 @@ import {
 import { AddClientDialog } from '@/components/studio-owner/AddClientDialog';
 import { InviteClientDialog } from '@/components/studio-owner/InviteClientDialog';
 import { EditClientDialog } from '@/components/studio-owner/EditClientDialog';
+import { RewardCreditsDialog } from '@/components/studio-owner/RewardCreditsDialog';
 import { SendEmailDialog } from '@/components/shared/SendEmailDialog';
 import BookingHistory from '@/components/studio-owner/BookingHistory';
 import { format } from 'date-fns';
@@ -91,6 +93,7 @@ export default function ClientsPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
+  const [rewardCreditsClient, setRewardCreditsClient] = useState<Client | null>(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailClient, setEmailClient] = useState<Client | null>(null);
 
@@ -581,6 +584,10 @@ export default function ClientsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRewardCreditsClient(client); }}>
+                          <Gift size={14} className="mr-2 text-purple-600" />
+                          Reward Credits
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditClient(client); }}>
                           <Edit size={14} className="mr-2" />
                           Edit Client
@@ -753,7 +760,17 @@ export default function ClientsPage() {
                 </div>
 
                 {/* Fixed Bottom Actions */}
-                <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+                <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                  <button
+                    onClick={() => {
+                      setRewardCreditsClient(selectedClient);
+                      closeClientDrawer();
+                    }}
+                    className="flex items-center justify-center w-full gap-2 px-4 py-3 font-semibold text-white transition-colors bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg hover:from-purple-700 hover:to-pink-700"
+                  >
+                    <Gift className="w-5 h-5" />
+                    Reward Credits
+                  </button>
                   {selectedClient.is_archived ? (
                     <button
                       onClick={() => handleArchiveClient(selectedClient.id, false)}
@@ -801,6 +818,15 @@ export default function ClientsPage() {
             email: emailClient.email,
             name: `${emailClient.first_name} ${emailClient.last_name}`,
           }}
+        />
+      )}
+
+      {rewardCreditsClient && (
+        <RewardCreditsDialog
+          client={rewardCreditsClient}
+          open={!!rewardCreditsClient}
+          onOpenChange={(open) => !open && setRewardCreditsClient(null)}
+          onSuccess={fetchClients}
         />
       )}
     </div>

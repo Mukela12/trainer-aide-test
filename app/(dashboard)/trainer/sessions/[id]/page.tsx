@@ -248,9 +248,10 @@ export default function SessionRunner() {
                             <>Target: {exercise.cardioDuration}s hold</>
                           ) : (
                             <>
-                              Target: {exercise.resistanceValue}kg •
-                              {exercise.repsMin}-{exercise.repsMax} reps •
+                              Target: {exercise.isBodyweight ? 'Bodyweight' : exercise.resistanceValue > 0 ? `${exercise.resistanceValue}kg` : exercise.targetRpe ? `RPE ${exercise.targetRpe}` : 'Set weight'} •{' '}
+                              {exercise.repsMin}-{exercise.repsMax} reps •{' '}
                               {exercise.sets} sets
+                              {exercise.tempo && <> • Tempo {exercise.tempo}</>}
                             </>
                           )}
                         </p>
@@ -471,9 +472,10 @@ export default function SessionRunner() {
                           <>Target: {exercise.cardioDuration}s hold</>
                         ) : (
                           <>
-                            Target: {exercise.resistanceValue}kg •
-                            {exercise.repsMin}-{exercise.repsMax} reps •
+                            Target: {exercise.isBodyweight ? 'Bodyweight' : exercise.resistanceValue > 0 ? `${exercise.resistanceValue}kg` : exercise.targetRpe ? `RPE ${exercise.targetRpe}` : 'Set weight'} •{' '}
+                            {exercise.repsMin}-{exercise.repsMax} reps •{' '}
                             {exercise.sets} sets
+                            {exercise.tempo && <> • Tempo {exercise.tempo}</>}
                           </>
                         )}
                       </p>
@@ -716,11 +718,12 @@ export default function SessionRunner() {
                   <>Hold: {currentExercise.cardioDuration} seconds</>
                 ) : (
                   <>
-                    Weight: {currentExercise.resistanceValue}kg
+                    Weight: {currentExercise.isBodyweight ? 'Bodyweight' : currentExercise.resistanceValue > 0 ? `${currentExercise.resistanceValue}kg` : currentExercise.targetRpe ? `RPE ${currentExercise.targetRpe}` : 'Set weight'}
                     <br />
                     Reps: {currentExercise.repsMin}-{currentExercise.repsMax}
                     <br />
                     Sets: {currentExercise.sets}
+                    {currentExercise.tempo && <><br />Tempo: {currentExercise.tempo}</>}
                   </>
                 )}
               </p>

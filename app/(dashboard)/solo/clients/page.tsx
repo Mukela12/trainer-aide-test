@@ -29,6 +29,7 @@ import {
   AlertCircle,
   Archive,
   ArchiveRestore,
+  Gift,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -39,6 +40,7 @@ import {
 import { AddClientDialog } from '@/components/studio-owner/AddClientDialog';
 import { InviteClientDialog } from '@/components/studio-owner/InviteClientDialog';
 import { EditClientDialog } from '@/components/studio-owner/EditClientDialog';
+import { RewardCreditsDialog } from '@/components/studio-owner/RewardCreditsDialog';
 import { SendEmailDialog } from '@/components/shared/SendEmailDialog';
 import { format, formatDistanceToNow } from 'date-fns';
 import ContentHeader from '@/components/shared/ContentHeader';
@@ -86,6 +88,7 @@ export default function SoloClientsPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
+  const [rewardCreditsClient, setRewardCreditsClient] = useState<Client | null>(null);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailClient, setEmailClient] = useState<Client | null>(null);
 
@@ -640,6 +643,15 @@ export default function SoloClientsPage() {
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
+                            setRewardCreditsClient(client);
+                          }}
+                        >
+                          <Gift size={14} className="mr-2 text-purple-600" />
+                          Reward Credits
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditClient(client);
                           }}
                         >
@@ -892,6 +904,16 @@ export default function SoloClientsPage() {
               {/* Actions */}
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
                 <Button
+                  className="w-full gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                  onClick={() => {
+                    setRewardCreditsClient(selectedClient);
+                    closeClientDrawer();
+                  }}
+                >
+                  <Gift size={16} />
+                  Reward Credits
+                </Button>
+                <Button
                   variant="outline"
                   className="w-full gap-2"
                   onClick={() => {
@@ -956,6 +978,15 @@ export default function SoloClientsPage() {
             email: emailClient.email,
             name: `${emailClient.first_name} ${emailClient.last_name}`,
           }}
+        />
+      )}
+
+      {rewardCreditsClient && (
+        <RewardCreditsDialog
+          client={rewardCreditsClient}
+          open={!!rewardCreditsClient}
+          onOpenChange={(open) => !open && setRewardCreditsClient(null)}
+          onSuccess={fetchClients}
         />
       )}
     </div>

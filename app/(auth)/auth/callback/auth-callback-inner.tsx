@@ -62,6 +62,9 @@ export function AuthCallbackInner() {
       supabase: ReturnType<typeof getSupabaseBrowserClient>,
       user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
     ) {
+      // Check for returnTo parameter (from invitation redirects)
+      const returnTo = searchParams.get('returnTo')
+
       // Look up user profile using multi-table strategy
       const profile = await lookupUserProfile(supabase, user)
 
@@ -75,6 +78,13 @@ export function AuthCallbackInner() {
         const isClient = profile.role === 'client'
         if (!profile.isOnboarded && !isClient) {
           router.push('/onboarding')
+          return
+        }
+
+        // If returnTo is specified and is a valid internal path, redirect there
+        // This handles invitation flow redirects after login
+        if (returnTo && returnTo.startsWith('/')) {
+          router.push(returnTo)
           return
         }
 
@@ -108,6 +118,11 @@ export function AuthCallbackInner() {
               is_onboarded: true,
             }, { onConflict: 'id' })
 
+            // Check for returnTo before defaulting to client dashboard
+            if (returnTo && returnTo.startsWith('/')) {
+              router.push(returnTo)
+              return
+            }
             router.push('/client')
             return
           }
@@ -125,6 +140,12 @@ export function AuthCallbackInner() {
           // New users need onboarding (except clients, but clients already handled above)
           if (!newProfile.isOnboarded) {
             router.push('/onboarding')
+            return
+          }
+
+          // Check for returnTo before defaulting to role dashboard
+          if (returnTo && returnTo.startsWith('/')) {
+            router.push(returnTo)
             return
           }
 
@@ -251,6 +272,7 @@ async function lookupUserProfile(
   if (staff) {
     const roleMap: Record<string, string> = {
       owner: 'studio_owner',
+      studio_owner: 'studio_owner',
       manager: 'studio_manager',
       instructor: 'trainer',
       trainer: 'trainer',
@@ -264,6 +286,7 @@ async function lookupUserProfile(
       lastName: staff.last_name || '',
       role: staff.is_solo ? 'solo_practitioner' : (roleMap[staff.staff_type] || 'trainer'),
       studioId: staff.studio_id,
+      isOnboarded: staff.is_onboarded === true, // Include onboarding status from bs_staff
     }
   }
 
@@ -278,6 +301,7 @@ async function lookupUserProfile(
     if (staffByEmail) {
       const roleMap: Record<string, string> = {
         owner: 'studio_owner',
+        studio_owner: 'studio_owner',
         manager: 'studio_manager',
         instructor: 'trainer',
         trainer: 'trainer',
@@ -291,6 +315,7 @@ async function lookupUserProfile(
         lastName: staffByEmail.last_name || '',
         role: staffByEmail.is_solo ? 'solo_practitioner' : (roleMap[staffByEmail.staff_type] || 'trainer'),
         studioId: staffByEmail.studio_id,
+        isOnboarded: staffByEmail.is_onboarded === true, // Include onboarding status from bs_staff
       }
     }
   }
@@ -309,6 +334,7 @@ async function lookupUserProfile(
       firstName: instructor.first_name || '',
       lastName: instructor.last_name || '',
       role: instructor.role || 'trainer',
+      isOnboarded: instructor.is_onboarded === true, // Include onboarding status
     }
   }
 
@@ -327,6 +353,7 @@ async function lookupUserProfile(
         firstName: instructorByEmail.first_name || '',
         lastName: instructorByEmail.last_name || '',
         role: instructorByEmail.role || 'trainer',
+        isOnboarded: instructorByEmail.is_onboarded === true, // Include onboarding status
       }
     }
   }
