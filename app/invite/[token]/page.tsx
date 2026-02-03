@@ -16,7 +16,6 @@ import {
   Loader2,
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
-import { useUserStore } from '@/lib/stores/user-store';
 
 interface InvitationDetails {
   id: string;
@@ -37,17 +36,22 @@ export default function InvitationPage() {
   const params = useParams();
   const router = useRouter();
   const token = params.token as string;
-  const { isAuthenticated, currentUser } = useUserStore();
 
   const [pageState, setPageState] = useState<PageState>('loading');
   const [invitation, setInvitation] = useState<InvitationDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  // Track actual Supabase auth state (not persisted store which can be stale)
+  const [isActuallyAuthenticated, setIsActuallyAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
     const loadInvitation = async () => {
       const supabase = getSupabaseBrowserClient();
+
+      // Check actual Supabase session (not persisted Zustand state)
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsActuallyAuthenticated(!!session);
 
       // Fetch invitation by token
       const { data, error } = await supabase
@@ -122,7 +126,7 @@ export default function InvitationPage() {
     if (!invitation) return;
 
     // For unauthenticated users, validate password
-    if (!isAuthenticated) {
+    if (!isActuallyAuthenticated) {
       if (password.length < 8) {
         setError('Password must be at least 8 characters');
         return;
@@ -141,7 +145,7 @@ export default function InvitationPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          password: isAuthenticated ? undefined : password,
+          password: isActuallyAuthenticated ? undefined : password,
         }),
       });
 
@@ -158,7 +162,7 @@ export default function InvitationPage() {
       }
 
       // Sign in the new user
-      if (!isAuthenticated && password) {
+      if (!isActuallyAuthenticated && password) {
         const supabase = getSupabaseBrowserClient();
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: invitation.email,
@@ -310,7 +314,7 @@ export default function InvitationPage() {
           </div>
 
           {/* Password setup for new users */}
-          {!isAuthenticated && (
+          {isActuallyAuthenticated === false && (
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
                 <Label htmlFor="password">Create Password</Label>
@@ -353,9 +357,9 @@ export default function InvitationPage() {
             {pageState === 'accepting' ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                {isAuthenticated ? 'Accepting...' : 'Creating Account...'}
+                {isActuallyAuthenticated ? 'Accepting...' : 'Creating Account...'}
               </>
-            ) : isAuthenticated ? (
+            ) : isActuallyAuthenticated ? (
               'Accept Invitation'
             ) : (
               'Accept & Create Account'
