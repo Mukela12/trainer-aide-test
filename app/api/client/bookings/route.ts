@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 
@@ -96,11 +97,14 @@ export async function GET(request: NextRequest) {
  * POST /api/client/bookings
  * Create a new booking for the client
  * Body: { serviceId, trainerId, scheduledAt }
+ *
+ * Uses multi-strategy lookup to handle various studio configurations
  */
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const supabase = createServerClient(
+    // Auth client for checking user identity
+    const authClient = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
@@ -117,7 +121,13 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Service role client for database queries (bypasses RLS)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -132,12 +142,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find the client record with self_booking_allowed flag and credits
+    // Find the client record with self_booking_allowed flag and credits (case-insensitive)
     const { data: client } = await supabase
       .from('fc_clients')
-      .select('id, studio_id, self_booking_allowed, credits')
-      .eq('email', user.email?.toLowerCase())
-      .single();
+      .select('id, studio_id, invited_by, self_booking_allowed, credits')
+      .ilike('email', user.email || '')
+      .maybeSingle();
 
     if (!client) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
@@ -154,10 +164,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate service belongs to this studio
+    // Build lookup IDs for validation (same multi-strategy approach as other client APIs)
+    const lookupIds: string[] = [];
+
+    if (client.studio_id) {
+      lookupIds.push(client.studio_id);
+    }
+
+    if (client.invited_by) {
+      lookupIds.push(client.invited_by);
+
+      // Check if the inviter has a studio_id in bs_staff
+      const { data: inviterStaff } = await supabase
+        .from('bs_staff')
+        .select('studio_id')
+        .eq('id', client.invited_by)
+        .maybeSingle();
+
+      if (inviterStaff?.studio_id && !lookupIds.includes(inviterStaff.studio_id)) {
+        lookupIds.push(inviterStaff.studio_id);
+
+        // Update client's studio_id if it was NULL
+        if (!client.studio_id) {
+          client.studio_id = inviterStaff.studio_id;
+          await supabase
+            .from('fc_clients')
+            .update({ studio_id: inviterStaff.studio_id })
+            .eq('id', client.id);
+        }
+      }
+    }
+
+    // If studio_id might be a bs_studios.id, get the owner_id too
+    if (client.studio_id) {
+      const { data: studio } = await supabase
+        .from('bs_studios')
+        .select('owner_id')
+        .eq('id', client.studio_id)
+        .maybeSingle();
+
+      if (studio?.owner_id && !lookupIds.includes(studio.owner_id)) {
+        lookupIds.push(studio.owner_id);
+      }
+    }
+
+    const uniqueLookupIds = [...new Set(lookupIds)];
+
+    // Validate service belongs to the client's studio/trainer
     const { data: service, error: serviceError } = await supabase
       .from('ta_services')
-      .select('id, name, duration, credits_required, studio_id, is_active, is_public')
+      .select('id, name, duration, credits_required, studio_id, created_by, is_active, is_public')
       .eq('id', serviceId)
       .single();
 
@@ -165,7 +221,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Service not found' }, { status: 404 });
     }
 
-    if (service.studio_id !== client.studio_id) {
+    // Check if service belongs to any of the lookup IDs (studio_id or created_by)
+    const serviceIsValid = uniqueLookupIds.some(
+      id => service.studio_id === id || service.created_by === id
+    );
+
+    if (!serviceIsValid) {
+      console.error('Service validation failed:', {
+        serviceId,
+        serviceStudioId: service.studio_id,
+        serviceCreatedBy: service.created_by,
+        lookupIds: uniqueLookupIds,
+      });
       return NextResponse.json(
         { error: 'Service does not belong to your studio' },
         { status: 400 }
@@ -179,16 +246,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate trainer belongs to this studio
-    const { data: trainerStaff } = await supabase
-      .from('bs_staff')
-      .select('id')
-      .eq('id', trainerId)
-      .eq('studio_id', client.studio_id)
-      .in('staff_type', ['trainer', 'owner', 'instructor'])
-      .single();
+    // Validate trainer belongs to the client's studio (multi-strategy)
+    // Check 1: Is trainer directly in the lookup IDs (solo practitioner)?
+    let trainerIsValid = uniqueLookupIds.includes(trainerId);
 
-    if (!trainerStaff) {
+    // Check 2: Is trainer in bs_staff with matching studio_id?
+    if (!trainerIsValid && uniqueLookupIds.length > 0) {
+      const { data: trainerStaff } = await supabase
+        .from('bs_staff')
+        .select('id, studio_id')
+        .eq('id', trainerId)
+        .in('staff_type', ['trainer', 'owner', 'instructor'])
+        .maybeSingle();
+
+      if (trainerStaff) {
+        // Check if trainer's studio_id matches any of our lookup IDs
+        trainerIsValid = uniqueLookupIds.includes(trainerStaff.studio_id);
+      }
+    }
+
+    // Check 3: Is the trainer the studio owner?
+    if (!trainerIsValid) {
+      const { data: trainerProfile } = await supabase
+        .from('profiles')
+        .select('id, role')
+        .eq('id', trainerId)
+        .maybeSingle();
+
+      if (trainerProfile && ['solo_practitioner', 'studio_owner', 'trainer'].includes(trainerProfile.role || '')) {
+        // Check if this trainer owns a studio that matches our lookup IDs
+        const { data: ownedStudios } = await supabase
+          .from('bs_studios')
+          .select('id')
+          .eq('owner_id', trainerId);
+
+        if (ownedStudios && ownedStudios.length > 0) {
+          trainerIsValid = ownedStudios.some(s => uniqueLookupIds.includes(s.id));
+        }
+      }
+    }
+
+    if (!trainerIsValid) {
+      console.error('Trainer validation failed:', {
+        trainerId,
+        lookupIds: uniqueLookupIds,
+        clientStudioId: client.studio_id,
+        clientInvitedBy: client.invited_by,
+      });
       return NextResponse.json(
         { error: 'Trainer not found at your studio' },
         { status: 400 }
@@ -266,6 +370,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Determine the best studio_id for the booking
+    // Priority: client.studio_id -> service.studio_id -> service.created_by -> trainerId
+    const bookingStudioId = client.studio_id || service.studio_id || service.created_by || trainerId;
+
     // Create the booking
     const { data: booking, error: bookingError } = await supabase
       .from('ta_bookings')
@@ -273,11 +381,10 @@ export async function POST(request: NextRequest) {
         client_id: client.id,
         trainer_id: trainerId,
         service_id: serviceId,
-        studio_id: client.studio_id,
+        studio_id: bookingStudioId,
         scheduled_at: scheduledAt,
         duration: service.duration,
         status: 'confirmed',
-        booked_by: 'client',
       })
       .select()
       .single();

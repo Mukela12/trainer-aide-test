@@ -1,12 +1,12 @@
 # Trainer-Aide Database Schema
 
-Last Updated: 2026-02-03T14:17:21.151Z
+Last Updated: 2026-02-03T15:19:28.647Z
 
 ---
 
 ## profiles
 
-- **Row Count:** 151
+- **Row Count:** 153
 - **Columns:** 59
 
 ```
@@ -73,7 +73,7 @@ Last Updated: 2026-02-03T14:17:21.151Z
 
 ## bs_studios
 
-- **Row Count:** 6
+- **Row Count:** 7
 - **Columns:** 24
 
 ```
@@ -105,7 +105,7 @@ Last Updated: 2026-02-03T14:17:21.151Z
 
 ## bs_staff
 
-- **Row Count:** 32
+- **Row Count:** 34
 - **Columns:** 18
 
 ```
@@ -131,7 +131,7 @@ Last Updated: 2026-02-03T14:17:21.151Z
 
 ## ta_services
 
-- **Row Count:** 43
+- **Row Count:** 44
 - **Columns:** 17
 
 ```
@@ -179,7 +179,7 @@ Last Updated: 2026-02-03T14:17:21.151Z
 
 ## ta_availability
 
-- **Row Count:** 126
+- **Row Count:** 143
 - **Columns:** 16
 
 ```
@@ -208,7 +208,7 @@ Last Updated: 2026-02-03T14:17:21.151Z
 
 ## fc_clients
 
-- **Row Count:** 102
+- **Row Count:** 104
 - **Columns:** 16
 
 ```
@@ -309,7 +309,7 @@ Last Updated: 2026-02-03T14:17:21.151Z
 
 ## ta_invitations
 
-- **Row Count:** 13
+- **Row Count:** 15
 - **Columns:** 17
 
 ```
@@ -334,7 +334,7 @@ Last Updated: 2026-02-03T14:17:21.151Z
 
 ## ta_sessions
 
-- **Row Count:** 11
+- **Row Count:** 13
 - **Columns:** 17
 
 ```

@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 /**
  * GET /api/client/shop/offers
  * Returns available offers for the client's studio
+ *
+ * Multi-strategy lookup:
+ * 1. Find client by email (case-insensitive)
+ * 2. Get studio_id from client, or fall back to finding through invited_by
+ * 3. Find offers by studio_id or created_by
+ *
+ * Uses service role client for database queries to bypass RLS
  */
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const supabase = createServerClient(
+    // Auth client for checking user identity
+    const authClient = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
@@ -26,26 +35,85 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Service role client for database queries (bypasses RLS)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Find the client record for this user by email to get studio_id
+    // Find the client record for this user by email (case-insensitive)
     const { data: client } = await supabase
       .from('fc_clients')
-      .select('id, studio_id')
-      .eq('email', user.email?.toLowerCase())
-      .single();
+      .select('id, studio_id, invited_by')
+      .ilike('email', user.email || '')
+      .maybeSingle();
 
-    if (!client || !client.studio_id) {
+    if (!client) {
+      console.error('Client not found for email:', user.email);
       return NextResponse.json(
-        { error: 'Client not found or not associated with a studio' },
+        { error: 'Client not found', offers: [] },
         { status: 404 }
       );
     }
 
-    // Get active offers for this studio
+    // Build the lookup IDs for offers
+    const lookupIds: string[] = [];
+
+    if (client.studio_id) {
+      lookupIds.push(client.studio_id);
+    }
+
+    // If client was invited, the inviter's ID might be the created_by
+    if (client.invited_by) {
+      lookupIds.push(client.invited_by);
+
+      // Check if the inviter has a studio_id in bs_staff
+      const { data: inviterStaff } = await supabase
+        .from('bs_staff')
+        .select('studio_id')
+        .eq('id', client.invited_by)
+        .maybeSingle();
+
+      if (inviterStaff?.studio_id && !lookupIds.includes(inviterStaff.studio_id)) {
+        lookupIds.push(inviterStaff.studio_id);
+
+        // Update client's studio_id if it was NULL
+        if (!client.studio_id) {
+          await supabase
+            .from('fc_clients')
+            .update({ studio_id: inviterStaff.studio_id })
+            .eq('id', client.id);
+        }
+      }
+    }
+
+    // If studio_id might be a bs_studios.id, get the owner_id too
+    if (client.studio_id) {
+      const { data: studio } = await supabase
+        .from('bs_studios')
+        .select('owner_id')
+        .eq('id', client.studio_id)
+        .maybeSingle();
+
+      if (studio?.owner_id && !lookupIds.includes(studio.owner_id)) {
+        lookupIds.push(studio.owner_id);
+      }
+    }
+
+    // Remove duplicates
+    const uniqueLookupIds = [...new Set(lookupIds)];
+
+    if (uniqueLookupIds.length === 0) {
+      console.error('No studio or creator IDs found for client:', client.id);
+      return NextResponse.json({ offers: [] });
+    }
+
+    // Query offers by studio_id OR created_by matching any of our lookup IDs
     const { data: offers, error } = await supabase
       .from('referral_signup_links')
       .select(`
@@ -59,9 +127,15 @@ export async function GET(request: NextRequest) {
         expires_at,
         credits,
         expiry_days,
-        is_gift
+        is_gift,
+        studio_id,
+        created_by
       `)
-      .eq('studio_id', client.studio_id)
+      .or(
+        uniqueLookupIds.map(id => `studio_id.eq.${id}`).join(',') +
+        ',' +
+        uniqueLookupIds.map(id => `created_by.eq.${id}`).join(',')
+      )
       .eq('is_active', true)
       .order('created_at', { ascending: false });
 
@@ -84,8 +158,13 @@ export async function GET(request: NextRequest) {
       return true;
     });
 
+    // Deduplicate offers by ID
+    const uniqueOffers = Array.from(
+      new Map(availableOffers.map(o => [o.id, o])).values()
+    );
+
     return NextResponse.json({
-      offers: availableOffers.map((o) => ({
+      offers: uniqueOffers.map((o) => ({
         id: o.id,
         title: o.title,
         description: o.description,

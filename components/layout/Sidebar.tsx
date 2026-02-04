@@ -23,6 +23,7 @@ import {
   Package,
   CreditCard,
   UserPlus,
+  ShoppingBag,
 } from 'lucide-react';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -121,6 +122,7 @@ const clientGroups: NavGroup[] = [
       { href: '/client', label: 'Home', icon: <Home size={20} /> },
       { href: '/client/book', label: 'Book Session', icon: <CalendarPlus size={20} /> },
       { href: '/client/bookings', label: 'My Bookings', icon: <Calendar size={20} /> },
+      { href: '/client/shop', label: 'Shop', icon: <ShoppingBag size={20} /> },
       { href: '/client/packages', label: 'My Credits', icon: <CreditCard size={20} /> },
       { href: '/client/sessions', label: 'Session History', icon: <Dumbbell size={20} /> },
       { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
