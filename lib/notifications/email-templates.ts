@@ -324,11 +324,15 @@ interface BookingRequestDeclinedData {
 }
 
 export function getBookingRequestCreatedEmail(data: BookingRequestData) {
+  const formatTime = (t: string) => {
+    const d = new Date(t);
+    return isNaN(d.getTime()) ? t : format(d, 'EEEE, MMMM d, yyyy \'at\' h:mm a');
+  };
   const timesHtml = data.preferredTimes
-    .map((t) => `<li style="margin: 8px 0; color: #272030;">${format(new Date(t), 'EEEE, MMMM d, yyyy \'at\' h:mm a')}</li>`)
+    .map((t) => `<li style="margin: 8px 0; color: #272030;">${formatTime(t)}</li>`)
     .join('');
   const timesText = data.preferredTimes
-    .map((t) => `  - ${format(new Date(t), 'EEEE, MMMM d, yyyy \'at\' h:mm a')}`)
+    .map((t) => `  - ${formatTime(t)}`)
     .join('\n');
   const footerText = getFooterText(data.branding);
 

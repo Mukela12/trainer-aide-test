@@ -1,6 +1,5 @@
-// Email service using Resend API
+// Email service using Elastic Email REST API
 
-import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 import {
   getBookingConfirmationEmail,
@@ -14,17 +13,14 @@ import {
   getCustomEmail,
 } from './email-templates';
 
-// Lazy initialization of Resend client to avoid build-time errors when API key is not set
-let resendClient: Resend | null = null;
+const ELASTIC_EMAIL_API_URL = 'https://api.elasticemail.com/v4/emails/transactional';
 
-const getResendClient = (): Resend => {
-  if (!resendClient) {
-    if (!process.env.RESEND_API_KEY) {
-      throw new Error('RESEND_API_KEY environment variable is not set');
-    }
-    resendClient = new Resend(process.env.RESEND_API_KEY);
+const getApiKey = (): string => {
+  const key = process.env.ELASTIC_EMAIL_API_KEY;
+  if (!key) {
+    throw new Error('ELASTIC_EMAIL_API_KEY environment variable is not set');
   }
-  return resendClient;
+  return key;
 };
 
 // Supabase service client for database operations
@@ -41,6 +37,54 @@ interface SendEmailResult {
   success: boolean;
   messageId?: string;
   error?: string;
+}
+
+/**
+ * Send an email via Elastic Email REST API
+ */
+async function sendViaElasticEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<{ messageId?: string; error?: string }> {
+  const response = await fetch(ELASTIC_EMAIL_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-ElasticEmail-ApiKey': getApiKey(),
+    },
+    body: JSON.stringify({
+      Recipients: {
+        To: [params.to],
+      },
+      Content: {
+        From: `${FROM_NAME} <${FROM_EMAIL}>`,
+        Subject: params.subject,
+        Body: [
+          {
+            ContentType: 'HTML',
+            Charset: 'utf-8',
+            Content: params.html,
+          },
+          {
+            ContentType: 'PlainText',
+            Charset: 'utf-8',
+            Content: params.text,
+          },
+        ],
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Elastic Email error:', response.status, errorText);
+    return { error: `Elastic Email API error (${response.status}): ${errorText}` };
+  }
+
+  const data = await response.json();
+  return { messageId: data?.TransactionID || data?.MessageID || JSON.stringify(data) };
 }
 
 /**
@@ -64,31 +108,28 @@ export async function sendBookingConfirmationEmail(params: {
       duration: params.duration,
     });
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.clientEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
-    // Log notification to database
     if (params.bookingId) {
       await logNotification({
         type: 'booking_confirmation',
         recipientEmail: params.clientEmail,
         bookingId: params.bookingId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending booking confirmation:', error);
     return { success: false, error: String(error) };
@@ -118,16 +159,15 @@ export async function sendReminderEmail(params: {
       params.hours
     );
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.clientEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,
     });
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
     if (params.bookingId) {
@@ -136,11 +176,11 @@ export async function sendReminderEmail(params: {
         recipientEmail: params.clientEmail,
         bookingId: params.bookingId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending reminder:', error);
     return { success: false, error: String(error) };
@@ -166,16 +206,15 @@ export async function sendLowCreditsEmail(params: {
       bookingLink: params.bookingLink,
     });
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.clientEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,
     });
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
     if (params.clientId) {
@@ -184,11 +223,11 @@ export async function sendLowCreditsEmail(params: {
         recipientEmail: params.clientEmail,
         clientId: params.clientId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending low credits alert:', error);
     return { success: false, error: String(error) };
@@ -214,16 +253,15 @@ export async function sendPaymentReceiptEmail(params: {
       serviceName: params.serviceName,
     });
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.clientEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,
     });
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
     if (params.paymentId) {
@@ -232,11 +270,11 @@ export async function sendPaymentReceiptEmail(params: {
         recipientEmail: params.clientEmail,
         paymentId: params.paymentId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending payment receipt:', error);
     return { success: false, error: String(error) };
@@ -264,17 +302,15 @@ export async function sendBookingRequestCreatedEmail(params: {
       notes: params.notes,
     });
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.trainerEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
     if (params.requestId) {
@@ -283,11 +319,11 @@ export async function sendBookingRequestCreatedEmail(params: {
         recipientEmail: params.trainerEmail,
         bookingId: params.requestId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending booking request created email:', error);
     return { success: false, error: String(error) };
@@ -313,17 +349,15 @@ export async function sendBookingRequestAcceptedEmail(params: {
       acceptedTime: params.acceptedTime,
     });
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.clientEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
     if (params.requestId) {
@@ -332,11 +366,11 @@ export async function sendBookingRequestAcceptedEmail(params: {
         recipientEmail: params.clientEmail,
         bookingId: params.requestId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending booking request accepted email:', error);
     return { success: false, error: String(error) };
@@ -360,17 +394,15 @@ export async function sendBookingRequestDeclinedEmail(params: {
       serviceName: params.serviceName,
     });
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.clientEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
     if (params.requestId) {
@@ -379,11 +411,11 @@ export async function sendBookingRequestDeclinedEmail(params: {
         recipientEmail: params.clientEmail,
         bookingId: params.requestId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending booking request declined email:', error);
     return { success: false, error: String(error) };
@@ -411,17 +443,15 @@ export async function sendClientInvitationEmail(params: {
       message: params.message,
     });
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.recipientEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
     if (params.invitationId) {
@@ -430,11 +460,11 @@ export async function sendClientInvitationEmail(params: {
         recipientEmail: params.recipientEmail,
         invitationId: params.invitationId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending client invitation email:', error);
     return { success: false, error: String(error) };
@@ -510,16 +540,15 @@ This invitation will expire in 7 days.
 Powered by allwondrous
     `.trim();
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.recipientEmail,
       subject,
       html,
       text,
     });
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
     if (params.invitationId) {
@@ -528,11 +557,11 @@ Powered by allwondrous
         recipientEmail: params.recipientEmail,
         invitationId: params.invitationId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending invitation:', error);
     return { success: false, error: String(error) };
@@ -560,17 +589,15 @@ export async function sendCustomEmail(params: {
       message: params.message,
     });
 
-    const { data, error } = await getResendClient().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    const result = await sendViaElasticEmail({
       to: params.recipientEmail,
       subject: email.subject,
       html: email.html,
       text: email.text,
     });
 
-    if (error) {
-      console.error('Resend error:', error);
-      return { success: false, error: error.message };
+    if (result.error) {
+      return { success: false, error: result.error };
     }
 
     if (params.clientId) {
@@ -579,11 +606,11 @@ export async function sendCustomEmail(params: {
         recipientEmail: params.recipientEmail,
         clientId: params.clientId,
         status: 'sent',
-        messageId: data?.id,
+        messageId: result.messageId,
       });
     }
 
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending custom email:', error);
     return { success: false, error: String(error) };
