@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useUserStore } from '@/lib/stores/user-store';
-import { useCalendarStore } from '@/lib/stores/booking-store';
+import { useBookings } from '@/lib/hooks/use-bookings';
+import { useAnalytics } from '@/lib/hooks/use-analytics';
+import { useBookingRequests } from '@/lib/hooks/use-booking-requests';
+import { useUpcomingSessions } from '@/lib/hooks/use-upcoming-sessions';
+import { useClients } from '@/lib/hooks/use-clients';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dumbbell, Calendar, Plus, Users, DollarSign, Clock, TrendingUp, Package, Inbox, FileText, UserPlus, Sparkles, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { PublicBookingLink } from '@/components/shared/PublicBookingLink';
+import type { SoloDashboardStats, UpcomingSession, RecentClient } from '@/lib/types/dashboard';
 
 // Format today's date
 const today = new Date();
@@ -61,133 +66,48 @@ function TierTwoActions() {
   );
 }
 
-interface DashboardStats {
-  earningsThisWeek: number;
-  sessionsThisWeek: number;
-  activeClients: number;
-  utilizationPercent: number;
-  softHoldsCount: number;
-  outstandingCredits: number;
-  lowCreditClients: number;
-  pendingRequests: number;
-}
-
-interface UpcomingSession {
-  id: string;
-  clientName: string;
-  scheduledAt: Date;
-  serviceName: string;
-  status: string;
-}
-
-interface RecentClient {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  credits: number;
-  createdAt: Date;
-}
-
 export default function SoloPractitionerDashboard() {
   const { currentUser, businessSlug } = useUserStore();
-  const { sessions: calendarSessions } = useCalendarStore();
+  const { sessions: calendarSessions } = useBookings(currentUser.id);
 
-  const [stats, setStats] = useState<DashboardStats>({
-    earningsThisWeek: 0,
-    sessionsThisWeek: 0,
-    activeClients: 0,
-    utilizationPercent: 0,
-    softHoldsCount: 0,
-    outstandingCredits: 0,
-    lowCreditClients: 0,
-    pendingRequests: 0,
-  });
-  const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
-  const [recentClients, setRecentClients] = useState<RecentClient[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // React Query hooks
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalytics(currentUser?.id);
+  const { data: pendingRequests = [] } = useBookingRequests(currentUser?.id, 'pending');
+  const { data: upcomingSessionsData = [], isLoading: sessionsLoading } = useUpcomingSessions(currentUser?.id, 5);
+  const { data: clients = [], isLoading: clientsLoading } = useClients(currentUser?.id);
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      setIsLoading(true);
+  const isLoading = analyticsLoading || sessionsLoading || clientsLoading;
 
-      try {
-        // Fetch analytics from API
-        const analyticsResponse = await fetch('/api/analytics/dashboard');
-        let pendingRequestsCount = 0;
+  const stats: SoloDashboardStats = {
+    earningsThisWeek: analyticsData?.earningsThisWeek || 0,
+    sessionsThisWeek: analyticsData?.sessionsThisWeek || 0,
+    activeClients: analyticsData?.activeClients || 0,
+    utilizationPercent: analyticsData?.utilizationPercent || 0,
+    softHoldsCount: analyticsData?.softHoldsCount || 0,
+    outstandingCredits: analyticsData?.outstandingCredits || 0,
+    lowCreditClients: analyticsData?.lowCreditClients || 0,
+    pendingRequests: pendingRequests.length,
+  };
 
-        // Fetch pending booking requests count
-        try {
-          const requestsRes = await fetch('/api/booking-requests');
-          if (requestsRes.ok) {
-            const requestsData = await requestsRes.json();
-            pendingRequestsCount = (requestsData.requests || []).filter(
-              (r: { status: string }) => r.status === 'pending'
-            ).length;
-          }
-        } catch {
-          // Ignore errors fetching requests
-        }
+  const upcomingSessions: UpcomingSession[] = upcomingSessionsData.map(s => ({
+    id: s.id,
+    clientName: s.clientName || 'Client',
+    scheduledAt: new Date(s.scheduledAt),
+    serviceName: s.serviceName || 'Session',
+    status: s.status,
+  }));
 
-        if (analyticsResponse.ok) {
-          const data = await analyticsResponse.json();
-          setStats({
-            earningsThisWeek: data.earningsThisWeek || 0,
-            sessionsThisWeek: data.sessionsThisWeek || 0,
-            activeClients: data.activeClients || 0,
-            utilizationPercent: data.utilizationPercent || 0,
-            softHoldsCount: data.softHoldsCount || 0,
-            outstandingCredits: data.outstandingCredits || 0,
-            lowCreditClients: data.lowCreditClients || 0,
-            pendingRequests: pendingRequestsCount,
-          });
-        }
-
-        // Fetch upcoming sessions via API to avoid RLS issues
-        const sessionsResponse = await fetch('/api/sessions/upcoming?limit=5');
-        if (sessionsResponse.ok) {
-          const sessionsData = await sessionsResponse.json();
-          setUpcomingSessions(
-            (sessionsData.sessions || []).map((s: { id: string; scheduledAt: string; status: string; clientName: string; serviceName: string }) => ({
-              id: s.id,
-              clientName: s.clientName || 'Client',
-              scheduledAt: new Date(s.scheduledAt),
-              serviceName: s.serviceName || 'Session',
-              status: s.status,
-            }))
-          );
-        }
-
-        // Fetch recent clients
-        const clientsResponse = await fetch('/api/clients');
-        if (clientsResponse.ok) {
-          const clientsData = await clientsResponse.json();
-          const sortedClients = (clientsData.clients || [])
-            .sort((a: { created_at: string }, b: { created_at: string }) =>
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )
-            .slice(0, 5)
-            .map((c: { id: string; first_name: string; last_name: string; email: string; credits: number; created_at: string }) => ({
-              id: c.id,
-              firstName: c.first_name || '',
-              lastName: c.last_name || '',
-              email: c.email,
-              credits: c.credits || 0,
-              createdAt: new Date(c.created_at),
-            }));
-          setRecentClients(sortedClients);
-        }
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (currentUser.id) {
-      loadDashboardData();
-    }
-  }, [currentUser.id]);
+  const recentClients: RecentClient[] = [...clients]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5)
+    .map(c => ({
+      id: c.id,
+      firstName: c.first_name || '',
+      lastName: c.last_name || '',
+      email: c.email,
+      credits: c.credits || 0,
+      createdAt: new Date(c.created_at),
+    }));
 
   // Also use calendar store data as fallback for soft holds
   const softHoldsFromStore = calendarSessions.filter(s => s.status === 'soft-hold').length;

@@ -11,19 +11,20 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
+import { useUpdateClient } from '@/lib/hooks/use-clients';
 
-interface Client {
+export interface ClientSummary {
   id: string;
   first_name: string;
   last_name: string;
   email: string;
-  phone: string | null;
+  phone?: string | null;
   credits: number | null;
 }
 
 interface EditClientDialogProps {
-  client: Client;
+  client: ClientSummary;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
@@ -31,7 +32,7 @@ interface EditClientDialogProps {
 
 export function EditClientDialog({ client, open, onOpenChange, onSuccess }: EditClientDialogProps) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const updateClient = useUpdateClient();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -64,27 +65,15 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      const response = await fetch('/api/clients', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: client.id,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          phone: formData.phone || null,
-          credits: formData.credits,
-        }),
+      await updateClient.mutateAsync({
+        id: client.id,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone || null,
+        credits: formData.credits,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update client');
-      }
 
       toast({
         title: 'Client updated',
@@ -99,8 +88,6 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to update client',
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -172,8 +159,8 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            <Button type="submit" disabled={updateClient.isPending}>
+              {updateClient.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </form>

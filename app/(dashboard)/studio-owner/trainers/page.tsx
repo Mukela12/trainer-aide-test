@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,45 +11,16 @@ import { InviteTrainerDialog } from '@/components/studio-owner/InviteTrainerDial
 import { TrainerProfileDialog } from '@/components/studio-owner/TrainerProfileDialog';
 import { AssignTemplateDialog } from '@/components/studio-owner/AssignTemplateDialog';
 import ContentHeader from '@/components/shared/ContentHeader';
-
-interface Trainer {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  staff_type: string;
-  is_onboarded: boolean;
-  created_at: string;
-}
+import { useTrainers } from '@/lib/hooks/use-trainers';
+import type { StaffMember } from '@/lib/hooks/use-trainers';
 
 export default function TrainersPage() {
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: trainers = [], isLoading: loading } = useTrainers();
   const [searchQuery, setSearchQuery] = useState('');
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null);
-
-  useEffect(() => {
-    const fetchTrainers = async () => {
-      try {
-        const response = await fetch('/api/trainers');
-        if (!response.ok) {
-          throw new Error('Failed to fetch trainers');
-        }
-        const data = await response.json();
-        setTrainers(data.trainers || []);
-      } catch (error) {
-        console.error('Error fetching trainers:', error);
-        setTrainers([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTrainers();
-  }, []);
+  const [selectedTrainer, setSelectedTrainer] = useState<StaffMember | null>(null);
 
   const filteredTrainers = trainers.filter((trainer) => {
     const fullName = `${trainer.first_name} ${trainer.last_name}`.toLowerCase();

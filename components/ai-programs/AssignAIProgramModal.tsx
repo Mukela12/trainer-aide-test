@@ -5,15 +5,10 @@ import { X, User, Search, CheckCircle2, Users, Dumbbell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import type { ClientProfile } from '@/lib/types/client-profile';
-
-interface Trainer {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  staff_type: string;
-}
+import { useClients } from '@/lib/hooks/use-clients';
+import { useAssignAIProgram } from '@/lib/hooks/use-ai-programs';
+import { useTrainers } from '@/lib/hooks/use-trainers';
+import { useUserStore } from '@/lib/stores/user-store';
 
 interface AssignAIProgramModalProps {
   programId: string;
@@ -32,56 +27,30 @@ export function AssignAIProgramModal({
 }: AssignAIProgramModalProps) {
   const [assignmentType, setAssignmentType] = useState<'client' | 'trainer'>(initialMode);
   const [searchTerm, setSearchTerm] = useState('');
-  const [clients, setClients] = useState<ClientProfile[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [assigning, setAssigning] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // React Query: fetch clients
+  const { currentUser } = useUserStore();
+  const { data: clients = [], isLoading: clientsLoading } = useClients(currentUser?.id);
+
+  // React Query: fetch trainers
+  const { data: trainers = [], isLoading: trainersLoading } = useTrainers();
+
+  // React Query: assign mutation
+  const assignMutation = useAssignAIProgram();
+
+  // Determine loading state based on assignment type
+  const loading = assignmentType === 'client' ? clientsLoading : trainersLoading;
+
+  // Reset selection and search when switching assignment type
   useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        setSelectedId(null);
-        setSearchTerm('');
-        setError(null);
-
-        if (assignmentType === 'client') {
-          const response = await fetch('/api/clients');
-          if (!response.ok) {
-            throw new Error('Failed to fetch clients');
-          }
-          const data = await response.json();
-          setClients(data.clients || []);
-        } else {
-          const response = await fetch('/api/trainers');
-          if (!response.ok) {
-            // Trainers endpoint may not be available for solo practitioners
-            // They can still see themselves
-            setTrainers([]);
-            return;
-          }
-          const data = await response.json();
-          setTrainers(data.trainers || []);
-        }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch data');
-        if (assignmentType === 'client') {
-          setClients([]);
-        } else {
-          setTrainers([]);
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
+    setSelectedId(null);
+    setSearchTerm('');
+    setError(null);
   }, [assignmentType]);
 
-  const filteredClients = clients.filter(client =>
+  const filteredClients = clients.filter((client: { first_name: string; last_name: string; email: string }) =>
     `${client.first_name} ${client.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -95,33 +64,22 @@ export function AssignAIProgramModal({
     if (!selectedId) return;
 
     try {
-      setAssigning(true);
       setError(null);
 
-      const body = assignmentType === 'client'
-        ? { client_id: selectedId }
-        : { trainer_id: selectedId };
-
-      const response = await fetch(`/api/ai-programs/${programId}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to assign program');
+      if (assignmentType === 'client') {
+        await assignMutation.mutateAsync({ programId, clientId: selectedId });
+      } else {
+        await assignMutation.mutateAsync({ programId, trainerId: selectedId });
       }
 
-      if (onAssigned) onAssigned();
+      onAssigned?.();
       onClose();
     } catch (err) {
-      console.error('Error assigning program:', err);
       setError(err instanceof Error ? err.message : 'Failed to assign program');
-    } finally {
-      setAssigning(false);
     }
   };
+
+  const assigning = assignMutation.isPending;
 
   const renderList = () => {
     if (loading) {
@@ -147,7 +105,7 @@ export function AssignAIProgramModal({
 
       return (
         <div className="space-y-2">
-          {filteredClients.map((client) => (
+          {filteredClients.map((client: { id: string; first_name: string; last_name: string; email: string }) => (
             <button
               key={client.id}
               onClick={() => setSelectedId(client.id)}

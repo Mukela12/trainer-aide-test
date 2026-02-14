@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { lookupUserProfile } from '@/lib/services/profile-service';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getClientGoals, createGoal } from '@/lib/services/goal-service';
 import type { CreateGoalInput } from '@/lib/types/client-goals';
 
 /**
@@ -20,32 +20,12 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
-    const profile = await lookupUserProfile(serviceClient, user);
-    const studioId = profile?.studio_id || user.id;
-
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status'); // 'active', 'achieved', 'abandoned', 'paused', or null for all
+    const status = searchParams.get('status') || undefined;
 
-    let query = serviceClient
-      .from('ta_client_goals')
-      .select(`
-        *,
-        milestones:ta_goal_milestones(*)
-      `)
-      .eq('client_id', clientId)
-      .or(`trainer_id.eq.${user.id},trainer_id.is.null`)
-      .order('priority', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    if (status) {
-      query = query.eq('status', status);
-    }
-
-    const { data: goals, error } = await query;
+    const { data: goals, error } = await getClientGoals(clientId, user.id, status);
 
     if (error) {
-      console.error('Error fetching client goals:', error);
       return NextResponse.json(
         { error: 'Failed to fetch goals', details: error.message },
         { status: 500 }
@@ -79,10 +59,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
     const body: CreateGoalInput = await request.json();
 
-    // Validate required fields
     if (!body.goal_type) {
       return NextResponse.json(
         { error: 'goal_type is required' },
@@ -97,31 +75,9 @@ export async function POST(
       );
     }
 
-    const goalData = {
-      client_id: clientId,
-      trainer_id: user.id,
-      goal_type: body.goal_type,
-      description: body.description,
-      target_value: body.target_value || null,
-      target_unit: body.target_unit || null,
-      current_value: body.current_value || null,
-      start_date: body.start_date || new Date().toISOString().split('T')[0],
-      target_date: body.target_date || null,
-      status: 'active',
-      priority: body.priority ?? 1,
-    };
-
-    const { data: goal, error } = await serviceClient
-      .from('ta_client_goals')
-      .insert(goalData)
-      .select(`
-        *,
-        milestones:ta_goal_milestones(*)
-      `)
-      .single();
+    const { data: goal, error } = await createGoal(clientId, user.id, body);
 
     if (error) {
-      console.error('Error creating goal:', error);
       return NextResponse.json(
         { error: 'Failed to create goal', details: error.message },
         { status: 500 }

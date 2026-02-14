@@ -6,6 +6,7 @@ import { ArrowLeft, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProgramEditor } from '@/components/ai-programs/ProgramEditor';
 import { useUserStore } from '@/lib/stores/user-store';
+import { useAIProgram, usePatchAIProgram } from '@/lib/hooks/use-ai-programs';
 import type { AIProgram } from '@/lib/types/ai-program';
 
 export default function ProgramEditPage() {
@@ -14,10 +15,15 @@ export default function ProgramEditPage() {
   const { canCreateAIPrograms } = useUserStore();
   const programId = params.id as string;
 
-  const [program, setProgram] = useState<AIProgram | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data: program, isLoading: loading, error: queryError } = useAIProgram(programId);
+  const [editableProgram, setEditableProgram] = useState<AIProgram | null>(null);
+  const patchMutation = usePatchAIProgram();
+
+  const error = queryError?.message || null;
+
+  useEffect(() => {
+    if (program) setEditableProgram(program);
+  }, [program]);
 
   // Redirect trainers to solo route - AI Programs only for solo practitioners
   useEffect(() => {
@@ -26,50 +32,12 @@ export default function ProgramEditPage() {
     }
   }, [canCreateAIPrograms, router, programId]);
 
-  useEffect(() => {
-    async function fetchProgram() {
-      try {
-        setLoading(true);
-        // TODO: Replace with actual API call
-        // const response = await fetch(`/api/ai-programs/${programId}`);
-        // const data = await response.json();
-        // setProgram(data.program);
-
-        // Mock data for now
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setError('API endpoint not yet implemented');
-      } catch (err) {
-        setError('Failed to load program');
-        console.error('Error fetching program:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchProgram();
-  }, [programId]);
-
   const handleSave = async (updatedProgram: AIProgram) => {
     try {
-      setSaving(true);
-
-      const response = await fetch(`/api/ai-programs/${programId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedProgram),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save program');
-      }
-
-      // Navigate back to view mode
+      await patchMutation.mutateAsync({ programId, updates: updatedProgram });
       router.push(`/trainer/programs/${programId}`);
-    } catch (err) {
-      console.error('Error saving program:', err);
-      setError('Failed to save changes');
-    } finally {
-      setSaving(false);
+    } catch {
+      // error handled by mutation state
     }
   };
 
@@ -138,11 +106,11 @@ export default function ProgramEditPage() {
           </div>
 
           <Button
-            onClick={() => program && handleSave(program)}
-            disabled={saving || !program}
+            onClick={() => editableProgram && handleSave(editableProgram)}
+            disabled={patchMutation.isPending || !editableProgram}
             className="bg-wondrous-primary hover:bg-purple-700 text-white"
           >
-            {saving ? (
+            {patchMutation.isPending ? (
               <>Saving...</>
             ) : (
               <>
@@ -154,10 +122,10 @@ export default function ProgramEditPage() {
         </div>
 
         {/* Editor */}
-        {program && (
+        {editableProgram && (
           <ProgramEditor
-            program={program}
-            onChange={setProgram}
+            program={editableProgram}
+            onChange={setEditableProgram}
             onSave={handleSave}
           />
         )}

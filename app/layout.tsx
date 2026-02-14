@@ -3,6 +3,7 @@ import { Bodoni_Moda, Lato, Montserrat } from "next/font/google";
 import "./globals.css";
 import { StoreInitializer } from "@/components/providers/StoreInitializer";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import { Toaster } from "@/components/ui/toaster";
 
 const bodoniModa = Bodoni_Moda({
@@ -46,11 +47,13 @@ export default function RootLayout({
         className={`${lato.variable} ${bodoniModa.variable} ${montserrat.variable} antialiased bg-gray-50 dark:bg-gray-900 font-sans overflow-x-hidden`}
         suppressHydrationWarning
       >
-        <AuthProvider>
-          <StoreInitializer />
-          {children}
-          <Toaster />
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <StoreInitializer />
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

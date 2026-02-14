@@ -42,6 +42,8 @@ import { SendEmailDialog } from '@/components/shared/SendEmailDialog';
 import BookingHistory from '@/components/studio-owner/BookingHistory';
 import { format } from 'date-fns';
 import ContentHeader from '@/components/shared/ContentHeader';
+import { useUserStore } from '@/lib/stores/user-store';
+import { useClients, usePatchClient } from '@/lib/hooks/use-clients';
 
 interface Client {
   id: string;
@@ -87,8 +89,10 @@ type CreditFilter = 'all' | 'with-credits' | 'low-credits' | 'no-credits';
 type StatusFilter = 'all' | 'active' | 'pending' | 'archived';
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { currentUser } = useUserStore();
+  const { data: clients = [], isLoading } = useClients(currentUser?.id);
+  const patchClient = usePatchClient();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -116,25 +120,6 @@ export default function ClientsPage() {
   const creditFilterRef = useRef<HTMLDivElement>(null);
   const statusFilterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
-
-  const fetchClients = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/clients');
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      const data = await response.json();
-      setClients(data.clients || []);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-      setClients([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchClients();
-  }, []);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -170,18 +155,12 @@ export default function ClientsPage() {
 
   const handleArchiveClient = async (clientId: string, archive: boolean) => {
     try {
-      const response = await fetch(`/api/clients?id=${clientId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_archived: archive }),
-      });
-      if (!response.ok) throw new Error('Failed to update client');
-      fetchClients();
+      await patchClient.mutateAsync({ clientId, updates: { is_archived: archive } });
       if (selectedClient?.id === clientId) {
         closeClientDrawer();
       }
-    } catch (error) {
-      console.error('Error archiving client:', error);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -796,14 +775,13 @@ export default function ClientsPage() {
       )}
 
       {/* Dialogs */}
-      <AddClientDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} onSuccess={fetchClients} />
-      <InviteClientDialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen} onSuccess={fetchClients} />
+      <AddClientDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
+      <InviteClientDialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen} />
       {editClient && (
         <EditClientDialog
           client={editClient}
           open={!!editClient}
           onOpenChange={(open) => !open && setEditClient(null)}
-          onSuccess={fetchClients}
         />
       )}
       {emailClient && (
@@ -826,7 +804,6 @@ export default function ClientsPage() {
           client={rewardCreditsClient}
           open={!!rewardCreditsClient}
           onOpenChange={(open) => !open && setRewardCreditsClient(null)}
-          onSuccess={fetchClients}
         />
       )}
     </div>

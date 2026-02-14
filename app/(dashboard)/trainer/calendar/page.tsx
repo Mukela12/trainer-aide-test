@@ -6,13 +6,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Plus, Clock, User, X, Search, Calendar as CalendarIcon, Inbox, CheckCircle, XCircle, MessageSquare, AlertCircle, Play, AlertTriangle, UserX, CalendarX, Check, TrendingUp, Repeat, StickyNote, Dumbbell, Bell, CalendarDays, Timer, CreditCard, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/lib/hooks/use-toast";
 import { useUserStore } from "@/lib/stores/user-store";
-import { useCalendarStore } from "@/lib/stores/booking-store";
-import { useTemplateStore } from "@/lib/stores/template-store";
-import { useAvailabilityStore } from "@/lib/stores/availability-store";
-import { useServiceStore } from "@/lib/stores/service-store";
-import { useBookingRequestStore } from "@/lib/stores/booking-request-store";
+import { useBookings, useAddSession, useUpdateSession, useCancelBooking } from "@/lib/hooks/use-bookings";
+import { useTemplates } from "@/lib/hooks/use-templates";
+import { useAvailability, useAddBlock, getBlockedBlocks as getBlockedBlocksUtil } from "@/lib/hooks/use-availability";
+import { useServices } from "@/lib/hooks/use-services";
+import { useBookingRequests, useAcceptBookingRequest, useDeclineBookingRequest } from "@/lib/hooks/use-booking-requests";
+import { useClients } from "@/lib/hooks/use-clients";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   generateTimeSlots,
   isTimeAvailable,
@@ -37,12 +39,19 @@ export default function TrainerCalendar() {
 
   // Store hooks
   const currentUser = useUserStore((state) => state.currentUser);
-  const { sessions, addSession, updateSession, removeSession, fetchBookings } = useCalendarStore();
-  const { templates } = useTemplateStore();
-  const { addBlock, getBlockedBlocks, availability: trainerAvailability, fetchAvailability } = useAvailabilityStore();
-  const { services, fetchServices, getServiceById } = useServiceStore();
-  const { requests: bookingRequests, fetchRequests, acceptRequest, declineRequest } = useBookingRequestStore();
+  const { sessions } = useBookings(currentUser?.id);
+  const addSessionMutation = useAddSession();
+  const updateSessionMutation = useUpdateSession();
+  const cancelBookingMutation = useCancelBooking();
+  const { data: templates = [] } = useTemplates(currentUser?.id);
+  const { data: trainerAvailability } = useAvailability(currentUser?.id);
+  const addBlockMutation = useAddBlock();
+  const { data: services = [] } = useServices();
+  const { data: bookingRequests = [] } = useBookingRequests(currentUser?.id, 'pending');
+  const acceptRequestMutation = useAcceptBookingRequest();
+  const declineRequestMutation = useDeclineBookingRequest();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Helper functions to replace mock data functions
   const getServiceType = (serviceTypeId: string | null) => {
@@ -70,6 +79,7 @@ export default function TrainerCalendar() {
 
   // Availability helper functions (replaces imports from availability-data)
   const isWithinAvailability = (datetime: Date, availability: typeof trainerAvailability): boolean => {
+    if (!availability) return false;
     const dayOfWeek = datetime.getDay();
     const hour = datetime.getHours();
     const minute = datetime.getMinutes();
@@ -93,6 +103,7 @@ export default function TrainerCalendar() {
   };
 
   const isTimeBlocked = (datetime: Date, availability: typeof trainerAvailability): boolean => {
+    if (!availability) return false;
     const dayOfWeek = datetime.getDay();
     const hour = datetime.getHours();
     const minute = datetime.getMinutes();
@@ -140,14 +151,15 @@ export default function TrainerCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [calendarTab, setCalendarTab] = useState<CalendarTab>("schedule");
-  const [clients, setClients] = useState<Array<{
-    id: string;
-    initials: string;
-    name: string;
-    color: string;
-    credits: number;
-    phone?: string;
-  }>>([]);
+  const { data: rawClients = [] } = useClients(currentUser?.id);
+  const clients = useMemo(() => rawClients.map((c) => ({
+    id: c.id,
+    initials: `${(c.first_name || '')[0] || ''}${(c.last_name || '')[0] || ''}`.toUpperCase() || '??',
+    name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Unknown',
+    color: `hsl(${Math.abs(c.id.split('').reduce((acc: number, ch: string) => acc + ch.charCodeAt(0), 0) % 360)}, 70%, 50%)`,
+    credits: c.credits || 0,
+    phone: c.phone || undefined,
+  })), [rawClients]);
 
   // Inline booking panel state (NO MODALS)
   const [showBookingPanel, setShowBookingPanel] = useState(false);
@@ -190,50 +202,10 @@ export default function TrainerCalendar() {
   const [blockReason, setBlockReason] = useState<BlockReasonType>('personal');
   const [blockNotes, setBlockNotes] = useState<string>('');
 
-  // Mark as mounted on client and fetch data from API
+  // Mark as mounted on client
   useEffect(() => {
     setIsMounted(true);
-
-    // Fetch clients from API
-    async function fetchClients() {
-      try {
-        const response = await fetch('/api/clients');
-        if (response.ok) {
-          const data = await response.json();
-          const transformedClients = (data.clients || []).map((c: {
-            id: string;
-            first_name?: string;
-            last_name?: string;
-            credits?: number;
-          }) => ({
-            id: c.id,
-            initials: `${(c.first_name || '')[0] || ''}${(c.last_name || '')[0] || ''}`.toUpperCase() || '??',
-            name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Unknown',
-            color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-            credits: c.credits || 0,
-          }));
-          setClients(transformedClients);
-        }
-      } catch (error) {
-        console.error('Error fetching clients:', error);
-      }
-    }
-
-    // Fetch bookings for current week
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 7);
-    endOfWeek.setHours(23, 59, 59, 999);
-
-    fetchClients();
-    fetchBookings(currentUser.id, startOfWeek, endOfWeek);
-    fetchServices();
-    fetchAvailability(currentUser.id);
-    fetchRequests(currentUser.id, 'pending');
-  }, [currentUser.id, fetchBookings, fetchServices, fetchAvailability, fetchRequests]);
+  }, []);
 
   // Soft hold expiry enforcement
   useEffect(() => {
@@ -252,7 +224,7 @@ export default function TrainerCalendar() {
           now > holdExpiryDate
         ) {
           hasExpired = true;
-          updateSession(session.id, { status: "cancelled" as const });
+          updateSessionMutation.mutate(session.id, { status: "cancelled" as const });
         }
       });
 
@@ -402,7 +374,7 @@ export default function TrainerCalendar() {
       notes: blockNotes || undefined,
     };
 
-    addBlock(newBlock);
+    addBlockMutation.mutate(newBlock);
 
     const description = effectiveRecurrence === 'weekly'
       ? `Blocked weekly from ${blockStartTime} to ${blockEndTime}`
@@ -476,16 +448,10 @@ export default function TrainerCalendar() {
     };
 
     // Update sessions
-    addSession(newSession);
+    addSessionMutation.mutate(newSession);
 
-    // Deduct credits
-    setClients(
-      clients.map((c) =>
-        c.id === clientId
-          ? { ...c, credits: c.credits - serviceType.creditsRequired }
-          : c
-      )
-    );
+    // Refresh clients to reflect updated credits
+    queryClient.invalidateQueries({ queryKey: ['clients'] });
 
     // Success notification
     toast({
@@ -532,7 +498,7 @@ export default function TrainerCalendar() {
     const session = sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
-    updateSession(sessionId, { status: "completed" });
+    updateSessionMutation.mutate(sessionId, { status: "completed" });
 
     toast({
       title: "Session Completed",
@@ -568,7 +534,7 @@ export default function TrainerCalendar() {
     const session = sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
-    updateSession(sessionId, { status: "late" });
+    updateSessionMutation.mutate(sessionId, { status: "late" });
 
     toast({
       variant: "warning",
@@ -588,16 +554,10 @@ export default function TrainerCalendar() {
     if (!serviceType || !client) return;
 
     // Update session status
-    updateSession(sessionId, { status: "no-show" });
+    updateSessionMutation.mutate(sessionId, { status: "no-show" });
 
-    // Refund credit
-    setClients(
-      clients.map((c) =>
-        c.id === session.clientId
-          ? { ...c, credits: c.credits + serviceType.creditsRequired }
-          : c
-      )
-    );
+    // Refresh clients to reflect refunded credits
+    queryClient.invalidateQueries({ queryKey: ['clients'] });
 
     toast({
       variant: "destructive",
@@ -617,16 +577,10 @@ export default function TrainerCalendar() {
     if (!serviceType || !client) return;
 
     // Remove session
-    removeSession(sessionId);
+    cancelBookingMutation.mutate(sessionId);
 
-    // Refund credit
-    setClients(
-      clients.map((c) =>
-        c.id === session.clientId
-          ? { ...c, credits: c.credits + serviceType.creditsRequired }
-          : c
-      )
-    );
+    // Refresh clients to reflect refunded credits
+    queryClient.invalidateQueries({ queryKey: ['clients'] });
 
     toast({
       title: "Session Cancelled",
@@ -693,7 +647,7 @@ export default function TrainerCalendar() {
     }
 
     // Update session datetime
-    updateSession(sessionId, { datetime: newDatetime });
+    updateSessionMutation.mutate(sessionId, { datetime: newDatetime });
 
     toast({
       title: "Session Rescheduled",
@@ -727,7 +681,7 @@ export default function TrainerCalendar() {
     if (!session) return;
 
     // Update the calendar session with selected template and sign-off mode
-    updateSession(setupSessionId, {
+    updateSessionMutation.mutate(setupSessionId, {
       templateId: setupTemplateId,
       signOffMode: setupSignOffMode,
     });
@@ -784,19 +738,13 @@ export default function TrainerCalendar() {
       workoutId: null,
     };
 
-    addSession(newSession);
+    addSessionMutation.mutate(newSession);
 
-    // Deduct credits
-    setClients(
-      clients.map((c) =>
-        c.id === request.clientId
-          ? { ...c, credits: c.credits - serviceType.creditsRequired }
-          : c
-      )
-    );
+    // Refresh clients to reflect updated credits
+    queryClient.invalidateQueries({ queryKey: ['clients'] });
 
     // Mark request as accepted via API
-    acceptRequest(requestId, selectedTime.toISOString());
+    acceptRequestMutation.mutate({ requestId, acceptedTime: selectedTime.toISOString() });
 
     toast({
       title: "Request Accepted",
@@ -810,7 +758,7 @@ export default function TrainerCalendar() {
     if (!request) return;
 
     // Decline request via API
-    declineRequest(requestId);
+    declineRequestMutation.mutate(requestId);
 
     toast({
       title: "Request Declined",
@@ -2021,7 +1969,7 @@ export default function TrainerCalendar() {
                                   workoutId: null,
                                   holdExpiry: holdExpiry,
                                 };
-                                addSession(newSession);
+                                addSessionMutation.mutate(newSession);
                                 toast({
                                   title: "Soft Hold Created",
                                   description: `Hold expires in 24 hours • ${client.name}`,

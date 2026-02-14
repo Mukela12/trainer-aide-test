@@ -1,107 +1,47 @@
 "use client";
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useUserStore } from '@/lib/stores/user-store';
-import { useCalendarStore } from '@/lib/stores/booking-store';
+import { useBookings } from '@/lib/hooks/use-bookings';
+import { useAnalytics } from '@/lib/hooks/use-analytics';
+import { useBookingRequests } from '@/lib/hooks/use-booking-requests';
+import { useUpcomingSessions } from '@/lib/hooks/use-upcoming-sessions';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { FileText, Dumbbell, Calendar, Users, DollarSign, Clock, Inbox, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
+import type { TrainerDashboardStats, UpcomingSession } from '@/lib/types/dashboard';
 
 // Format today's date
 const today = new Date();
 const dateString = format(today, 'EEEE, MMMM d');
 
-interface DashboardStats {
-  earningsThisWeek: number;
-  sessionsThisWeek: number;
-  activeClients: number;
-  softHoldsCount: number;
-  pendingRequests: number;
-}
-
-interface UpcomingSession {
-  id: string;
-  clientName: string;
-  scheduledAt: Date;
-  serviceName: string;
-  status: string;
-}
-
 export default function TrainerDashboard() {
   const { currentUser } = useUserStore();
-  const { sessions: calendarSessions } = useCalendarStore();
+  const { sessions: calendarSessions } = useBookings(currentUser?.id);
 
-  const [stats, setStats] = useState<DashboardStats>({
-    earningsThisWeek: 0,
-    sessionsThisWeek: 0,
-    activeClients: 0,
-    softHoldsCount: 0,
-    pendingRequests: 0,
-  });
-  const [upcomingSessions, setUpcomingSessions] = useState<UpcomingSession[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalytics(currentUser?.id);
+  const { data: pendingRequests = [] } = useBookingRequests(currentUser?.id, 'pending');
+  const { data: upcomingSessionsData = [], isLoading: sessionsLoading } = useUpcomingSessions(currentUser?.id, 5);
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      setIsLoading(true);
+  const isLoading = analyticsLoading || sessionsLoading;
 
-      try {
-        // Fetch analytics from API
-        const analyticsResponse = await fetch('/api/analytics/dashboard');
-        let pendingRequestsCount = 0;
+  const stats: TrainerDashboardStats = {
+    earningsThisWeek: analyticsData?.earningsThisWeek || 0,
+    sessionsThisWeek: analyticsData?.sessionsThisWeek || 0,
+    activeClients: analyticsData?.activeClients || 0,
+    softHoldsCount: analyticsData?.softHoldsCount || 0,
+    pendingRequests: pendingRequests.length,
+  };
 
-        // Fetch pending booking requests count
-        try {
-          const requestsRes = await fetch('/api/booking-requests');
-          if (requestsRes.ok) {
-            const requestsData = await requestsRes.json();
-            pendingRequestsCount = (requestsData.requests || []).filter(
-              (r: { status: string }) => r.status === 'pending'
-            ).length;
-          }
-        } catch {
-          // Ignore errors fetching requests
-        }
-
-        if (analyticsResponse.ok) {
-          const data = await analyticsResponse.json();
-          setStats({
-            earningsThisWeek: data.earningsThisWeek || 0,
-            sessionsThisWeek: data.sessionsThisWeek || 0,
-            activeClients: data.activeClients || 0,
-            softHoldsCount: data.softHoldsCount || 0,
-            pendingRequests: pendingRequestsCount,
-          });
-        }
-
-        // Fetch upcoming sessions via API
-        const sessionsResponse = await fetch('/api/sessions/upcoming?limit=5');
-        if (sessionsResponse.ok) {
-          const sessionsData = await sessionsResponse.json();
-          setUpcomingSessions(
-            (sessionsData.sessions || []).map((s: { id: string; scheduledAt: string; status: string; clientName: string; serviceName: string }) => ({
-              id: s.id,
-              clientName: s.clientName || 'Client',
-              scheduledAt: new Date(s.scheduledAt),
-              serviceName: s.serviceName || 'Session',
-              status: s.status,
-            }))
-          );
-        }
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (currentUser.id) {
-      loadDashboardData();
-    }
-  }, [currentUser.id]);
+  const upcomingSessions: UpcomingSession[] = upcomingSessionsData.map(s => ({
+    id: s.id,
+    clientName: s.clientName || 'Client',
+    scheduledAt: new Date(s.scheduledAt),
+    serviceName: s.serviceName || 'Session',
+    status: s.status,
+  }));
 
   // Also use calendar store data as fallback for soft holds
   const softHoldsFromStore = calendarSessions.filter(s => s.status === 'soft-hold').length;

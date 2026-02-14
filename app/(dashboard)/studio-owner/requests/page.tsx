@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useUserStore } from '@/lib/stores/user-store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,105 +24,37 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import ContentHeader from '@/components/shared/ContentHeader';
+import { useBookingRequests, useAcceptBookingRequest, useDeclineBookingRequest, type BookingRequest } from '@/lib/hooks/use-booking-requests';
 
-interface BookingRequest {
-  id: string;
-  client: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-  } | null;
-  service: {
-    id: string;
-    name: string;
-    duration: number;
-  } | null;
-  preferred_times: string[];
-  notes: string | null;
-  status: 'pending' | 'accepted' | 'declined' | 'expired';
-  created_at: string;
-  expires_at: string;
-  clientName?: string;
-}
-
-export default function StudioOwnerBookingRequestsPage() {
+export default function StudioOwnerBookingRequestResponsesPage() {
   const { currentUser } = useUserStore();
-  const [requests, setRequests] = useState<BookingRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: requests = [], isLoading: loading } = useBookingRequests(currentUser?.id);
+  const acceptMutation = useAcceptBookingRequest();
+  const declineMutation = useDeclineBookingRequest();
+
   const [selectedRequest, setSelectedRequest] = useState<BookingRequest | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(false);
   const [showDeclineDialog, setShowDeclineDialog] = useState(false);
-
-  const fetchRequests = async () => {
-    try {
-      const res = await fetch('/api/booking-requests');
-      if (res.ok) {
-        const data = await res.json();
-        setRequests(data.requests || []);
-      }
-    } catch (err) {
-      console.error('Error fetching booking requests:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRequests();
-  }, []);
 
   const handleAccept = async () => {
     if (!selectedRequest || !selectedTime) return;
-
-    setProcessing(true);
     try {
-      const res = await fetch('/api/booking-requests', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedRequest.id,
-          status: 'accepted',
-          acceptedTime: selectedTime,
-        }),
-      });
-
-      if (res.ok) {
-        await fetchRequests();
-        setSelectedRequest(null);
-        setSelectedTime(null);
-      }
-    } catch (err) {
-      console.error('Error accepting request:', err);
-    } finally {
-      setProcessing(false);
+      await acceptMutation.mutateAsync({ requestId: selectedRequest.id, acceptedTime: selectedTime });
+      setSelectedRequest(null);
+      setSelectedTime(null);
+    } catch {
+      // Error handled by React Query
     }
   };
 
   const handleDecline = async () => {
     if (!selectedRequest) return;
-
-    setProcessing(true);
     try {
-      const res = await fetch('/api/booking-requests', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedRequest.id,
-          status: 'declined',
-        }),
-      });
-
-      if (res.ok) {
-        await fetchRequests();
-        setSelectedRequest(null);
-        setShowDeclineDialog(false);
-      }
-    } catch (err) {
-      console.error('Error declining request:', err);
-    } finally {
-      setProcessing(false);
+      await declineMutation.mutateAsync(selectedRequest.id);
+      setSelectedRequest(null);
+      setShowDeclineDialog(false);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -197,7 +129,7 @@ export default function StudioOwnerBookingRequestsPage() {
                           Preferred times:
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {request.preferred_times.map((time, idx) => (
+                          {request.preferredTimes.map((time, idx) => (
                             <div
                               key={idx}
                               className="flex items-center gap-1 text-sm bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded"
@@ -220,7 +152,7 @@ export default function StudioOwnerBookingRequestsPage() {
 
                       <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
                         <AlertCircle size={12} />
-                        Expires {format(new Date(request.expires_at), 'MMM d, h:mm a')}
+                        Expires {format(new Date(request.expiresAt), 'MMM d, h:mm a')}
                       </div>
                     </div>
 
@@ -240,7 +172,7 @@ export default function StudioOwnerBookingRequestsPage() {
                         size="sm"
                         onClick={() => {
                           setSelectedRequest(request);
-                          setSelectedTime(request.preferred_times[0] || null);
+                          setSelectedTime(request.preferredTimes[0] || null);
                         }}
                       >
                         <Check size={16} className="mr-1" />
@@ -322,7 +254,7 @@ export default function StudioOwnerBookingRequestsPage() {
               Select a time:
             </p>
             <div className="space-y-2">
-              {selectedRequest?.preferred_times.map((time, idx) => (
+              {selectedRequest?.preferredTimes.map((time, idx) => (
                 <button
                   key={idx}
                   onClick={() => setSelectedTime(time)}
@@ -360,9 +292,9 @@ export default function StudioOwnerBookingRequestsPage() {
             </Button>
             <Button
               onClick={handleAccept}
-              disabled={!selectedTime || processing}
+              disabled={!selectedTime || acceptMutation.isPending}
             >
-              {processing ? 'Confirming...' : 'Confirm Booking'}
+              {acceptMutation.isPending ? 'Confirming...' : 'Confirm Booking'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -394,9 +326,9 @@ export default function StudioOwnerBookingRequestsPage() {
             <Button
               variant="destructive"
               onClick={handleDecline}
-              disabled={processing}
+              disabled={declineMutation.isPending}
             >
-              {processing ? 'Declining...' : 'Decline Request'}
+              {declineMutation.isPending ? 'Declining...' : 'Decline Request'}
             </Button>
           </DialogFooter>
         </DialogContent>

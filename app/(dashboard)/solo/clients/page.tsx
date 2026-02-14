@@ -31,6 +31,9 @@ import {
   ArchiveRestore,
   Gift,
 } from 'lucide-react';
+import { useUserStore } from '@/lib/stores/user-store';
+import { useClients, usePatchClient, useDeleteClient } from '@/lib/hooks/use-clients';
+import { useBookingHistory } from '@/lib/hooks/use-booking-history';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,15 +62,6 @@ interface Client {
   last_session_date?: string | null;
 }
 
-interface BookingHistoryItem {
-  id: string;
-  session_name: string;
-  scheduled_at: string;
-  status: string;
-  credits_used: number;
-  duration?: number;
-}
-
 type SortField = 'name' | 'credits' | 'created_at' | 'last_session';
 type CreditFilter = 'all' | 'with-credits' | 'low-credits' | 'no-credits';
 type StatusFilter = 'all' | 'active' | 'pending';
@@ -82,8 +76,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function SoloClientsPage() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { currentUser } = useUserStore();
+  const { data: clients = [], isLoading } = useClients(currentUser?.id);
+  const patchClient = usePatchClient();
+  const deleteClientMutation = useDeleteClient();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -96,8 +93,6 @@ export default function SoloClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showDrawer, setShowDrawer] = useState(false);
   const [isDrawerAnimating, setIsDrawerAnimating] = useState(false);
-  const [bookingHistory, setBookingHistory] = useState<BookingHistoryItem[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
 
   // Sorting and filtering state
@@ -111,25 +106,6 @@ export default function SoloClientsPage() {
   // Refs for click-outside detection
   const creditFilterRef = useRef<HTMLDivElement>(null);
   const statusFilterRef = useRef<HTMLDivElement>(null);
-
-  const fetchClients = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/clients');
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      const data = await response.json();
-      setClients(data.clients || []);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-      setClients([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchClients();
-  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -146,29 +122,14 @@ export default function SoloClientsPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch booking history when drawer opens
-  const fetchBookingHistory = async (clientId: string) => {
-    setLoadingHistory(true);
-    try {
-      const response = await fetch(`/api/clients/booking-history?client_id=${clientId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setBookingHistory(data.bookings || []);
-      }
-    } catch (error) {
-      console.error('Error fetching booking history:', error);
-      setBookingHistory([]);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
+  // Booking history via React Query (auto-fetches when selectedClient is set)
+  const { data: bookingHistory = [], isLoading: loadingHistory } = useBookingHistory(selectedClient?.id);
 
   // Open client drawer with animation
   const openClientDrawer = (client: Client) => {
     setSelectedClient(client);
     setShowDrawer(true);
     setShowAllHistory(false);
-    fetchBookingHistory(client.id);
     setTimeout(() => setIsDrawerAnimating(true), 10);
   };
 
@@ -178,7 +139,6 @@ export default function SoloClientsPage() {
     setTimeout(() => {
       setShowDrawer(false);
       setSelectedClient(null);
-      setBookingHistory([]);
     }, 300);
   };
 
@@ -186,18 +146,13 @@ export default function SoloClientsPage() {
     if (!confirm(`Are you sure you want to delete "${clientName}"? This action cannot be undone.`)) {
       return;
     }
-
     try {
-      const response = await fetch(`/api/clients?id=${clientId}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete client');
-      fetchClients();
+      await deleteClientMutation.mutateAsync(clientId);
       if (selectedClient?.id === clientId) {
         closeClientDrawer();
       }
-    } catch (error) {
-      console.error('Error deleting client:', error);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -211,24 +166,12 @@ export default function SoloClientsPage() {
     }
 
     try {
-      const response = await fetch(`/api/clients?id=${client.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_archived: !isCurrentlyArchived }),
-      });
-      if (!response.ok) throw new Error(`Failed to ${action} client`);
-
-      // Update local state
-      setClients(prev => prev.map(c =>
-        c.id === client.id ? { ...c, is_archived: !isCurrentlyArchived } : c
-      ));
-
+      await patchClient.mutateAsync({ clientId: client.id, updates: { is_archived: !isCurrentlyArchived } });
       // Update selected client if in drawer
       if (selectedClient?.id === client.id) {
         setSelectedClient({ ...selectedClient, is_archived: !isCurrentlyArchived });
       }
-    } catch (error) {
-      console.error(`Error ${action}ing client:`, error);
+    } catch {
       alert(`Failed to ${action} client`);
     }
   };
@@ -953,16 +896,15 @@ export default function SoloClientsPage() {
       )}
 
       {/* Dialogs */}
-      <AddClientDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} onSuccess={fetchClients} />
+      <AddClientDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
 
-      <InviteClientDialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen} onSuccess={fetchClients} />
+      <InviteClientDialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen} />
 
       {editClient && (
         <EditClientDialog
           client={editClient}
           open={!!editClient}
           onOpenChange={(open) => !open && setEditClient(null)}
-          onSuccess={fetchClients}
         />
       )}
 
@@ -986,7 +928,6 @@ export default function SoloClientsPage() {
           client={rewardCreditsClient}
           open={!!rewardCreditsClient}
           onOpenChange={(open) => !open && setRewardCreditsClient(null)}
-          onSuccess={fetchClients}
         />
       )}
     </div>

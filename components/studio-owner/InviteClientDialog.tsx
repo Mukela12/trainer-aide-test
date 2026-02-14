@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
+import { useCreateInvitation } from '@/lib/hooks/use-invitations';
 import { Send, Check, Copy } from 'lucide-react';
 
 interface InviteClientDialogProps {
@@ -24,7 +25,7 @@ interface InviteClientDialogProps {
 
 export function InviteClientDialog({ open, onOpenChange, onSuccess }: InviteClientDialogProps) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const createInvitation = useCreateInvitation();
   const [inviteResult, setInviteResult] = useState<{
     inviteUrl: string;
     emailSent: boolean;
@@ -50,29 +51,13 @@ export function InviteClientDialog({ open, onOpenChange, onSuccess }: InviteClie
       return;
     }
 
-    setIsSubmitting(true);
     setInviteResult(null);
 
     try {
-      const response = await fetch('/api/client-invitations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      const result = await createInvitation.mutateAsync(formData);
+      setInviteResult(result);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send invitation');
-      }
-
-      setInviteResult({
-        inviteUrl: data.inviteUrl,
-        emailSent: data.emailSent,
-        emailError: data.emailError,
-      });
-
-      if (data.emailSent) {
+      if (result.emailSent) {
         toast({
           title: 'Invitation sent',
           description: `An invitation email has been sent to ${formData.email}.`,
@@ -84,7 +69,6 @@ export function InviteClientDialog({ open, onOpenChange, onSuccess }: InviteClie
           description: 'Email could not be sent. Please share the invite link manually.',
         });
       }
-
       onSuccess?.();
     } catch (error) {
       toast({
@@ -92,8 +76,6 @@ export function InviteClientDialog({ open, onOpenChange, onSuccess }: InviteClie
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to send invitation',
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -230,8 +212,8 @@ export function InviteClientDialog({ open, onOpenChange, onSuccess }: InviteClie
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="gap-2">
-                {isSubmitting ? (
+              <Button type="submit" disabled={createInvitation.isPending} className="gap-2">
+                {createInvitation.isPending ? (
                   'Sending...'
                 ) : (
                   <>

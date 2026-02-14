@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { FileText, Check, Loader2, User, Users, Sparkles } from 'lucide-react';
+import { useTemplates } from '@/lib/hooks/use-templates';
+import { useAIProgramTemplates, useAssignAIProgram } from '@/lib/hooks/use-ai-programs';
+import { useUserStore } from '@/lib/stores/user-store';
 
 interface Template {
   id: string;
@@ -59,84 +63,96 @@ export function AssignTemplateDialog({
   const targetId = clientId || trainerId;
   const targetName = clientName || trainerName;
 
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [aiPrograms, setAIPrograms] = useState<AIProgram[]>([]);
-  const [assignedTemplateIds, setAssignedTemplateIds] = useState<Set<string>>(new Set());
-  const [assignedAIProgramIds, setAssignedAIProgramIds] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+  const currentUser = useUserStore((s) => s.currentUser);
+  const assignAIProgram = useAssignAIProgram();
+
+  // --- React Query: all templates ---
+  const { data: allTemplatesRaw = [], isLoading: templatesLoading } = useTemplates(currentUser?.id);
+
+  // Cast WorkoutTemplate[] to the local Template interface
+  const templates = useMemo<Template[]>(
+    () => allTemplatesRaw.map((t) => ({ id: t.id, name: t.name, description: t.description || null, type: t.type })),
+    [allTemplatesRaw],
+  );
+
+  // --- React Query: AI program templates ---
+  const { data: aiProgramTemplatesRaw = [], isLoading: aiTemplatesLoading } = useAIProgramTemplates();
+
+  // Only show AI programs in trainer mode
+  const aiPrograms = useMemo<AIProgram[]>(
+    () =>
+      mode === 'trainer'
+        ? aiProgramTemplatesRaw.map((p) => ({
+            id: p.id,
+            program_name: p.program_name,
+            description: p.description ?? null,
+            primary_goal: p.primary_goal,
+            experience_level: p.experience_level,
+            total_weeks: p.total_weeks,
+            sessions_per_week: p.sessions_per_week,
+          }))
+        : [],
+    [aiProgramTemplatesRaw, mode],
+  );
+
+  // --- React Query: assigned regular templates ---
+  const assignedEndpoint =
+    mode === 'trainer'
+      ? `/api/trainers/${targetId}/templates`
+      : `/api/clients/${targetId}/templates`;
+
+  const { data: assignedTemplateData } = useQuery({
+    queryKey: ['assigned-templates', mode, targetId],
+    queryFn: async () => {
+      const res = await fetch(assignedEndpoint);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.templates || []) as Array<{ id: string }>;
+    },
+    enabled: open && !!targetId,
+  });
+
+  // --- React Query: assigned AI programs (trainer mode only) ---
+  const { data: assignedAIProgramData } = useQuery({
+    queryKey: ['assigned-ai-programs', targetId],
+    queryFn: async () => {
+      const res = await fetch(`/api/trainers/${targetId}/ai-programs`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.aiPrograms || []) as Array<{ id: string }>;
+    },
+    enabled: open && !!targetId && mode === 'trainer',
+  });
+
+  // --- Derived sets ---
+  const assignedTemplateIds = useMemo(
+    () => new Set(assignedTemplateData?.map((t) => t.id) || []),
+    [assignedTemplateData],
+  );
+
+  const assignedAIProgramIds = useMemo(
+    () => new Set(assignedAIProgramData?.map((p) => p.id) || []),
+    [assignedAIProgramData],
+  );
+
+  // --- Selection state ---
   const [selectedTemplates, setSelectedTemplates] = useState<Set<string>>(new Set());
   const [selectedAIPrograms, setSelectedAIPrograms] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync selection state when assigned data loads
   useEffect(() => {
-    if (open && targetId) {
-      loadData();
-    }
-  }, [open, targetId, mode]);
+    setSelectedTemplates(new Set(assignedTemplateIds));
+  }, [assignedTemplateIds]);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    setSelectedAIPrograms(new Set(assignedAIProgramIds));
+  }, [assignedAIProgramIds]);
 
-    try {
-      // Fetch available regular templates
-      const templatesResponse = await fetch('/api/templates');
-      if (templatesResponse.ok) {
-        const templatesData = await templatesResponse.json();
-        setTemplates(templatesData.templates || []);
-      }
-
-      // Fetch available AI programs (only for trainer mode)
-      if (mode === 'trainer') {
-        const aiResponse = await fetch('/api/ai-programs/templates');
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          setAIPrograms(aiData.templates || []);
-        }
-      } else {
-        setAIPrograms([]);
-      }
-
-      // Fetch already assigned regular templates based on mode
-      const endpoint = mode === 'trainer'
-        ? `/api/trainers/${targetId}/templates`
-        : `/api/clients/${targetId}/templates`;
-
-      const assignedResponse = await fetch(endpoint);
-      if (assignedResponse.ok) {
-        const assignedData = await assignedResponse.json();
-        const assignedIds = new Set<string>((assignedData.templates || []).map((t: { id: string }) => t.id));
-        setAssignedTemplateIds(assignedIds);
-        setSelectedTemplates(new Set(assignedIds));
-      } else {
-        setAssignedTemplateIds(new Set());
-        setSelectedTemplates(new Set());
-      }
-
-      // Fetch already assigned AI programs (only for trainer mode)
-      if (mode === 'trainer') {
-        const assignedAIResponse = await fetch(`/api/trainers/${targetId}/ai-programs`);
-        if (assignedAIResponse.ok) {
-          const assignedAIData = await assignedAIResponse.json();
-          const assignedAIIds = new Set<string>((assignedAIData.aiPrograms || []).map((p: { id: string }) => p.id));
-          setAssignedAIProgramIds(assignedAIIds);
-          setSelectedAIPrograms(new Set(assignedAIIds));
-        } else {
-          setAssignedAIProgramIds(new Set());
-          setSelectedAIPrograms(new Set());
-        }
-      } else {
-        setAssignedAIProgramIds(new Set());
-        setSelectedAIPrograms(new Set());
-      }
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError('Failed to load templates');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Derive loading from query states
+  const loading = templatesLoading || aiTemplatesLoading;
 
   const toggleTemplate = (templateId: string) => {
     const newSelected = new Set(selectedTemplates);
@@ -201,18 +217,9 @@ export function AssignTemplateDialog({
         const aiToAssign = [...selectedAIPrograms].filter(id => !assignedAIProgramIds.has(id));
         const aiToUnassign = [...assignedAIProgramIds].filter(id => !selectedAIPrograms.has(id));
 
-        // Assign new AI programs
+        // Assign new AI programs via useAssignAIProgram hook
         for (const programId of aiToAssign) {
-          const response = await fetch(`/api/ai-programs/${programId}/assign`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ trainer_id: targetId }),
-          });
-
-          if (!response.ok) {
-            const data = await response.json();
-            throw new Error(data.error || 'Failed to assign AI program');
-          }
+          await assignAIProgram.mutateAsync({ programId, trainerId: targetId });
         }
 
         // Unassign removed AI programs
@@ -226,6 +233,12 @@ export function AssignTemplateDialog({
             throw new Error(data.error || 'Failed to unassign AI program');
           }
         }
+      }
+
+      // Invalidate the assigned queries so they refetch fresh data
+      await queryClient.invalidateQueries({ queryKey: ['assigned-templates', mode, targetId] });
+      if (mode === 'trainer') {
+        await queryClient.invalidateQueries({ queryKey: ['assigned-ai-programs', targetId] });
       }
 
       onSuccess?.();

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { MOCK_EXERCISES, getExercisesByCategory } from '@/lib/mock-data';
+import { useExerciseLookup } from '@/lib/hooks/use-exercise';
 import { Exercise, MuscleGroup } from '@/lib/types';
 import { Search, Dumbbell, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -63,7 +63,9 @@ export function ExerciseLibrary({
   const [cardioDuration, setCardioDuration] = useState(180); // 3 minutes in seconds
   const [cardioIntensity, setCardioIntensity] = useState(7);
 
-  const filteredExercises = MOCK_EXERCISES.filter((exercise) => {
+  const { exercises: allExercises } = useExerciseLookup();
+
+  const filteredExercises = allExercises.filter((exercise) => {
     const matchesSearch = exercise.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || exercise.category === selectedCategory;
     const matchesCardioFilter = !filterCardioOnly || exercise.category === 'cardio';

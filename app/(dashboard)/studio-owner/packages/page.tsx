@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,34 +16,16 @@ import {
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Search, Package, Plus, MoreVertical, Users, CreditCard, Loader2 } from 'lucide-react';
 import ContentHeader from '@/components/shared/ContentHeader';
-
-interface TrainingPackage {
-  id: string;
-  name: string;
-  description: string | null;
-  sessionCount: number;
-  priceCents: number;
-  validityDays: number | null;
-  isActive: boolean;
-  createdAt: string;
-}
-
-interface ClientPackage {
-  id: string;
-  clientName: string;
-  packageName: string;
-  creditsRemaining: number;
-  creditsTotal: number;
-  expiresAt: string | null;
-}
+import { useWrappedPackages, useCreatePackage } from '@/lib/hooks/use-packages';
+import type { PackageData, ClientPackage } from '@/lib/hooks/use-packages';
 
 export default function PackagesPage() {
-  const [packages, setPackages] = useState<TrainingPackage[]>([]);
-  const [clientPackages, setClientPackages] = useState<ClientPackage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading } = useWrappedPackages();
+  const packages: PackageData[] = data?.packages || [];
+  const clientPackages: ClientPackage[] = data?.clientPackages || [];
+  const createPackage = useCreatePackage();
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -53,62 +35,31 @@ export default function PackagesPage() {
     isPublic: true,
   });
 
-  const loadPackages = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/packages?format=wrapped');
-      if (!response.ok) throw new Error('Failed to fetch packages');
-      const data = await response.json();
-      setPackages(data.packages || []);
-      setClientPackages(data.clientPackages || []);
-    } catch (error) {
-      console.error('Error fetching packages:', error);
-      setPackages([]);
-      setClientPackages([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadPackages();
-  }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.sessionCount || !formData.priceInPounds) return;
 
-    setIsSaving(true);
     try {
-      const response = await fetch('/api/packages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          description: formData.description || null,
-          sessionCount: parseInt(formData.sessionCount),
-          priceCents: Math.round(parseFloat(formData.priceInPounds) * 100),
-          validityDays: parseInt(formData.validityDays) || 90,
-          isPublic: formData.isPublic,
-        }),
+      await createPackage.mutateAsync({
+        name: formData.name,
+        description: formData.description || null,
+        sessionCount: parseInt(formData.sessionCount),
+        priceCents: Math.round(parseFloat(formData.priceInPounds) * 100),
+        validityDays: parseInt(formData.validityDays) || 90,
+        isPublic: formData.isPublic,
       });
 
-      if (response.ok) {
-        setIsDialogOpen(false);
-        setFormData({
-          name: '',
-          description: '',
-          sessionCount: '10',
-          priceInPounds: '360',
-          validityDays: '90',
-          isPublic: true,
-        });
-        loadPackages();
-      }
-    } catch (error) {
-      console.error('Error creating package:', error);
-    } finally {
-      setIsSaving(false);
+      setIsDialogOpen(false);
+      setFormData({
+        name: '',
+        description: '',
+        sessionCount: '10',
+        priceInPounds: '360',
+        validityDays: '90',
+        isPublic: true,
+      });
+    } catch {
+      // error handled by mutation state
     }
   };
 
@@ -476,10 +427,10 @@ export default function PackagesPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={isSaving}
+                disabled={createPackage.isPending}
                 className="bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
               >
-                {isSaving ? (
+                {createPackage.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...

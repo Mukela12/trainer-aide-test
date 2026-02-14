@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { lookupUserProfile } from '@/lib/services/profile-service';
-import { sendBookingConfirmationEmail, queueNotification } from '@/lib/notifications/email-service';
+import { getBookings, createBooking } from '@/lib/services/booking-service';
 
 /**
  * GET /api/bookings
@@ -18,68 +18,28 @@ export async function GET(request: NextRequest) {
     }
 
     const serviceClient = createServiceRoleClient();
-
-    // Clean up expired soft-holds before fetching bookings
-    await serviceClient
-      .from('ta_bookings')
-      .update({ status: 'cancelled' })
-      .eq('status', 'soft-hold')
-      .lt('hold_expiry', new Date().toISOString());
-
     const profile = await lookupUserProfile(serviceClient, user);
     const studioId = profile?.studio_id || user.id;
 
     const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-    const status = searchParams.get('status');
-    const clientId = searchParams.get('clientId');
 
-    let query = serviceClient
-      .from('ta_bookings')
-      .select(`
-        *,
-        client:fc_clients(id, first_name, last_name, email, credits),
-        service:ta_services(id, name, duration, color, credits_required)
-      `)
-      .or(`trainer_id.eq.${user.id},studio_id.eq.${studioId}`)
-      .order('scheduled_at', { ascending: true });
-
-    if (startDate) {
-      query = query.gte('scheduled_at', startDate);
-    }
-    if (endDate) {
-      query = query.lte('scheduled_at', endDate);
-    }
-    if (status) {
-      query = query.eq('status', status);
-    }
-    if (clientId) {
-      query = query.eq('client_id', clientId);
-    }
-
-    const { data: bookings, error } = await query;
+    const { data: bookings, error } = await getBookings({
+      userId: user.id,
+      studioId,
+      startDate: searchParams.get('startDate'),
+      endDate: searchParams.get('endDate'),
+      status: searchParams.get('status'),
+      clientId: searchParams.get('clientId'),
+    });
 
     if (error) {
-      console.error('Error fetching bookings:', error);
       return NextResponse.json(
         { error: 'Failed to fetch bookings', details: error.message },
         { status: 500 }
       );
     }
 
-    // Transform to include client name for convenience
-    const transformedBookings = (bookings || []).map((booking: {
-      client?: { first_name?: string | null; last_name?: string | null } | null;
-      [key: string]: unknown;
-    }) => ({
-      ...booking,
-      clientName: booking.client
-        ? `${booking.client.first_name || ''} ${booking.client.last_name || ''}`.trim()
-        : null,
-    }));
-
-    return NextResponse.json({ bookings: transformedBookings });
+    return NextResponse.json({ bookings });
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json(
@@ -123,139 +83,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const bookingData = {
-      studio_id: studioId,
-      trainer_id: body.trainerId || body.trainer_id || user.id,
-      client_id: body.clientId || body.client_id || null,
-      service_id: body.serviceId || body.service_id || null,
-      scheduled_at: body.scheduledAt || body.scheduled_at,
-      duration: body.duration,
-      status: body.status || 'confirmed',
-      hold_expiry: body.holdExpiry || body.hold_expiry || null,
-      session_id: body.sessionId || body.session_id || null,
-      template_id: body.templateId || body.template_id || null,
-      sign_off_mode: body.signOffMode || body.sign_off_mode || 'full_session',
-      notes: body.notes || null,
-    };
-
-    // If it's a soft-hold, set expiry (15 minutes from now if not provided)
-    if (bookingData.status === 'soft-hold' && !bookingData.hold_expiry) {
-      const expiry = new Date();
-      expiry.setMinutes(expiry.getMinutes() + 15);
-      bookingData.hold_expiry = expiry.toISOString();
-    }
-
-    // Check for booking conflicts
-    const scheduledDate = new Date(bookingData.scheduled_at);
-    const endTime = new Date(scheduledDate.getTime() + bookingData.duration * 60 * 1000);
-
-    const { data: existingBookings } = await serviceClient
-      .from('ta_bookings')
-      .select('id, scheduled_at, duration')
-      .eq('trainer_id', bookingData.trainer_id)
-      .in('status', ['confirmed', 'soft-hold', 'checked-in'])
-      .gte('scheduled_at', new Date(scheduledDate.getTime() - 120 * 60 * 1000).toISOString())
-      .lte('scheduled_at', endTime.toISOString());
-
-    // Check for overlaps
-    for (const existing of existingBookings || []) {
-      const existingStart = new Date(existing.scheduled_at);
-      const existingEnd = new Date(existingStart.getTime() + existing.duration * 60 * 1000);
-
-      if (scheduledDate < existingEnd && endTime > existingStart) {
-        return NextResponse.json(
-          { error: 'Time slot conflict with existing booking' },
-          { status: 409 }
-        );
-      }
-    }
-
-    const { data, error } = await serviceClient
-      .from('ta_bookings')
-      .insert(bookingData)
-      .select(`
-        *,
-        client:fc_clients(id, first_name, last_name, email, credits),
-        service:ta_services(id, name, duration, color, credits_required)
-      `)
-      .single();
+    const { data, error } = await createBooking({
+      studioId,
+      userId: user.id,
+      body,
+    });
 
     if (error) {
-      console.error('Error creating booking:', error);
+      const status = error.message.includes('conflict') ? 409 : 500;
       return NextResponse.json(
-        { error: 'Failed to create booking', details: error.message },
-        { status: 500 }
+        { error: error.message },
+        { status }
       );
-    }
-
-    // Send booking confirmation email if booking is confirmed and has client
-    if (data && data.status === 'confirmed' && data.client?.email) {
-      try {
-        // Get trainer info
-        const { data: trainer } = await serviceClient
-          .from('profiles')
-          .select('first_name, last_name')
-          .eq('id', data.trainer_id)
-          .single();
-
-        const trainerName = trainer
-          ? `${trainer.first_name || ''} ${trainer.last_name || ''}`.trim() || 'Your Trainer'
-          : 'Your Trainer';
-
-        const clientName = data.client
-          ? `${data.client.first_name || ''} ${data.client.last_name || ''}`.trim() || 'Client'
-          : 'Client';
-
-        await sendBookingConfirmationEmail({
-          clientEmail: data.client.email,
-          clientName,
-          trainerName,
-          serviceName: data.service?.name || 'Session',
-          scheduledAt: data.scheduled_at,
-          duration: data.duration,
-          bookingId: data.id,
-        });
-
-        // Queue reminder emails
-        const scheduledAt = new Date(data.scheduled_at);
-
-        // Template data for notification emails
-        const templateData = {
-          client_name: clientName,
-          service_name: data.service?.name || 'Session',
-          scheduled_at: data.scheduled_at,
-          trainer_name: trainerName,
-        };
-
-        // 24-hour reminder
-        const reminder24h = new Date(scheduledAt.getTime() - 24 * 60 * 60 * 1000);
-        if (reminder24h > new Date()) {
-          await queueNotification({
-            type: 'reminder_24h',
-            recipientEmail: data.client.email,
-            bookingId: data.id,
-            clientId: data.client_id,
-            scheduledFor: reminder24h,
-            templateData,
-          });
-        }
-
-        // 2-hour reminder
-        const reminder2h = new Date(scheduledAt.getTime() - 2 * 60 * 60 * 1000);
-        if (reminder2h > new Date()) {
-          await queueNotification({
-            type: 'reminder_2h',
-            recipientEmail: data.client.email,
-            bookingId: data.id,
-            clientId: data.client_id,
-            scheduledFor: reminder2h,
-            templateData,
-          });
-        }
-      } catch (emailError) {
-        console.error('Error sending booking confirmation email:', emailError);
-        // Don't fail the booking creation if email fails
-      }
     }
 
     return NextResponse.json({ booking: data }, { status: 201 });

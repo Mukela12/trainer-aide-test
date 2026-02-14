@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
-
-interface RouteParams {
-  params: Promise<{ id: string }>;
-}
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import type { RouteParams } from '@/lib/types/api';
+import {
+  assignTemplateToTrainer,
+  assignTemplateToClient,
+  unassignTemplateFromTrainer,
+  unassignTemplateFromClient,
+} from '@/lib/services/template-service';
 
 // POST /api/templates/[id]/assign - Assign template to trainer or client
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -52,86 +55,36 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Use service role client for insert to bypass RLS
-    const serviceClient = createServiceRoleClient();
-
-    // Verify template exists
-    const { data: template, error: templateError } = await serviceClient
-      .from('ta_workout_templates')
-      .select('id')
-      .eq('id', templateId)
-      .single();
-
-    if (templateError || !template) {
-      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
-    }
-
     if (trainerId) {
-      // Assign to trainer
-      const { data: assignment, error } = await serviceClient
-        .from('ta_trainer_template_assignments')
-        .insert({
-          template_id: templateId,
-          trainer_id: trainerId,
-          assigned_by: user.id,
-        })
-        .select()
-        .single();
+      const { data, error } = await assignTemplateToTrainer(templateId, trainerId, user.id);
 
       if (error) {
-        if (error.code === '23505') {
-          return NextResponse.json(
-            { error: 'Template already assigned to this trainer' },
-            { status: 409 }
-          );
+        if (error.message === 'Template not found') {
+          return NextResponse.json({ error: 'Template not found' }, { status: 404 });
         }
-        console.error('Error assigning template to trainer:', error);
-        return NextResponse.json(
-          { error: 'Failed to assign template' },
-          { status: 500 }
-        );
+        if (error.message === 'Template already assigned to this trainer') {
+          return NextResponse.json({ error: error.message }, { status: 409 });
+        }
+        return NextResponse.json({ error: 'Failed to assign template' }, { status: 500 });
       }
 
-      return NextResponse.json({
-        id: assignment.id,
-        templateId: assignment.template_id,
-        trainerId: assignment.trainer_id,
-        assignedAt: assignment.assigned_at,
-      });
+      return NextResponse.json(data);
     }
 
     if (clientId) {
-      // Assign to client
-      const { data: assignment, error } = await serviceClient
-        .from('ta_client_template_assignments')
-        .insert({
-          template_id: templateId,
-          client_id: clientId,
-          assigned_by: user.id,
-        })
-        .select()
-        .single();
+      const { data, error } = await assignTemplateToClient(templateId, clientId, user.id);
 
       if (error) {
-        if (error.code === '23505') {
-          return NextResponse.json(
-            { error: 'Template already assigned to this client' },
-            { status: 409 }
-          );
+        if (error.message === 'Template not found') {
+          return NextResponse.json({ error: 'Template not found' }, { status: 404 });
         }
-        console.error('Error assigning template to client:', error);
-        return NextResponse.json(
-          { error: 'Failed to assign template' },
-          { status: 500 }
-        );
+        if (error.message === 'Template already assigned to this client') {
+          return NextResponse.json({ error: error.message }, { status: 409 });
+        }
+        return NextResponse.json({ error: 'Failed to assign template' }, { status: 500 });
       }
 
-      return NextResponse.json({
-        id: assignment.id,
-        templateId: assignment.template_id,
-        clientId: assignment.client_id,
-        assignedAt: assignment.assigned_at,
-      });
+      return NextResponse.json(data);
     }
   } catch (error) {
     console.error('Error in template assign POST:', error);
@@ -160,38 +113,21 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Use service role client for delete
-    const serviceClient = createServiceRoleClient();
-
     if (trainerId) {
-      const { error } = await serviceClient
-        .from('ta_trainer_template_assignments')
-        .delete()
-        .eq('template_id', templateId)
-        .eq('trainer_id', trainerId);
+      const { error } = await unassignTemplateFromTrainer(templateId, trainerId);
 
       if (error) {
         console.error('Error removing trainer assignment:', error);
-        return NextResponse.json(
-          { error: 'Failed to remove assignment' },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to remove assignment' }, { status: 500 });
       }
     }
 
     if (clientId) {
-      const { error } = await serviceClient
-        .from('ta_client_template_assignments')
-        .delete()
-        .eq('template_id', templateId)
-        .eq('client_id', clientId);
+      const { error } = await unassignTemplateFromClient(templateId, clientId);
 
       if (error) {
         console.error('Error removing client assignment:', error);
-        return NextResponse.json(
-          { error: 'Failed to remove assignment' },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to remove assignment' }, { status: 500 });
       }
     }
 

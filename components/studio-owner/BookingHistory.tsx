@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Calendar, ChevronDown, ChevronUp, Clock, CreditCard, AlertCircle } from 'lucide-react';
 import {
-  BookingHistoryItem,
-  BookingHistoryResponse,
   BOOKING_STATUS_COLORS,
   BOOKING_STATUS_LABELS
 } from '@/lib/types/booking-history';
+import { useBookingHistory } from '@/lib/hooks/use-booking-history';
 
 interface BookingHistoryProps {
   clientId: string;
@@ -15,40 +14,9 @@ interface BookingHistoryProps {
 }
 
 export default function BookingHistory({ clientId, clientName }: BookingHistoryProps) {
-  const [bookings, setBookings] = useState<BookingHistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: bookings = [], isLoading: loading, error: queryError, refetch } = useBookingHistory(clientId);
+  const error = queryError?.message || null;
   const [showAll, setShowAll] = useState(false);
-
-  useEffect(() => {
-    fetchBookingHistory();
-  }, [clientId]);
-
-  const fetchBookingHistory = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const params = new URLSearchParams({
-        client_id: clientId,
-      });
-
-      const response = await fetch(`/api/clients/booking-history?${params.toString()}`);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to fetch booking history');
-      }
-
-      const result: BookingHistoryResponse = await response.json();
-      setBookings(result.bookings || []);
-    } catch (err: unknown) {
-      console.error('Error fetching booking history:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load booking history');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -113,7 +81,7 @@ export default function BookingHistory({ clientId, clientName }: BookingHistoryP
               <p className="text-sm text-red-700 dark:text-red-400 font-medium">Error Loading History</p>
               <p className="text-xs text-red-600 dark:text-red-500 mt-1">{error}</p>
               <button
-                onClick={fetchBookingHistory}
+                onClick={() => refetch()}
                 className="text-xs text-red-700 dark:text-red-400 underline mt-2 hover:text-red-800"
               >
                 Try Again

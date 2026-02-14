@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useSessionStore } from '@/lib/stores/session-store';
+import { useSessionData } from '@/lib/hooks/use-sessions';
 import { useUserStore } from '@/lib/stores/user-store';
+import { useClientBookings, useClientPackages } from '@/lib/hooks/use-client-bookings';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -32,40 +32,17 @@ function getTimeBasedGreeting(): string {
 }
 
 export default function ClientDashboard() {
-  const { sessions } = useSessionStore();
   const { currentUser } = useUserStore();
+  const { sessions } = useSessionData(currentUser.id);
   const greeting = getTimeBasedGreeting();
-  const [credits, setCredits] = useState<number | null>(null);
-  const [upcomingBookingsCount, setUpcomingBookingsCount] = useState<number>(0);
 
-  // Fetch credits and bookings on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch credits
-        const creditsRes = await fetch('/api/client/packages');
-        if (creditsRes.ok) {
-          const data = await creditsRes.json();
-          setCredits(data.totalCredits || 0);
-        }
+  const { data: packageData } = useClientPackages(currentUser?.id);
+  const { data: bookings = [] } = useClientBookings(currentUser?.id);
 
-        // Fetch upcoming bookings count
-        const bookingsRes = await fetch('/api/client/bookings');
-        if (bookingsRes.ok) {
-          const data = await bookingsRes.json();
-          const upcoming = (data.bookings || []).filter(
-            (b: { scheduledAt: string; status: string }) =>
-              new Date(b.scheduledAt) > new Date() && b.status !== 'cancelled'
-          );
-          setUpcomingBookingsCount(upcoming.length);
-        }
-      } catch (err) {
-        console.error('Error fetching client data:', err);
-      }
-    };
-
-    fetchData();
-  }, []);
+  const credits = packageData?.totalCredits ?? null;
+  const upcomingBookingsCount = bookings.filter(
+    (b) => new Date(b.scheduledAt) > new Date() && b.status !== 'cancelled'
+  ).length;
 
   // Use the authenticated user's ID to filter sessions
   // The client sees sessions where they are the client

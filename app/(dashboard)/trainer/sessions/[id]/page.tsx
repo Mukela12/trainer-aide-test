@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useSessionStore } from '@/lib/stores/session-store';
+import { useSessionData, useUpdateExercise, useUpdateBlock as useUpdateBlockMutation, useCompleteSession } from '@/lib/hooks/use-sessions';
+import { useUserStore } from '@/lib/stores/user-store';
 import { useTimerStore } from '@/lib/stores/timer-store';
-import { useExerciseLookup } from '@/hooks/use-exercise';
+import { useExerciseLookup } from '@/lib/hooks/use-exercise';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,7 @@ import { ExerciseInfoInline, ExerciseInfoButton } from '@/components/exercise/Ex
 import { SessionExercise, SignOffMode } from '@/lib/types';
 import { ChevronRight, CheckCircle2, Circle, User, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { useSessionAlerts } from '@/lib/hooks/useSessionAlerts';
 
 export default function SessionRunner() {
@@ -27,7 +28,11 @@ export default function SessionRunner() {
   const sessionId = params.id as string;
   const { toast } = useToast();
 
-  const { sessions, updateExercise, updateBlock, completeSession } = useSessionStore();
+  const { currentUser } = useUserStore();
+  const { sessions } = useSessionData(currentUser?.id);
+  const updateExerciseHook = useUpdateExercise();
+  const updateBlockHook = useUpdateBlockMutation();
+  const completeSessionMutation = useCompleteSession();
   const session = sessions.find((s) => s.id === sessionId);
 
   const { getElapsedSeconds, isPaused, isTimerActive } = useTimerStore();
@@ -83,7 +88,7 @@ export default function SessionRunner() {
     exerciseId: string,
     updates: Partial<SessionExercise>
   ) => {
-    updateExercise(sessionId, blockId, exerciseId, updates);
+    updateExerciseHook.mutate(sessionId, blockId, exerciseId, updates, sessions);
   };
 
   const handleCompleteExercise = (blockId: string, exerciseId: string) => {
@@ -105,7 +110,7 @@ export default function SessionRunner() {
       }
     }
 
-    updateExercise(sessionId, blockId, exerciseId, { completed: true });
+    updateExerciseHook.mutate(sessionId, blockId, exerciseId, { completed: true }, sessions);
 
     // Move to next exercise/block based on sign-off mode
     if (session.signOffMode === 'per_exercise') {
@@ -129,7 +134,7 @@ export default function SessionRunner() {
       return;
     }
 
-    updateBlock(sessionId, blockId, { completed: true });
+    updateBlockHook.mutate(sessionId, blockId, { completed: true }, sessions);
 
     // Move to next block
     if (currentBlockIndex < session.blocks.length - 1) {
@@ -159,7 +164,14 @@ export default function SessionRunner() {
     publicNotes: string;
     trainerDeclaration: boolean;
   }) => {
-    completeSession(sessionId, data.overallRpe, data.privateNotes, data.publicNotes, data.trainerDeclaration);
+    completeSessionMutation.mutate({
+      sessionId,
+      overallRpe: data.overallRpe,
+      privateNotes: data.privateNotes,
+      publicNotes: data.publicNotes,
+      trainerDeclaration: data.trainerDeclaration,
+      startedAt: session!.startedAt,
+    });
     router.push('/trainer/sessions');
   };
 

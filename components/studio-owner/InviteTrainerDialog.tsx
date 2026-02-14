@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils/cn';
 import { Mail, User, Loader2, CheckCircle2 } from 'lucide-react';
+import { useInviteTrainer } from '@/lib/hooks/use-invitations';
 
 interface InviteTrainerDialogProps {
   open: boolean;
@@ -37,7 +38,7 @@ export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTra
     commissionPercent: 70,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const inviteTrainer = useInviteTrainer();
   const [isSuccess, setIsSuccess] = useState(false);
 
   const resetForm = () => {
@@ -79,49 +80,31 @@ export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTra
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    setIsSubmitting(true);
     setErrors({});
 
     try {
-      const response = await fetch('/api/invitations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email.toLowerCase(),
-          firstName: formData.firstName || null,
-          lastName: formData.lastName || null,
-          role: formData.role,
-          message: formData.message || null,
-          commissionPercent: formData.commissionPercent,
-        }),
+      await inviteTrainer.mutateAsync({
+        email: formData.email.toLowerCase(),
+        firstName: formData.firstName || null,
+        lastName: formData.lastName || null,
+        role: formData.role,
+        message: formData.message || null,
+        commissionPercent: formData.commissionPercent,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 409) {
-          setErrors({ email: 'An invitation for this email already exists' });
-        } else {
-          setErrors({ submit: data.error || 'Failed to send invitation' });
-        }
-        return;
-      }
-
-      // Success
       setIsSuccess(true);
       onSuccess?.();
 
-      // Close dialog after showing success message
       setTimeout(() => {
         handleClose();
       }, 2000);
-    } catch (error) {
-      console.error('Error sending invitation:', error);
-      setErrors({ submit: 'Failed to send invitation. Please try again.' });
-    } finally {
-      setIsSubmitting(false);
+    } catch (error: unknown) {
+      const err = error as Error & { status?: number };
+      if (err.status === 409) {
+        setErrors({ email: 'An invitation for this email already exists' });
+      } else {
+        setErrors({ submit: err.message || 'Failed to send invitation. Please try again.' });
+      }
     }
   };
 
@@ -271,7 +254,7 @@ export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTra
             type="button"
             variant="outline"
             onClick={handleClose}
-            disabled={isSubmitting}
+            disabled={inviteTrainer.isPending}
             className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Cancel
@@ -279,10 +262,10 @@ export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTra
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={inviteTrainer.isPending}
             className="bg-wondrous-magenta hover:bg-wondrous-magenta-alt"
           >
-            {isSubmitting ? (
+            {inviteTrainer.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Sending...

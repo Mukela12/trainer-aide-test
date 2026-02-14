@@ -9,7 +9,7 @@ import { ProgramOverview } from '@/components/ai-programs/ProgramOverview';
 import { WorkoutsList } from '@/components/ai-programs/WorkoutsList';
 import { ShareProgramModal } from '@/components/ai-programs/ShareProgramModal';
 import { useUserStore } from '@/lib/stores/user-store';
-import type { AIProgram } from '@/lib/types/ai-program';
+import { useAIProgram } from '@/lib/hooks/use-ai-programs';
 
 type TabType = 'overview' | 'workouts' | 'progress';
 
@@ -20,10 +20,10 @@ export default function ProgramViewerPage() {
   const programId = params.id as string;
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [program, setProgram] = useState<AIProgram | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  const { data: program, isLoading: loading, error: queryError } = useAIProgram(programId);
+  const error = queryError?.message || null;
 
   // Redirect trainers to solo route - AI Programs only for solo practitioners
   useEffect(() => {
@@ -31,39 +31,6 @@ export default function ProgramViewerPage() {
       router.replace(`/solo/programs/${programId}`);
     }
   }, [canCreateAIPrograms, router, programId]);
-
-  useEffect(() => {
-    async function fetchProgram() {
-      try {
-        setLoading(true);
-
-        // Fetch the actual program from the API
-        const response = await fetch(`/api/ai-programs/${programId}`);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch program: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        // The API returns { program: {...} }, so we need to unwrap it
-        const fetchedProgram = data.program || data;
-
-        if (!fetchedProgram) {
-          throw new Error('Program data not found');
-        }
-
-        setProgram(fetchedProgram);
-      } catch (err) {
-        console.error('Error fetching program:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load program');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchProgram();
-  }, [programId]);
 
   const handleBack = () => {
     router.push('/trainer/programs');

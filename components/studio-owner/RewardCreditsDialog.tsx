@@ -13,19 +13,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
+import { usePatchClient } from '@/lib/hooks/use-clients';
 import { Gift, Plus, Minus } from 'lucide-react';
-
-interface Client {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  credits: number | null;
-}
+import type { ClientSummary } from './EditClientDialog';
 
 interface RewardCreditsDialogProps {
-  client: Client;
+  client: ClientSummary;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
@@ -33,7 +27,7 @@ interface RewardCreditsDialogProps {
 
 export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: RewardCreditsDialogProps) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const patchClient = usePatchClient();
   const [creditsToAdd, setCreditsToAdd] = useState(1);
   const [reason, setReason] = useState('');
 
@@ -56,22 +50,8 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      const response = await fetch(`/api/clients?id=${client.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          credits: newTotal,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to reward credits');
-      }
+      await patchClient.mutateAsync({ clientId: client.id, updates: { credits: newTotal } });
 
       toast({
         title: 'Credits rewarded!',
@@ -90,8 +70,6 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to reward credits',
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -187,10 +165,10 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={patchClient.isPending}
               className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
             >
-              {isSubmitting ? 'Rewarding...' : `Reward ${creditsToAdd} Credit${creditsToAdd > 1 ? 's' : ''}`}
+              {patchClient.isPending ? 'Rewarding...' : `Reward ${creditsToAdd} Credit${creditsToAdd > 1 ? 's' : ''}`}
             </Button>
           </DialogFooter>
         </form>

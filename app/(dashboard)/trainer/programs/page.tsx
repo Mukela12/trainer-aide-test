@@ -6,19 +6,16 @@ import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ProgramCard } from '@/components/ai-programs/ProgramCard';
-import { useToast } from '@/hooks/use-toast';
+import { useAIPrograms } from '@/lib/hooks/use-ai-programs';
 import { useUserStore } from '@/lib/stores/user-store';
-import type { AIProgram } from '@/lib/types/ai-program';
 import ContentHeader from '@/components/shared/ContentHeader';
 
 type FilterType = 'all' | 'draft' | 'active' | 'completed' | 'archived';
 
 export default function ProgramsListPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const { canCreateAIPrograms } = useUserStore();
-  const [programs, setPrograms] = useState<AIProgram[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: programs = [], isLoading: loading } = useAIPrograms();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
 
@@ -28,34 +25,6 @@ export default function ProgramsListPage() {
       router.replace('/solo/programs');
     }
   }, [canCreateAIPrograms, router]);
-
-  useEffect(() => {
-    async function fetchPrograms() {
-      try {
-        setLoading(true);
-        const response = await fetch('/api/ai-programs');
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch programs');
-        }
-
-        const data = await response.json();
-        setPrograms(data.programs || []);
-      } catch (err) {
-        console.error('Failed to load programs:', err);
-        setPrograms([]); // Set empty array on error
-        toast({
-          variant: 'destructive',
-          title: 'Error Loading Programs',
-          description: 'Failed to load AI programs. Please try refreshing the page.',
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchPrograms();
-  }, []);
 
   const filteredPrograms = programs.filter((program) => {
     // Apply status filter

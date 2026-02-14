@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTemplateStore } from '@/lib/stores/template-store';
-import { useExerciseLookup } from '@/hooks/use-exercise';
+import { useTemplates, useAddTemplate, useUpdateTemplate } from '@/lib/hooks/use-templates';
+import { useUserStore } from '@/lib/stores/user-store';
+import { useExerciseLookup } from '@/lib/hooks/use-exercise';
 import { generateId } from '@/lib/utils/generators';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +16,7 @@ import { ExerciseLibrary, ExerciseCustomParams } from '@/components/studio-owner
 import { ExerciseImageViewer, ExerciseImageButton } from '@/components/shared/ExerciseImageViewer';
 import { WorkoutTemplate, WorkoutBlock, TemplateExercise, Exercise, TemplateType, SignOffMode } from '@/lib/types';
 import { Plus, Trash2, ChevronUp, ChevronDown, Save, X } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 
 function TemplateBuilderContent() {
   const router = useRouter();
@@ -23,7 +24,10 @@ function TemplateBuilderContent() {
   const templateId = searchParams.get('id');
   const { toast } = useToast();
 
-  const { templates, addTemplate, updateTemplate } = useTemplateStore();
+  const { currentUser } = useUserStore();
+  const { data: templates = [] } = useTemplates(currentUser?.id);
+  const addTemplateMutation = useAddTemplate();
+  const updateTemplateMutation = useUpdateTemplate();
 
   // Form state
   const [templateName, setTemplateName] = useState('');
@@ -270,9 +274,9 @@ function TemplateBuilderContent() {
     };
 
     if (templateId) {
-      updateTemplate(templateId, template);
+      updateTemplateMutation.mutate({ id: templateId, updates: template });
     } else {
-      addTemplate(template);
+      addTemplateMutation.mutate(template);
     }
 
     // Clear unsaved changes flag

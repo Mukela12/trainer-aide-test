@@ -299,21 +299,6 @@ export interface User {
 }
 
 // ========================================
-// STATS & ANALYTICS
-// ========================================
-
-export interface DashboardStats {
-  totalTemplates?: number;
-  activeTemplates?: number;
-  totalSessions?: number;
-  sessionsToday?: number;
-  sessionsThisWeek?: number;
-  sessionsThisMonth?: number;
-  averageRpe?: number;
-  consistencyStreak?: number;
-}
-
-// ========================================
 // FORM TYPES
 // ========================================
 

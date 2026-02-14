@@ -131,14 +131,11 @@ export function ProgramGeneratorWizard() {
 
       // Step 2: Use Server-Sent Events (SSE) for real-time progress updates
       // Falls back to polling if SSE fails
-      console.log(`🔄 Connecting to SSE stream for program ${program_id}...`);
-
       const useSSE = typeof EventSource !== 'undefined';
 
       if (useSSE) {
         await connectSSEStream(program_id, config);
       } else {
-        console.log('⚠️ EventSource not supported, falling back to polling');
         await pollForProgress(program_id, config);
       }
 
@@ -164,7 +161,6 @@ export function ProgramGeneratorWizard() {
 
           switch (data.type) {
             case 'connected':
-              console.log('✅ SSE connected:', data.message);
               break;
 
             case 'progress':
@@ -182,7 +178,6 @@ export function ProgramGeneratorWizard() {
               break;
 
             case 'completed':
-              console.log('✅ Generation completed via SSE');
               eventSource.close();
 
               // Fetch workouts to get accurate counts
@@ -238,8 +233,6 @@ export function ProgramGeneratorWizard() {
     const pollTimeoutSec = 360;
     const maxPollAttempts = Math.ceil(pollTimeoutSec / 2);
 
-    console.log(`⏱️ Polling timeout: ${pollTimeoutSec}s for ${config.total_weeks}-week program`);
-
     let pollAttempts = 0;
 
     return new Promise((resolve, reject) => {
@@ -293,13 +286,8 @@ export function ProgramGeneratorWizard() {
             return prev;
           });
 
-          if (pollAttempts % 15 === 0) {
-            console.log(`Poll #${pollAttempts}: status = ${programData?.generation_status}, progress = ${percentage}%`);
-          }
-
           if (programData?.generation_status === 'completed') {
             clearInterval(pollInterval);
-            console.log('✅ Generation completed via polling');
             await fetchProgramResults(programId);
             resolve();
           } else if (programData?.generation_status === 'failed') {
@@ -341,8 +329,6 @@ export function ProgramGeneratorWizard() {
         const totalExercises = workouts.reduce((sum: number, workout: any) => {
           return sum + (workout.exercises?.length || 0);
         }, 0);
-
-        console.log(`📊 Program stats: ${workouts.length} workouts, ${totalExercises} exercises`);
 
         setGenerationResult({
           success: true,

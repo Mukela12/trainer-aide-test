@@ -81,14 +81,11 @@ export const useUserStore = create<UserState>()(
 
       setBusinessSlug: (slug: string) => set({ businessSlug: slug }),
 
-      // Logout - clears user data, sessions, and timer
+      // Logout - clears user data and timer (React Query cache auto-clears on unmount)
       logout: () => {
-        // Import stores here to avoid circular dependencies
-        const { useSessionStore } = require('./session-store');
         const { useTimerStore } = require('./timer-store');
 
-        // Clear sessions and timer
-        useSessionStore.getState().clearAllSessions();
+        // Clear timer
         useTimerStore.getState().clearTimer();
 
         // Clear user data

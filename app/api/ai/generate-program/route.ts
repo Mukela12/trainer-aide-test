@@ -192,21 +192,6 @@ export async function POST(request: NextRequest) {
       experienceLevel = body.experience_level;
     }
 
-    // Debug logging for Netlify deployment
-    console.log('🔍 DEBUG - Environment check:');
-    console.log(`   SUPABASE_URL exists: ${!!process.env.NEXT_PUBLIC_SUPABASE_URL}`);
-    console.log(`   SUPABASE_URL length: ${process.env.NEXT_PUBLIC_SUPABASE_URL?.length || 0}`);
-    console.log(`   SERVICE_ROLE_KEY exists: ${!!process.env.SUPABASE_SERVICE_ROLE_KEY}`);
-    console.log(`   SERVICE_ROLE_KEY length: ${process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0}`);
-    console.log(`   ANTHROPIC_KEY exists: ${!!process.env.ANTHROPIC_API_KEY}`);
-
-    console.log('🤖 Creating program record...');
-    console.log(`   Duration: ${body.total_weeks} weeks x ${body.sessions_per_week} sessions/week`);
-    console.log(`   Trainer ID: ${body.trainer_id}`);
-    console.log(`   Client Profile ID: ${body.client_profile_id || 'none'}`);
-    console.log(`   Primary Goal: ${primaryGoal}`);
-    console.log(`   Experience Level: ${experienceLevel}`);
-
     // Create master program record with "generating" status
     // Note: client_profile_id is only set if client exists in client_profiles table (FK constraint)
     const programData = {
@@ -232,18 +217,11 @@ export async function POST(request: NextRequest) {
       generation_error: null,
     };
 
-    console.log('🔍 DEBUG - Program data to insert:', JSON.stringify(programData, null, 2));
-
     let savedProgram, programError;
     try {
       const result = await createAIProgram(programData);
       savedProgram = result.data;
       programError = result.error;
-      console.log('🔍 DEBUG - createAIProgram result:', {
-        hasData: !!savedProgram,
-        hasError: !!programError,
-        errorDetails: programError ? JSON.stringify(programError, null, 2) : null
-      });
     } catch (err) {
       console.error('🔍 DEBUG - createAIProgram threw exception:', err);
       programError = err;
@@ -268,9 +246,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    console.log(`✅ Program created: ${savedProgram.id}`);
-    console.log('🚀 Triggering background worker...');
 
     // Trigger background worker (fire-and-forget)
     const workerUrl = new URL('/api/ai/generate-program/worker', request.url);

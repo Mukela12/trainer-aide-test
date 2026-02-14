@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseServer } from '@/lib/supabase-server';
-import { updateAIProgram, deleteAIProgram, getAIProgramById } from '@/lib/services/ai-program-service';
-import { getUserById } from '@/lib/mock-data/users';
+import { getAIProgramById, deleteAIProgram, updateAIProgramWithWorkouts } from '@/lib/services/ai-program-service';
+import { getProfileById } from '@/lib/services/profile-service';
 
 /**
  * GET /api/ai-programs/[id]
@@ -44,78 +43,17 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    // Role-based access control: Verify program belongs to a solo practitioner
-    const existingProgram = await getAIProgramById(id);
-    if (!existingProgram) {
+    const { data: fullProgram, error } = await updateAIProgramWithWorkouts(id, body);
+
+    if (error) {
+      const status = error.message.includes('not found') ? 404
+        : error.message.includes('Unauthorized') ? 403
+        : 500;
       return NextResponse.json(
-        { error: 'Program not found' },
-        { status: 404 }
+        { error: error.message },
+        { status }
       );
     }
-
-    const user = getUserById(existingProgram.trainer_id);
-    if (!user || user.role !== 'solo_practitioner') {
-      return NextResponse.json(
-        { error: 'Unauthorized: AI Programs are only available to solo practitioners' },
-        { status: 403 }
-      );
-    }
-
-    // Update program metadata
-    const { data: updatedProgram, error } = await updateAIProgram(id, {
-      program_name: body.program_name,
-      description: body.description,
-      total_weeks: body.total_weeks,
-      sessions_per_week: body.sessions_per_week,
-      session_duration_minutes: body.session_duration_minutes,
-      status: body.status,
-    });
-
-    if (error || !updatedProgram) {
-      console.error('Error updating program:', error);
-      return NextResponse.json(
-        { error: 'Failed to update program', details: error?.message },
-        { status: 500 }
-      );
-    }
-
-    // Update workouts if provided
-    if (body.workouts && Array.isArray(body.workouts)) {
-      for (const workout of body.workouts) {
-        await supabaseServer
-          .from('ai_workouts')
-          .update({
-            workout_name: workout.workout_name,
-            notes: workout.notes,
-          })
-          .eq('id', workout.id);
-
-        // Update exercises if provided
-        if (workout.exercises && Array.isArray(workout.exercises)) {
-          for (const exercise of workout.exercises) {
-            await supabaseServer
-              .from('ai_workout_exercises')
-              .update({
-                exercise_name: exercise.exercise_name,
-                sets: exercise.sets,
-                reps: exercise.reps,
-                tempo: exercise.tempo,
-                rest_seconds: exercise.rest_seconds,
-                rir: exercise.rir,
-                movement_pattern: exercise.movement_pattern,
-                primary_muscles: exercise.primary_muscles,
-                coaching_cues: exercise.coaching_cues,
-                notes: exercise.notes,
-                order_index: exercise.order_index,
-              })
-              .eq('id', exercise.id);
-          }
-        }
-      }
-    }
-
-    // Fetch updated program with all relations
-    const fullProgram = await getAIProgramById(id);
 
     return NextResponse.json({
       program: fullProgram,
@@ -155,7 +93,7 @@ export async function DELETE(
                     existingProgram.generation_status === 'generating'; // stuck programs
 
     if (!isFailed) {
-      const user = getUserById(existingProgram.trainer_id);
+      const user = await getProfileById(existingProgram.trainer_id);
       if (!user || user.role !== 'solo_practitioner') {
         return NextResponse.json(
           { error: 'Unauthorized: AI Programs are only available to solo practitioners' },

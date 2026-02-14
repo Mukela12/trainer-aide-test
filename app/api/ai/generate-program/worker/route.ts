@@ -105,10 +105,6 @@ export async function POST(request: NextRequest) {
     // Vercel Pro: 300s with maxDuration export
     const WORKER_TIMEOUT_MS = isNetlify ? 58000 : 300000;
 
-    console.log(`🤖 Starting background generation for program ${body.program_id}...`);
-    console.log(`   Program: ${body.total_weeks} weeks × ${body.sessions_per_week} sessions/week`);
-    console.log(`⏱️  Timeout: ${Math.round(WORKER_TIMEOUT_MS / 1000)}s (platform: ${isNetlify ? 'Netlify' : 'Vercel'})`);
-
     // Warn if program duration may exceed platform capabilities
     if (isNetlify && body.total_weeks > 4) {
       console.warn(`⚠️  Warning: ${body.total_weeks}-week program may timeout on Netlify (60s limit). Recommended: ≤4 weeks on Netlify, or deploy to Vercel for longer programs.`);
@@ -185,7 +181,6 @@ export async function POST(request: NextRequest) {
             target_date: g.target_date,
             priority: g.priority,
           }));
-          console.log(`📋 Found ${clientGoals?.length || 0} active client goals to incorporate`);
         }
       } catch (goalsError) {
         console.warn('Could not fetch client goals (non-critical):', goalsError);
@@ -226,8 +221,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Filter exercises
-    console.log('📋 Filtering exercises...');
-
     // Calculate total steps for progress tracking
     const totalStepsEstimate = 2 + (body.total_weeks * 2) + 3; // Filter + Prompts + (Before+After each week) + Validate + Save + Complete
 
@@ -248,8 +241,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient exercises' }, { status: 400 });
     }
 
-    console.log(`✅ ${filteredExercises.length} exercises available`);
-
     await updateAIProgram(body.program_id, {
       progress_message: `Warm-up builder is stretching itself…`,
       current_step: 2,
@@ -257,15 +248,12 @@ export async function POST(request: NextRequest) {
     });
 
     // Step 2: Generate prompts
-    console.log('📝 Generating prompts...');
     const { system: systemPrompt, user: userPrompt } = generateWorkoutPrompt(
       generationRequest,
       filteredExercises
     );
 
     // Step 3: Generate program in chunks to avoid token limits
-    console.log('🧠 Generating program in chunks to avoid token limits...');
-
     const totalWeeks = body.total_weeks;
 
     // Dynamic chunk sizing based on program length for optimal performance:
@@ -274,8 +262,6 @@ export async function POST(request: NextRequest) {
     // - Large programs (9+ weeks): 2-week chunks to stay within token/timeout limits
     const CHUNK_SIZE = totalWeeks <= 3 ? totalWeeks : 2;
     const chunks = Math.ceil(totalWeeks / CHUNK_SIZE);
-
-    console.log(`📊 Will generate ${chunks} chunks (${CHUNK_SIZE} week${CHUNK_SIZE > 1 ? 's' : ''} per chunk)`);
 
     // Wondrous Build Sequence - Creative progress messages for week generation
     const weekBuildMessages = [
@@ -321,8 +307,6 @@ export async function POST(request: NextRequest) {
       const startWeek = chunkIndex * CHUNK_SIZE + 1;
       const endWeek = Math.min((chunkIndex + 1) * CHUNK_SIZE, totalWeeks);
       const weeksInChunk = endWeek - startWeek + 1;
-
-      console.log(`\n🔄 Generating chunk ${chunkIndex + 1}/${chunks}: Weeks ${startWeek}-${endWeek}...`);
 
       // Update progress: Starting chunk generation
       const currentStep = 2 + (chunkIndex * 2) + 1;
@@ -381,8 +365,6 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       const platformMaxTokens = isNetlify ? 6000 : 8192;
       const maxTokens = Math.min(platformMaxTokens, Math.max(4000, estimatedTokens));
 
-      console.log(`   Token allocation: ${maxTokens} (estimated: ${estimatedTokens}, platform: ${isNetlify ? 'Netlify' : 'Vercel'})`);
-
       // Update progress before API call to give user feedback during long wait
       const apiProgressPercentage = Math.round(12 + ((chunkIndex / chunks) * 70)); // 12% to 82%
       const estimatedApiTime = isNetlify ? 45 : 90; // Netlify: shorter estimate, Vercel: longer OK
@@ -391,12 +373,7 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
         progress_percentage: apiProgressPercentage,
       });
 
-      // Log API call start with timestamp for timeout debugging
       const apiCallStart = Date.now();
-      const elapsedTotal = Math.round((apiCallStart - startTime) / 1000);
-      const remainingTimeout = Math.max(0, Math.round(WORKER_TIMEOUT_MS / 1000) - elapsedTotal);
-      console.log(`   ⏳ Starting Anthropic API call... (elapsed: ${elapsedTotal}s, timeout in: ${remainingTimeout}s)`);
-
       const { data: chunkProgram, error: chunkError, raw: chunkRaw } = await callClaudeJSON<AIGeneratedProgram>({
         systemPrompt,
         userPrompt: chunkUserPrompt,
@@ -407,12 +384,7 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
 
       // Log API call completion with timing and token details
       const apiCallDuration = Math.round((Date.now() - apiCallStart) / 1000);
-      if (chunkRaw) {
-        console.log(`   ✅ Anthropic API completed (${apiCallDuration}s)`);
-        console.log(`      Input tokens: ${chunkRaw.usage.input_tokens}`);
-        console.log(`      Output tokens: ${chunkRaw.usage.output_tokens}`);
-        console.log(`      Stop reason: ${chunkRaw.stop_reason}`);
-      } else if (chunkError) {
+      if (chunkError) {
         console.error(`   ❌ Anthropic API failed (${apiCallDuration}s): ${chunkError.message}`);
       }
 
@@ -426,12 +398,8 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       }
 
       totalTokensUsed += (chunkRaw?.usage.output_tokens || 0);
-      console.log(`   ✅ Chunk generated: ${chunkRaw?.usage.output_tokens || 0} tokens`);
 
       // Log what weeks this chunk returned
-      const chunkWeeks = chunkProgram.weekly_structure?.map(w => w.week_number) || [];
-      console.log(`   📋 Chunk returned ${chunkWeeks.length} weeks: [${chunkWeeks.join(', ')}]`);
-
       // Combine chunks
       if (!combinedProgram) {
         // First chunk - use as base
@@ -463,8 +431,6 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       return NextResponse.json({ error: 'Generation failed' }, { status: 500 });
     }
 
-    console.log(`\n✅ All chunks combined: ${totalTokensUsed} total tokens`);
-
     const aiProgram = combinedProgram;
     const raw = { usage: { input_tokens: 0, output_tokens: totalTokensUsed }, model: 'claude-sonnet-4-5-20250929' };
 
@@ -476,8 +442,6 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       });
       return NextResponse.json({ error: errorMsg }, { status: 500 });
     }
-
-    console.log('✅ AI generation successful (chunked)');
 
     // Update progress: Validating
     await updateAIProgram(body.program_id, {
@@ -500,14 +464,7 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
     // Use the fixed program (with invalid exercises removed)
     const fixedProgram = validation.fixedProgram;
 
-    if (validation.warnings.length > 0) {
-      console.log(`⚠️  Validation passed with ${validation.warnings.length} warnings (invalid exercises removed)`);
-    } else {
-      console.log('✅ Validation passed');
-    }
-
     // Step 5: Update program with AI data
-    console.log('💾 Updating program...');
     await updateAIProgram(body.program_id, {
       description: fixedProgram.description,
       ai_rationale: fixedProgram.ai_rationale,
@@ -530,8 +487,6 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
     if (originalWeekCount !== fixedProgram.weekly_structure.length) {
       console.warn(`⚠️  Removed ${originalWeekCount - fixedProgram.weekly_structure.length} duplicate weeks`);
     }
-
-    console.log(`📊 Final structure: ${fixedProgram.weekly_structure.length} unique weeks (${fixedProgram.weekly_structure.map(w => w.week_number).join(', ')})`);
 
     // Helper: Map AI-generated session types to valid database values
     const validSessionTypes: SessionType[] = ['strength', 'hypertrophy', 'conditioning', 'mobility', 'recovery', 'mixed'];
@@ -563,12 +518,10 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       };
 
       if (sessionTypeMap[normalized]) {
-        console.log(`⚠️  Mapped session_type "${aiSessionType}" → "${sessionTypeMap[normalized]}"`);
         return sessionTypeMap[normalized];
       }
 
       // Default fallback
-      console.log(`⚠️  Unknown session_type "${aiSessionType}", defaulting to "mixed"`);
       return 'mixed';
     };
 
@@ -595,15 +548,6 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       }))
     );
 
-    // Log workout creation details
-    const workoutsByWeek = workoutsToCreate.reduce((acc, w) => {
-      acc[w.week_number] = (acc[w.week_number] || 0) + 1;
-      return acc;
-    }, {} as Record<number, number>);
-
-    console.log(`📝 Creating ${workoutsToCreate.length} workouts:`,
-      Object.entries(workoutsByWeek).map(([week, count]) => `Week ${week}: ${count}`).join(', '));
-
     const { data: savedWorkouts, error: workoutsError } = await createAIWorkouts(workoutsToCreate);
 
     if (workoutsError || !savedWorkouts) {
@@ -613,8 +557,6 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       });
       return NextResponse.json({ error: 'Failed to save workouts' }, { status: 500 });
     }
-
-    console.log(`✅ ${savedWorkouts.length} workouts saved`);
 
     // Update progress: Saving workouts
     await updateAIProgram(body.program_id, {
@@ -670,8 +612,6 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
         if (savedExercises) totalExercises += savedExercises.length;
       }
     }
-
-    console.log(`✅ ${totalExercises} exercises created`);
 
     // Step 8: Nutrition plan (if requested)
     if (body.include_nutrition && body.client_profile_id) {
@@ -746,8 +686,6 @@ IMPORTANT: Generate weeks ${startWeek} through ${endWeek} as the NEXT progressio
       current_step: totalStepsEstimate,
       progress_percentage: 100,
     });
-
-      console.log(`✅ Generation complete! Time: ${Date.now() - startTime}ms`);
 
       return NextResponse.json({ success: true, program_id: body.program_id });
     })(); // Close generationPromise async function
@@ -831,12 +769,6 @@ function validateAndFixAIProgram(
         warnings.push(`Week ${week.week_number}, day ${workout.day_number} only has ${validExercises.length} exercises (may be incomplete)`);
       }
     }
-  }
-
-  // Log warnings
-  if (warnings.length > 0) {
-    console.log(`⚠️  Validation warnings (${warnings.length}):`);
-    warnings.forEach(w => console.log(`   - ${w}`));
   }
 
   // Program is valid if no critical errors (some warnings are OK)

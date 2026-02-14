@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { lookupUserProfile } from '@/lib/services/profile-service';
+import { createTemplate } from '@/lib/services/template-service';
 
 /**
  * GET /api/templates
@@ -66,7 +67,6 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify user is authenticated
     const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -77,14 +77,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user profile for studio_id
     const serviceClient = createServiceRoleClient();
     const profile = await lookupUserProfile(serviceClient, user);
 
-    // Parse request body
     const body = await request.json();
 
-    // Validate required fields
     if (!body.name) {
       return NextResponse.json(
         { error: 'name is required' },
@@ -92,71 +89,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create studio_id for the user
-    let studioId = profile?.studio_id;
-
-    // For solo practitioners without a studio, create one on-the-fly
-    if (!studioId) {
-      // Check if a studio already exists for this user
-      const { data: existingStudio } = await serviceClient
-        .from('bs_studios')
-        .select('id')
-        .eq('owner_id', user.id)
-        .maybeSingle();
-
-      if (existingStudio) {
-        studioId = existingStudio.id;
-      } else {
-        // Create a new studio for the solo practitioner
-        const { data: newStudio, error: studioError } = await serviceClient
-          .from('bs_studios')
-          .insert({
-            name: profile?.firstName ? `${profile.firstName}'s Studio` : 'My Studio',
-            owner_id: user.id,
-            plan: 'free',
-            license_level: 'single-site',
-            studio_type: 'personal_training',
-            studio_mode: 'single-site',
-            platform_version: 'v2',
-          })
-          .select()
-          .single();
-
-        if (studioError) {
-          console.error('Error creating studio for solo practitioner:', studioError);
-          return NextResponse.json(
-            { error: 'Failed to create template', details: 'Could not create studio for solo practitioner' },
-            { status: 500 }
-          );
-        }
-
-        studioId = newStudio.id;
-      }
-    }
-
-    // Convert camelCase to snake_case for database
-    // Actual columns: id, trainer_id, name, created_at, studio_id, created_by, title, description, is_active, json_definition, is_default, sign_off_mode
-    const templateData = {
-      name: body.name,
-      title: body.name, // title is required, use name as default
-      description: body.description || null,
-      created_by: user.id,
-      studio_id: studioId,
-      trainer_id: user.id,
-      json_definition: body.blocks || body.jsonDefinition || null,
-      sign_off_mode: body.defaultSignOffMode || body.signOffMode || 'full_session',
-      is_default: body.isDefault || false,
-      is_active: true,
-    };
-
-    const { data, error } = await serviceClient
-      .from('ta_workout_templates')
-      .insert(templateData)
-      .select()
-      .single();
+    const { data, error } = await createTemplate({
+      userId: user.id,
+      studioId: profile?.studio_id,
+      role: profile?.role || 'solo_practitioner',
+      firstName: profile?.firstName,
+      body,
+    });
 
     if (error) {
-      console.error('Error creating template:', error);
       return NextResponse.json(
         { error: 'Failed to create template', details: error.message },
         { status: 500 }

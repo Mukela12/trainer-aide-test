@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,23 +25,14 @@ import {
 import { useUserStore } from '@/lib/stores/user-store';
 import { cn } from '@/lib/utils/cn';
 import ContentHeader from '@/components/shared/ContentHeader';
-
-interface PackageData {
-  id: string;
-  name: string;
-  description: string | null;
-  sessionCount: number;
-  priceCents: number;
-  validityDays: number;
-  perSessionPriceCents: number | null;
-  isActive: boolean;
-  isPublic: boolean;
-}
+import { usePackages, useCreatePackage, useDeletePackage } from '@/lib/hooks/use-packages';
+import type { PackageData } from '@/lib/hooks/use-packages';
 
 export default function PackagesPage() {
   const { currentUser } = useUserStore();
-  const [packages, setPackages] = useState<PackageData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: packages = [], isLoading } = usePackages();
+  const createPackage = useCreatePackage();
+  const deletePackage = useDeletePackage();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -51,79 +42,38 @@ export default function PackagesPage() {
     validityDays: '90',
     isPublic: true,
   });
-  const [isSaving, setIsSaving] = useState(false);
-
-  const loadPackages = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/packages');
-      if (response.ok) {
-        const data = await response.json();
-        setPackages(data);
-      }
-    } catch (error) {
-      console.error('Error loading packages:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadPackages();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.sessionCount || !formData.priceInPounds) return;
 
-    setIsSaving(true);
     try {
-      const response = await fetch('/api/packages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          description: formData.description || null,
-          sessionCount: parseInt(formData.sessionCount),
-          priceCents: Math.round(parseFloat(formData.priceInPounds) * 100),
-          validityDays: parseInt(formData.validityDays) || 90,
-          isPublic: formData.isPublic,
-        }),
+      await createPackage.mutateAsync({
+        name: formData.name,
+        description: formData.description || null,
+        sessionCount: parseInt(formData.sessionCount),
+        priceCents: Math.round(parseFloat(formData.priceInPounds) * 100),
+        validityDays: parseInt(formData.validityDays) || 90,
+        isPublic: formData.isPublic,
       });
 
-      if (response.ok) {
-        setIsDialogOpen(false);
-        setFormData({
-          name: '',
-          description: '',
-          sessionCount: '10',
-          priceInPounds: '360',
-          validityDays: '90',
-          isPublic: true,
-        });
-        loadPackages();
-      }
-    } catch (error) {
-      console.error('Error creating package:', error);
-    } finally {
-      setIsSaving(false);
+      setIsDialogOpen(false);
+      setFormData({
+        name: '',
+        description: '',
+        sessionCount: '10',
+        priceInPounds: '360',
+        validityDays: '90',
+        isPublic: true,
+      });
+    } catch {
+      // error handled by mutation state
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this package?')) return;
-
-    try {
-      const response = await fetch(`/api/packages?id=${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        loadPackages();
-      }
-    } catch (error) {
-      console.error('Error deleting package:', error);
-    }
+    deletePackage.mutate(id);
   };
 
   const perSessionPrice = formData.sessionCount && formData.priceInPounds
@@ -254,8 +204,8 @@ export default function PackagesPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving ? 'Creating...' : 'Create Package'}
+                <Button type="submit" disabled={createPackage.isPending}>
+                  {createPackage.isPending ? 'Creating...' : 'Create Package'}
                 </Button>
               </div>
             </form>

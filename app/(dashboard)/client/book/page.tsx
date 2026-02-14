@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,12 @@ import { ServiceSelector } from '@/components/client/booking/ServiceSelector';
 import { TrainerSelector } from '@/components/client/booking/TrainerSelector';
 import { TimeSlotPicker } from '@/components/client/booking/TimeSlotPicker';
 import { BookingConfirmation } from '@/components/client/booking/BookingConfirmation';
+import {
+  useClientStudioServices,
+  useClientStudioTrainers,
+  useClientCredits,
+  useCreateClientBooking,
+} from '@/lib/hooks/use-client-booking';
 import type {
   ClientService,
   StudioTrainer,
@@ -36,12 +42,6 @@ const STEPS: { id: BookingStep; label: string; icon: React.ReactNode }[] = [
 export default function ClientBookPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<BookingStep>('service');
-  const [services, setServices] = useState<ClientService[]>([]);
-  const [trainers, setTrainers] = useState<StudioTrainer[]>([]);
-  const [credits, setCredits] = useState<number>(0);
-  const [isLoadingServices, setIsLoadingServices] = useState(true);
-  const [isLoadingTrainers, setIsLoadingTrainers] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Selected values
@@ -52,41 +52,11 @@ export default function ClientBookPage() {
   const [selectedTrainerId, setSelectedTrainerId] = useState<string | null>(null);
   const [selectedTrainerName, setSelectedTrainerName] = useState<string>('');
 
-  // Fetch data on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch services
-        const servicesRes = await fetch('/api/client/studio/services');
-        if (servicesRes.ok) {
-          const data = await servicesRes.json();
-          setServices(data.services || []);
-        }
-        setIsLoadingServices(false);
-
-        // Fetch trainers
-        const trainersRes = await fetch('/api/client/studio/trainers');
-        if (trainersRes.ok) {
-          const data = await trainersRes.json();
-          setTrainers(data.trainers || []);
-        }
-        setIsLoadingTrainers(false);
-
-        // Fetch credits
-        const creditsRes = await fetch('/api/client/packages');
-        if (creditsRes.ok) {
-          const data = await creditsRes.json();
-          setCredits(data.totalCredits || 0);
-        }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setIsLoadingServices(false);
-        setIsLoadingTrainers(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+  // React Query hooks
+  const { data: services = [], isLoading: isLoadingServices } = useClientStudioServices();
+  const { data: trainers = [], isLoading: isLoadingTrainers } = useClientStudioTrainers();
+  const { data: credits = 0 } = useClientCredits();
+  const bookingMutation = useCreateClientBooking();
 
   const currentStepIndex = STEPS.findIndex((s) => s.id === currentStep);
 
@@ -133,36 +103,17 @@ export default function ClientBookPage() {
   const handleConfirmBooking = async () => {
     if (!selectedService || !selectedDate || !selectedTrainerId) return;
 
-    setIsSubmitting(true);
     setError(null);
 
     try {
-      const scheduledAt = selectedDate.toISOString();
-
-      const res = await fetch('/api/client/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          serviceId: selectedService.id,
-          trainerId: selectedTrainerId,
-          scheduledAt,
-        }),
+      await bookingMutation.mutateAsync({
+        serviceId: selectedService.id,
+        trainerId: selectedTrainerId,
+        scheduledAt: selectedDate.toISOString(),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Failed to create booking');
-        return;
-      }
-
-      // Success - redirect to bookings page
       router.push('/client/bookings?booked=true');
     } catch (err) {
-      console.error('Error creating booking:', err);
-      setError('An unexpected error occurred. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
     }
   };
 
@@ -320,7 +271,7 @@ export default function ClientBookPage() {
             currentCredits={credits}
             onConfirm={handleConfirmBooking}
             onBack={handleBack}
-            isSubmitting={isSubmitting}
+            isSubmitting={bookingMutation.isPending}
             error={error}
           />
         )}

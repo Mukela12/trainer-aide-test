@@ -5,7 +5,11 @@
  */
 
 import { imagesSupabase } from '@/lib/supabase/images-client';
-import type { SupabaseExercise, ExerciseLevel, MovementPattern, PlaneOfMotion, ExerciseType } from '../types';
+import type { Exercise, SupabaseExercise, ExerciseLevel, MovementPattern, PlaneOfMotion, ExerciseType } from '../types';
+import {
+  supabaseToFrontendExercises,
+  supabaseToFrontendExercise,
+} from '@/lib/utils/exercise-adapter';
 
 export interface ExerciseFilters {
   equipment?: string | string[];
@@ -198,4 +202,75 @@ export async function searchExercisesClient(searchTerm: string, filters?: Exerci
   }
 
   return data || [];
+}
+
+// --- High-level exercise functions (consolidated from mock-data/exercises.ts) ---
+
+// Cache for exercises (to avoid repeated Supabase calls)
+let cachedExercises: Exercise[] | null = null;
+let lastCacheTime: number | null = null;
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Load all exercises from Supabase with client-side caching
+ */
+export async function loadExercises(): Promise<Exercise[]> {
+  const now = Date.now();
+  if (cachedExercises && lastCacheTime && (now - lastCacheTime) < CACHE_DURATION_MS) {
+    return cachedExercises;
+  }
+
+  const supabaseExercises = await getAllExercisesClient();
+  const exercises = supabaseToFrontendExercises(supabaseExercises);
+
+  cachedExercises = exercises;
+  lastCacheTime = now;
+
+  return exercises;
+}
+
+/**
+ * Get exercise by ID (returns frontend Exercise type)
+ */
+export async function getExerciseById(id: string): Promise<Exercise | null> {
+  try {
+    const supabaseExercise = await getExerciseByIdClient(id);
+    if (!supabaseExercise) return null;
+    return supabaseToFrontendExercise(supabaseExercise);
+  } catch (error) {
+    console.error('Error fetching exercise by ID:', error);
+    const fallback = cachedExercises?.find((ex: Exercise) => ex.id === id);
+    return fallback || null;
+  }
+}
+
+/**
+ * Get exercises by category (returns frontend Exercise type)
+ */
+export async function getExercisesByCategory(category: string): Promise<Exercise[]> {
+  try {
+    const supabaseExercises = await getExercisesClient({
+      anatomicalCategory: category,
+    });
+    return supabaseToFrontendExercises(supabaseExercises);
+  } catch (error) {
+    console.error('Error fetching exercises by category:', error);
+    return (cachedExercises || []).filter((ex: Exercise) => ex.category === category);
+  }
+}
+
+/**
+ * Search exercises by name (returns frontend Exercise type)
+ */
+export async function searchExercises(searchTerm: string, limit = 50): Promise<Exercise[]> {
+  try {
+    const supabaseExercises = await searchExercisesClient(searchTerm, { limit });
+    return supabaseToFrontendExercises(supabaseExercises);
+  } catch (error) {
+    console.error('Error searching exercises:', error);
+    const searchLower = searchTerm.toLowerCase();
+    return (cachedExercises || [])
+      .filter((ex: Exercise) => ex.name.toLowerCase().includes(searchLower))
+      .slice(0, limit);
+  }
 }

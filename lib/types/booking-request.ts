@@ -22,3 +22,28 @@ export interface BookingRequestFormData {
   preferredTimes: Date[];
   notes?: string;
 }
+
+export interface BookingRequestClient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+export interface BookingRequestService {
+  id: string;
+  name: string;
+  duration: number;
+}
+
+export interface BookingRequestResponse {
+  id: string;
+  client: BookingRequestClient | null;
+  service: BookingRequestService | null;
+  preferred_times: string[];
+  notes: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  created_at: string;
+  expires_at: string;
+  clientName?: string;
+}

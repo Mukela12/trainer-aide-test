@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useTemplateStore } from '@/lib/stores/template-store';
+import { useDeleteTemplate, useDuplicateTemplate } from '@/lib/hooks/use-templates';
 import { useUserStore } from '@/lib/stores/user-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +39,8 @@ interface Template {
 
 export default function TemplateLibrary() {
   const router = useRouter();
-  const { deleteTemplate, duplicateTemplate } = useTemplateStore();
+  const deleteTemplateMutation = useDeleteTemplate();
+  const duplicateTemplateMutation = useDuplicateTemplate();
   const { currentUser } = useUserStore();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [aiTemplates, setAITemplates] = useState<AIProgram[]>([]);
@@ -160,14 +161,14 @@ export default function TemplateLibrary() {
 
   const handleDelete = async (templateId: string, templateName: string) => {
     if (confirm(`Are you sure you want to delete "${templateName}"? This action cannot be undone.`)) {
-      await deleteTemplate(templateId);
+      await deleteTemplateMutation.mutateAsync(templateId);
       // Remove from local state
       setTemplates(templates.filter(t => t.id !== templateId));
     }
   };
 
   const handleDuplicate = async (templateId: string) => {
-    const duplicated = await duplicateTemplate(templateId);
+    const duplicated = await duplicateTemplateMutation.mutateAsync(templateId);
     if (duplicated) {
       // Add to local state
       setTemplates([...templates, {

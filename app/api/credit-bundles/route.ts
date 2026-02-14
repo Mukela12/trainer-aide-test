@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { lookupUserProfile } from '@/lib/services/profile-service';
+import {
+  getCreditBundles,
+  createCreditBundle,
+  updateCreditBundle,
+  deleteCreditBundle,
+} from '@/lib/services/credit-bundle-service';
 
-interface CreditBundle {
-  id: string;
-  name: string;
-  credit_count: number;
-  total_price: number;
-  price_per_credit: number;
-  expiry_days: number | null;
-  is_active: boolean;
-  owner_id: string;
-  studio_id: string | null;
-  created_at: string;
-}
-
-/**
- * GET /api/credit-bundles
- * Fetches all credit bundles for the authenticated user's studio
- */
 export async function GET() {
   try {
     const supabase = await createServerSupabaseClient();
@@ -36,15 +25,9 @@ export async function GET() {
     }
 
     const studioId = profile.studio_id || user.id;
-
-    const { data: bundles, error } = await serviceClient
-      .from('credit_bundles')
-      .select('*')
-      .or(`owner_id.eq.${user.id},studio_id.eq.${studioId}`)
-      .order('created_at', { ascending: false });
+    const { data: bundles, error } = await getCreditBundles(user.id, studioId);
 
     if (error) {
-      console.error('Error fetching credit bundles:', error);
       return NextResponse.json({ error: 'Failed to fetch credit bundles' }, { status: 500 });
     }
 
@@ -55,10 +38,6 @@ export async function GET() {
   }
 }
 
-/**
- * POST /api/credit-bundles
- * Creates a new credit bundle
- */
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -87,27 +66,16 @@ export async function POST(request: NextRequest) {
     }
 
     const studioId = profile.studio_id || user.id;
-    const pricePerCredit = body.total_price / body.credit_count;
-
-    const bundleData = {
+    const { data, error } = await createCreditBundle({
+      userId: user.id,
+      studioId,
       name: body.name,
-      credit_count: body.credit_count,
-      total_price: body.total_price,
-      price_per_credit: pricePerCredit,
-      expiry_days: body.expiry_days || 90,
-      is_active: true,
-      owner_id: user.id,
-      studio_id: studioId,
-    };
-
-    const { data, error } = await serviceClient
-      .from('credit_bundles')
-      .insert(bundleData)
-      .select()
-      .single();
+      creditCount: body.credit_count,
+      totalPrice: body.total_price,
+      expiryDays: body.expiry_days,
+    });
 
     if (error) {
-      console.error('Error creating credit bundle:', error);
       return NextResponse.json({ error: 'Failed to create credit bundle' }, { status: 500 });
     }
 
@@ -118,10 +86,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * PUT /api/credit-bundles
- * Updates an existing credit bundle
- */
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -131,40 +95,21 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
-    const profile = await lookupUserProfile(serviceClient, user);
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
-    }
-
     const body = await request.json();
 
     if (!body.id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
 
-    const updateData: Record<string, unknown> = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.credit_count !== undefined) updateData.credit_count = body.credit_count;
-    if (body.total_price !== undefined) updateData.total_price = body.total_price;
-    if (body.expiry_days !== undefined) updateData.expiry_days = body.expiry_days;
-    if (body.is_active !== undefined) updateData.is_active = body.is_active;
-
-    if (body.credit_count && body.total_price) {
-      updateData.price_per_credit = body.total_price / body.credit_count;
-    }
-
-    const { data, error } = await serviceClient
-      .from('credit_bundles')
-      .update(updateData)
-      .eq('id', body.id)
-      .eq('owner_id', user.id)
-      .select()
-      .single();
+    const { data, error } = await updateCreditBundle(body.id, user.id, {
+      name: body.name,
+      credit_count: body.credit_count,
+      total_price: body.total_price,
+      expiry_days: body.expiry_days,
+      is_active: body.is_active,
+    });
 
     if (error) {
-      console.error('Error updating credit bundle:', error);
       return NextResponse.json({ error: 'Failed to update credit bundle' }, { status: 500 });
     }
 
@@ -175,10 +120,6 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-/**
- * DELETE /api/credit-bundles
- * Deletes a credit bundle by ID
- */
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -188,8 +129,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
-
     const { searchParams } = new URL(request.url);
     const bundleId = searchParams.get('id');
 
@@ -197,14 +136,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id query parameter is required' }, { status: 400 });
     }
 
-    const { error } = await serviceClient
-      .from('credit_bundles')
-      .delete()
-      .eq('id', bundleId)
-      .eq('owner_id', user.id);
+    const { error } = await deleteCreditBundle(bundleId, user.id);
 
     if (error) {
-      console.error('Error deleting credit bundle:', error);
       return NextResponse.json({ error: 'Failed to delete credit bundle' }, { status: 500 });
     }
 

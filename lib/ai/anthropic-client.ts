@@ -86,8 +86,6 @@ export async function callClaude(params: {
   } = params;
 
   try {
-    const startTime = Date.now();
-
     const response = await anthropic.messages.create({
       model,
       max_tokens: maxTokens,
@@ -100,8 +98,6 @@ export async function callClaude(params: {
         },
       ],
     });
-
-    const latency = Date.now() - startTime;
 
     // Extract text content
     const content = response.content
@@ -118,11 +114,6 @@ export async function callClaude(params: {
       },
       model: response.model,
     };
-
-    console.log(`✅ Claude API call successful (${latency}ms)`);
-    console.log(`   Input tokens: ${result.usage.input_tokens}`);
-    console.log(`   Output tokens: ${result.usage.output_tokens}`);
-    console.log(`   Estimated cost: $${estimateCost(result).toFixed(4)}`);
 
     // Warning: Check if response was truncated due to max_tokens
     if (response.stop_reason === 'max_tokens') {

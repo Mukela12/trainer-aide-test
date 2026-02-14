@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useSessionStore } from '@/lib/stores/session-store';
-import { useCalendarStore } from '@/lib/stores/booking-store';
+import { useSessionData, useDeleteSession } from '@/lib/hooks/use-sessions';
+import { useBookings } from '@/lib/hooks/use-bookings';
+import { useUserStore } from '@/lib/stores/user-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +18,10 @@ import ContentHeader from '@/components/shared/ContentHeader';
 type TabType = 'in_progress' | 'upcoming' | 'completed';
 
 export default function MySessions() {
-  const { sessions, deleteSession } = useSessionStore();
-  const { sessions: calendarSessions } = useCalendarStore();
+  const { currentUser } = useUserStore();
+  const { sessions } = useSessionData(currentUser?.id);
+  const deleteSessionMutation = useDeleteSession();
+  const { sessions: calendarSessions } = useBookings(currentUser?.id);
   const [activeTab, setActiveTab] = useState<TabType>('in_progress');
 
   const inProgressSessions = sessions.filter((s) => !s.completed);
@@ -50,7 +53,7 @@ export default function MySessions() {
       return;
     }
     if (confirm(`Are you sure you want to delete "${sessionName}"?`)) {
-      deleteSession(sessionId);
+      deleteSessionMutation.mutate(sessionId);
     }
   };
 

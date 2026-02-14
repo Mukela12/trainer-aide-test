@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
+import { useCreateClient } from '@/lib/hooks/use-clients';
 
 interface AddClientDialogProps {
   open: boolean;
@@ -23,7 +24,7 @@ interface AddClientDialogProps {
 
 export function AddClientDialog({ open, onOpenChange, onSuccess }: AddClientDialogProps) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const createClient = useCreateClient();
   const [sendWelcomeEmail, setSendWelcomeEmail] = useState(true);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -45,23 +46,8 @@ export function AddClientDialog({ open, onOpenChange, onSuccess }: AddClientDial
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      const response = await fetch('/api/clients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          sendWelcomeEmail,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create client');
-      }
+      const data = await createClient.mutateAsync({ ...formData, sendWelcomeEmail });
 
       if (sendWelcomeEmail && data.emailSent) {
         toast({
@@ -97,8 +83,6 @@ export function AddClientDialog({ open, onOpenChange, onSuccess }: AddClientDial
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to add client',
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -187,8 +171,8 @@ export function AddClientDialog({ open, onOpenChange, onSuccess }: AddClientDial
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Adding...' : 'Add Client'}
+            <Button type="submit" disabled={createClient.isPending}>
+              {createClient.isPending ? 'Adding...' : 'Add Client'}
             </Button>
           </DialogFooter>
         </form>

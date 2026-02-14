@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getPackages, createPackage, deletePackage } from '@/lib/services/package-service';
 
 // GET /api/packages - List trainer's packages
 export async function GET(request: NextRequest) {
@@ -10,79 +11,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if requesting for a specific trainer (public view)
-    const trainerId = request.nextUrl.searchParams.get('trainerId');
+    const trainerId = request.nextUrl.searchParams.get('trainerId') || user.id;
     const publicOnly = request.nextUrl.searchParams.get('public') === 'true';
+    const format = request.nextUrl.searchParams.get('format') || undefined;
 
-    let query = supabase
-      .from('ta_packages')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (trainerId) {
-      query = query.eq('trainer_id', trainerId);
-      if (publicOnly) {
-        query = query.eq('is_public', true).eq('is_active', true);
-      }
-    } else {
-      query = query.eq('trainer_id', user.id);
-    }
-
-    const { data: packages, error } = await query;
+    const { data, error } = await getPackages(trainerId, { publicOnly, format });
 
     if (error) {
       console.error('Error fetching packages:', error);
       return NextResponse.json({ error: 'Failed to fetch packages' }, { status: 500 });
     }
 
-    // Format packages
-    const formattedPackages = packages.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      sessionCount: p.session_count,
-      priceCents: p.price_cents,
-      validityDays: p.validity_days,
-      perSessionPriceCents: p.per_session_price_cents,
-      savingsPercent: p.savings_percent,
-      isActive: p.is_active,
-      isPublic: p.is_public,
-      createdAt: p.created_at,
-    }));
-
-    // Check if request expects wrapped format (studio-owner pages)
-    const wrapResponse = request.nextUrl.searchParams.get('format') === 'wrapped';
-
-    if (wrapResponse) {
-      // Fetch client packages for studio owner view
-      const { data: clientPackages } = await supabase
-        .from('ta_client_packages')
-        .select(`
-          id,
-          credits_remaining,
-          credits_total,
-          expires_at,
-          fc_clients!inner(first_name, last_name),
-          ta_packages!inner(name)
-        `)
-        .eq('ta_packages.trainer_id', trainerId || user.id)
-        .eq('is_active', true);
-
-      return NextResponse.json({
-        packages: formattedPackages,
-        clientPackages: (clientPackages || []).map((cp: Record<string, unknown>) => ({
-          id: cp.id,
-          clientName: `${(cp.fc_clients as Record<string, string>)?.first_name || ''} ${(cp.fc_clients as Record<string, string>)?.last_name || ''}`.trim(),
-          packageName: (cp.ta_packages as Record<string, string>)?.name || '',
-          creditsRemaining: cp.credits_remaining,
-          creditsTotal: cp.credits_total,
-          expiresAt: cp.expires_at,
-        })),
-      });
+    // Wrapped format returns { packages, clientPackages }
+    if (format === 'wrapped') {
+      return NextResponse.json(data);
     }
 
-    // Return flat array for backwards compatibility (solo pages)
-    return NextResponse.json(formattedPackages);
+    // Flat array for backwards compatibility (solo pages)
+    return NextResponse.json(data!.packages);
   } catch (error) {
     console.error('Error in packages GET:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -93,7 +39,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, description, sessionCount, priceCents, validityDays, isPublic } = body;
+    const { name, sessionCount, priceCents } = body;
 
     if (!name || !sessionCount || !priceCents) {
       return NextResponse.json(
@@ -108,38 +54,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Calculate per-session price
-    const perSessionPriceCents = Math.round(priceCents / sessionCount);
-
-    const { data: newPackage, error } = await supabase
-      .from('ta_packages')
-      .insert({
-        trainer_id: user.id,
-        name,
-        description: description || null,
-        session_count: sessionCount,
-        price_cents: priceCents,
-        validity_days: validityDays || 90,
-        per_session_price_cents: perSessionPriceCents,
-        is_active: true,
-        is_public: isPublic !== false,
-      })
-      .select()
-      .single();
+    const { data, error } = await createPackage(user.id, {
+      name: body.name,
+      description: body.description,
+      sessionCount: body.sessionCount,
+      priceCents: body.priceCents,
+      validityDays: body.validityDays,
+      isPublic: body.isPublic,
+    });
 
     if (error) {
       console.error('Error creating package:', error);
       return NextResponse.json({ error: 'Failed to create package' }, { status: 500 });
     }
 
-    return NextResponse.json({
-      id: newPackage.id,
-      name: newPackage.name,
-      description: newPackage.description,
-      sessionCount: newPackage.session_count,
-      priceCents: newPackage.price_cents,
-      validityDays: newPackage.validity_days,
-    });
+    return NextResponse.json(data);
   } catch (error) {
     console.error('Error in packages POST:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -160,12 +89,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Soft delete - just mark as inactive
-    const { error } = await supabase
-      .from('ta_packages')
-      .update({ is_active: false })
-      .eq('id', packageId)
-      .eq('trainer_id', user.id);
+    const { error } = await deletePackage(packageId, user.id);
 
     if (error) {
       console.error('Error deleting package:', error);

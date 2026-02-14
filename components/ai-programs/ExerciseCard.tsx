@@ -5,7 +5,7 @@ import { Lightbulb, Image as ImageIcon } from 'lucide-react';
 import { ExerciseImageViewer } from '@/components/shared/ExerciseImageViewer';
 import { Button } from '@/components/ui/button';
 
-interface WorkoutExercise {
+export interface WorkoutExercise {
   id: string;
   exercise_id: string;
   exercise_name: string;

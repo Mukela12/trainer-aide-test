@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +9,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Mail, Calendar, Users, FileText, Loader2 } from 'lucide-react';
+import { useTrainerStats } from '@/lib/hooks/use-trainer-stats';
 
 interface TrainerProfileDialogProps {
   open: boolean;
@@ -25,53 +25,8 @@ interface TrainerProfileDialogProps {
   } | null;
 }
 
-interface TrainerStats {
-  totalClients: number;
-  totalBookings: number;
-  totalTemplates: number;
-  upcomingBookings: number;
-}
-
 export function TrainerProfileDialog({ open, onOpenChange, trainer }: TrainerProfileDialogProps) {
-  const [stats, setStats] = useState<TrainerStats | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (open && trainer) {
-      loadTrainerStats();
-    }
-  }, [open, trainer]);
-
-  const loadTrainerStats = async () => {
-    if (!trainer) return;
-
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/trainers/${trainer.id}/stats`);
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      } else {
-        // Set default stats if endpoint doesn't exist
-        setStats({
-          totalClients: 0,
-          totalBookings: 0,
-          totalTemplates: 0,
-          upcomingBookings: 0,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading trainer stats:', error);
-      setStats({
-        totalClients: 0,
-        totalBookings: 0,
-        totalTemplates: 0,
-        upcomingBookings: 0,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: stats, isLoading: loading } = useTrainerStats(trainer?.id, open);
 
   if (!trainer) return null;
 

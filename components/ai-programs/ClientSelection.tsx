@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Search, User, ChevronRight, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useClients } from '@/lib/hooks/use-clients';
+import { useUserStore } from '@/lib/stores/user-store';
 import type { ClientProfile } from '@/lib/types/client-profile';
 
 interface ClientSelectionProps {
@@ -15,32 +17,11 @@ interface ClientSelectionProps {
 
 export function ClientSelection({ selectedClient, onSelect, onBack }: ClientSelectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [clients, setClients] = useState<ClientProfile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [useCustomParams, setUseCustomParams] = useState(false);
 
-  useEffect(() => {
-    const fetchClients = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('/api/clients');
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch clients');
-        }
-
-        const data = await response.json();
-        setClients(data.clients || []);
-      } catch (error) {
-        console.error('Error fetching clients:', error);
-        setClients([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchClients();
-  }, []);
+  const { currentUser } = useUserStore();
+  const { data: rawClients = [], isLoading: loading } = useClients(currentUser?.id);
+  const clients = rawClients as unknown as ClientProfile[];
 
   const filteredClients = clients.filter((client) => {
     const fullName = `${client.first_name} ${client.last_name}`.toLowerCase();

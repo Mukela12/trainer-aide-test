@@ -40,7 +40,6 @@ export function WorkoutEditor({ workout, onChange }: WorkoutEditorProps) {
 
   const handleAddExercise = () => {
     // TODO: Open exercise picker modal
-    console.log('Add exercise functionality coming soon');
   };
 
   const handleRemoveExercise = (exerciseId: string) => {

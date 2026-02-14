@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useSessionStore } from '@/lib/stores/session-store';
-import { useCalendarStore } from '@/lib/stores/booking-store';
-import { useServiceStore } from '@/lib/stores/service-store';
+import { useSessionData, useDeleteSession } from '@/lib/hooks/use-sessions';
+import { useBookings } from '@/lib/hooks/use-bookings';
+import { useServices, useAddService, useUpdateService } from '@/lib/hooks/use-services';
 import { useUserStore } from '@/lib/stores/user-store';
 import { Service, ServiceType } from '@/lib/types/service';
 import { Button } from '@/components/ui/button';
@@ -40,14 +40,17 @@ export default function ServicesPage() {
   const [sessionTab, setSessionTab] = useState<SessionTab>('upcoming');
 
   // Service management
-  const { services, addService, updateService } = useServiceStore();
+  const { data: services = [] } = useServices();
+  const addServiceMutation = useAddService();
+  const updateServiceMutation = useUpdateService();
   const { currentUser } = useUserStore();
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
 
   // Session management
-  const { sessions, deleteSession } = useSessionStore();
-  const { sessions: calendarSessions } = useCalendarStore();
+  const { sessions } = useSessionData(currentUser.id);
+  const deleteSessionMutation = useDeleteSession();
+  const { sessions: calendarSessions } = useBookings(currentUser.id);
 
   // Service stats
   const activeServices = services.filter((s) => s.isActive);
@@ -101,7 +104,7 @@ export default function ServicesPage() {
   };
 
   const toggleServiceStatus = (serviceId: string, currentStatus: boolean) => {
-    updateService(serviceId, { isActive: !currentStatus });
+    updateServiceMutation.mutate({ id: serviceId, updates: { isActive: !currentStatus } });
   };
 
   const handleAddService = () => {
@@ -121,9 +124,9 @@ export default function ServicesPage() {
     };
 
     if (selectedService) {
-      updateService(serviceWithUser.id, serviceWithUser);
+      updateServiceMutation.mutate({ id: serviceWithUser.id, updates: serviceWithUser });
     } else {
-      addService(serviceWithUser);
+      addServiceMutation.mutate(serviceWithUser);
     }
 
     setIsServiceDialogOpen(false);
@@ -136,7 +139,7 @@ export default function ServicesPage() {
       return;
     }
     if (confirm(`Are you sure you want to delete "${sessionName}"?`)) {
-      deleteSession(sessionId);
+      deleteSessionMutation.mutate(sessionId);
     }
   };
 

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
-
-interface RouteParams {
-  params: Promise<{ id: string }>;
-}
+import type { RouteParams } from '@/lib/types/api';
 
 // GET /api/trainers/[id]/stats - Get trainer statistics
 export async function GET(request: NextRequest, { params }: RouteParams) {

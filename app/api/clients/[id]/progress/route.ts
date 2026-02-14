@@ -29,8 +29,6 @@ export async function GET(
 
     // If view doesn't exist or fails, compute manually
     if (viewError) {
-      console.log('v_client_progress view not available, computing manually');
-
       // Get latest metrics
       const { data: latestMetric } = await serviceClient
         .from('ta_body_metrics')

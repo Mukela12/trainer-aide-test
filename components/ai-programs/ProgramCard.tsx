@@ -6,6 +6,7 @@ import { Calendar, Clock, Dumbbell, MoreVertical, Target, TrendingUp, Edit, Copy
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AssignClientModal } from './AssignClientModal';
+import { useDuplicateAIProgram, useToggleAIProgramTemplate, usePatchAIProgram, useDeleteAIProgram } from '@/lib/hooks/use-ai-programs';
 import type { AIProgram } from '@/lib/types/ai-program';
 
 interface ProgramCardProps {
@@ -17,8 +18,14 @@ export function ProgramCard({ program, onUpdate }: ProgramCardProps) {
   const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const duplicateMutation = useDuplicateAIProgram();
+  const toggleTemplateMutation = useToggleAIProgramTemplate();
+  const patchMutation = usePatchAIProgram();
+  const deleteMutation = useDeleteAIProgram();
+
+  const isProcessing = duplicateMutation.isPending || toggleTemplateMutation.isPending || patchMutation.isPending || deleteMutation.isPending;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -45,103 +52,43 @@ export function ProgramCard({ program, onUpdate }: ProgramCardProps) {
 
   const handleDuplicate = async () => {
     setShowMenu(false);
-    if (isProcessing) return;
-
     try {
-      setIsProcessing(true);
-      const response = await fetch(`/api/ai-programs/${program.id}/duplicate`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to duplicate program');
-      }
-
-      const data = await response.json();
-      if (onUpdate) onUpdate();
-      router.push(`/trainer/programs/${data.program.id}`);
-    } catch (error) {
-      console.error('Error duplicating program:', error);
+      const duplicated = await duplicateMutation.mutateAsync(program.id);
+      onUpdate?.();
+      router.push(`/trainer/programs/${duplicated.id}`);
+    } catch {
       alert('Failed to duplicate program');
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   const handleToggleTemplate = async () => {
     setShowMenu(false);
-    if (isProcessing) return;
-
     try {
-      setIsProcessing(true);
-      const response = await fetch(`/api/ai-programs/${program.id}/template`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_template: !program.is_template }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update template status');
-      }
-
-      if (onUpdate) onUpdate();
-    } catch (error) {
-      console.error('Error updating template status:', error);
+      await toggleTemplateMutation.mutateAsync({ programId: program.id, isTemplate: !program.is_template });
+      onUpdate?.();
+    } catch {
       alert('Failed to update template status');
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   const handleArchive = async () => {
     setShowMenu(false);
-    if (isProcessing) return;
-
     try {
-      setIsProcessing(true);
-      const response = await fetch(`/api/ai-programs/${program.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: program.status === 'archived' ? 'draft' : 'archived' }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to archive program');
-      }
-
-      if (onUpdate) onUpdate();
-    } catch (error) {
-      console.error('Error archiving program:', error);
+      await patchMutation.mutateAsync({ programId: program.id, updates: { status: program.status === 'archived' ? 'draft' : 'archived' } });
+      onUpdate?.();
+    } catch {
       alert('Failed to archive program');
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   const handleDelete = async () => {
     setShowMenu(false);
-    if (isProcessing) return;
-
-    if (!confirm('Are you sure you want to delete this program? This action cannot be undone.')) {
-      return;
-    }
-
+    if (!confirm('Are you sure you want to delete this program? This action cannot be undone.')) return;
     try {
-      setIsProcessing(true);
-      const response = await fetch(`/api/ai-programs/${program.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete program');
-      }
-
-      if (onUpdate) onUpdate();
-    } catch (error) {
-      console.error('Error deleting program:', error);
+      await deleteMutation.mutateAsync(program.id);
+      onUpdate?.();
+    } catch {
       alert('Failed to delete program');
-    } finally {
-      setIsProcessing(false);
     }
   };
 

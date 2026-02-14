@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 
 interface UseSessionAlertsOptions {
   isActive: boolean;

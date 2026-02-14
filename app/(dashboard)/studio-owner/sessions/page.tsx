@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { useSessionStore } from '@/lib/stores/session-store';
+import { useSessionData } from '@/lib/hooks/use-sessions';
+import { useUserStore } from '@/lib/stores/user-store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,8 @@ import ContentHeader from '@/components/shared/ContentHeader';
 type FilterType = 'all' | 'completed' | 'in_progress';
 
 export default function AllSessionsPage() {
-  const { sessions } = useSessionStore();
+  const { currentUser } = useUserStore();
+  const { sessions } = useSessionData(currentUser.id);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<FilterType>('all');
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useUserStore } from '@/lib/stores/user-store';
+import { useClientBookings, useCancelClientBooking } from '@/lib/hooks/use-client-bookings';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,26 +28,18 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import ContentHeader from '@/components/shared/ContentHeader';
-
-interface Booking {
-  id: string;
-  scheduledAt: string;
-  duration: number;
-  status: 'confirmed' | 'pending' | 'completed' | 'cancelled' | 'soft-hold';
-  serviceName: string;
-  trainerName: string;
-}
+import type { ClientBooking } from '@/lib/hooks/use-client-bookings';
 
 export default function ClientBookingsPage() {
   const { currentUser } = useUserStore();
   const searchParams = useSearchParams();
-  const [isLoading, setIsLoading] = useState(true);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const { data: bookings = [], isLoading, error: queryError, refetch } = useClientBookings(currentUser?.id);
+  const cancelMutation = useCancelClientBooking();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [isCancelling, setIsCancelling] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<ClientBooking | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  const error = queryError ? 'Unable to load your bookings. Please try again.' : null;
 
   // Check for success redirect from booking
   useEffect(() => {
@@ -58,55 +51,18 @@ export default function ClientBookingsPage() {
     }
   }, [searchParams]);
 
-  const fetchBookings = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch('/api/client/bookings');
-      if (!res.ok) {
-        throw new Error('Failed to fetch bookings');
-      }
-      const data = await res.json();
-      setBookings(data.bookings || []);
-    } catch (err) {
-      console.error('Error fetching bookings:', err);
-      setError('Unable to load your bookings. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchBookings();
-  }, []);
-
-  const handleCancelClick = (booking: Booking) => {
+  const handleCancelClick = (booking: ClientBooking) => {
     setSelectedBooking(booking);
     setCancelDialogOpen(true);
   };
 
   const handleCancelBooking = async () => {
     if (!selectedBooking) return;
-
-    setIsCancelling(true);
     try {
-      const res = await fetch(`/api/client/bookings?id=${selectedBooking.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to cancel booking');
-      }
-
-      // Refresh bookings
-      await fetchBookings();
+      await cancelMutation.mutateAsync(selectedBooking.id);
       setCancelDialogOpen(false);
-    } catch (err) {
-      console.error('Error cancelling booking:', err);
-      setError('Failed to cancel booking. Please try again.');
-    } finally {
-      setIsCancelling(false);
+    } catch {
+      // Error handled by React Query
     }
   };
 
@@ -152,12 +108,12 @@ export default function ClientBookingsPage() {
 
   // Filter and sort bookings
   const upcomingBookings = bookings
-    .filter((b) => !isPast(new Date(b.scheduledAt)) && b.status !== 'cancelled')
-    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+    .filter((b: ClientBooking) => !isPast(new Date(b.scheduledAt)) && b.status !== 'cancelled')
+    .sort((a: ClientBooking, b: ClientBooking) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
   const pastBookings = bookings
-    .filter((b) => isPast(new Date(b.scheduledAt)) || b.status === 'cancelled')
-    .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
+    .filter((b: ClientBooking) => isPast(new Date(b.scheduledAt)) || b.status === 'cancelled')
+    .sort((a: ClientBooking, b: ClientBooking) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
     .slice(0, 10); // Show last 10 only
 
   if (isLoading) {
@@ -179,7 +135,7 @@ export default function ClientBookingsPage() {
             Something went wrong
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
-          <Button onClick={fetchBookings}>Try Again</Button>
+          <Button onClick={() => refetch()}>Try Again</Button>
         </Card>
       </div>
     );
@@ -224,7 +180,7 @@ export default function ClientBookingsPage() {
 
         {upcomingBookings.length > 0 ? (
           <div className="space-y-4">
-            {upcomingBookings.map((booking) => {
+            {upcomingBookings.map((booking: ClientBooking) => {
               const scheduledDate = new Date(booking.scheduledAt);
               const canCancel = !isPast(new Date(scheduledDate.getTime() - 24 * 60 * 60 * 1000));
 
@@ -301,7 +257,7 @@ export default function ClientBookingsPage() {
         <div>
           <h2 className="text-heading-2 dark:text-gray-100 mb-4">Recent Sessions</h2>
           <div className="space-y-3">
-            {pastBookings.map((booking) => {
+            {pastBookings.map((booking: ClientBooking) => {
               const scheduledDate = new Date(booking.scheduledAt);
 
               return (
@@ -364,16 +320,16 @@ export default function ClientBookingsPage() {
             <Button
               variant="outline"
               onClick={() => setCancelDialogOpen(false)}
-              disabled={isCancelling}
+              disabled={cancelMutation.isPending}
             >
               Keep Booking
             </Button>
             <Button
               variant="destructive"
               onClick={handleCancelBooking}
-              disabled={isCancelling}
+              disabled={cancelMutation.isPending}
             >
-              {isCancelling ? 'Cancelling...' : 'Yes, Cancel'}
+              {cancelMutation.isPending ? 'Cancelling...' : 'Yes, Cancel'}
             </Button>
           </DialogFooter>
         </DialogContent>

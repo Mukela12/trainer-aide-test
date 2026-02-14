@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useTemplateStore } from '@/lib/stores/template-store';
+import { useTemplates } from '@/lib/hooks/use-templates';
+import { useAnalytics } from '@/lib/hooks/use-analytics';
+import { useBookingRequests } from '@/lib/hooks/use-booking-requests';
+import { useClients } from '@/lib/hooks/use-clients';
 import { useUserStore } from '@/lib/stores/user-store';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
@@ -10,148 +12,41 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FileText, CheckCircle, Dumbbell, TrendingUp, Plus, Inbox, Users, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { PublicBookingLink } from '@/components/shared/PublicBookingLink';
+import type { StudioOwnerDashboardStats, RecentClient } from '@/lib/types/dashboard';
 
 // Format today's date
 const today = new Date();
 const dateString = format(today, 'EEEE, MMMM d');
 
-interface DashboardStats {
-  totalTemplates: number;
-  activeTemplates: number;
-  totalSessions: number;
-  averageRpe: number;
-  pendingRequests: number;
-  totalClients: number;
-}
-
-interface RecentClient {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  credits: number;
-  createdAt: Date;
-}
-
 export default function StudioOwnerDashboard() {
-  const templates = useTemplateStore((state) => state.templates);
   const { currentUser, businessSlug } = useUserStore();
+  const { data: templates = [] } = useTemplates(currentUser.id);
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalytics(currentUser?.id);
+  const { data: pendingRequests = [] } = useBookingRequests(currentUser?.id, 'pending');
+  const { data: clients = [], isLoading: clientsLoading } = useClients(currentUser?.id);
 
-  const [stats, setStats] = useState<DashboardStats>({
-    totalTemplates: 0,
-    activeTemplates: 0,
-    totalSessions: 0,
-    averageRpe: 0,
-    pendingRequests: 0,
-    totalClients: 0,
-  });
-  const [recentClients, setRecentClients] = useState<RecentClient[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const isLoading = analyticsLoading || clientsLoading;
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      setIsLoading(true);
+  const stats: StudioOwnerDashboardStats = {
+    totalTemplates: templates.length,
+    activeTemplates: templates.length,
+    totalSessions: analyticsData?.sessionsThisWeek || 0,
+    averageRpe: analyticsData?.averageRpe || 0,
+    pendingRequests: pendingRequests.length,
+    totalClients: clients.length,
+  };
 
-      try {
-        // Fetch analytics from API
-        const analyticsResponse = await fetch('/api/analytics/dashboard');
-        let pendingRequestsCount = 0;
-
-        // Fetch pending booking requests count
-        try {
-          const requestsRes = await fetch('/api/booking-requests');
-          if (requestsRes.ok) {
-            const requestsData = await requestsRes.json();
-            pendingRequestsCount = (requestsData.requests || []).filter(
-              (r: { status: string }) => r.status === 'pending'
-            ).length;
-          }
-        } catch {
-          // Ignore errors fetching requests
-        }
-
-        // Fetch templates count from API
-        let templatesCount = templates.length;
-        try {
-          const templatesRes = await fetch('/api/templates');
-          if (templatesRes.ok) {
-            const templatesData = await templatesRes.json();
-            templatesCount = (templatesData.templates || []).length;
-          }
-        } catch {
-          // Fall back to store data
-        }
-
-        // Fetch clients data
-        let clientsCount = 0;
-        try {
-          const clientsRes = await fetch('/api/clients');
-          if (clientsRes.ok) {
-            const clientsData = await clientsRes.json();
-            const clients = clientsData.clients || [];
-            clientsCount = clients.length;
-
-            // Sort by created_at and take recent 5
-            const sortedClients = clients
-              .sort((a: { created_at: string }, b: { created_at: string }) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-              )
-              .slice(0, 5)
-              .map((c: { id: string; first_name: string; last_name: string; email: string; credits: number; created_at: string }) => ({
-                id: c.id,
-                firstName: c.first_name || '',
-                lastName: c.last_name || '',
-                email: c.email,
-                credits: c.credits || 0,
-                createdAt: new Date(c.created_at),
-              }));
-            setRecentClients(sortedClients);
-          }
-        } catch {
-          // Ignore errors
-        }
-
-        if (analyticsResponse.ok) {
-          const data = await analyticsResponse.json();
-          setStats({
-            totalTemplates: templatesCount || templates.length,
-            activeTemplates: templatesCount || templates.length,
-            totalSessions: data.sessionsThisWeek || 0,
-            averageRpe: data.averageRpe || 0,
-            pendingRequests: pendingRequestsCount,
-            totalClients: clientsCount,
-          });
-        } else {
-          // Fall back to store-based calculations
-          setStats({
-            totalTemplates: templates.length,
-            activeTemplates: templates.length,
-            totalSessions: 0,
-            averageRpe: 0,
-            pendingRequests: pendingRequestsCount,
-            totalClients: clientsCount,
-          });
-        }
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        // Fall back to store data on error
-        setStats({
-          totalTemplates: templates.length,
-          activeTemplates: templates.length,
-          totalSessions: 0,
-          averageRpe: 0,
-          pendingRequests: 0,
-          totalClients: 0,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (currentUser.id) {
-      loadDashboardData();
-    }
-  }, [currentUser.id, templates.length]);
+  const recentClients: RecentClient[] = [...clients]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5)
+    .map(c => ({
+      id: c.id,
+      firstName: c.first_name || '',
+      lastName: c.last_name || '',
+      email: c.email,
+      credits: c.credits || 0,
+      createdAt: new Date(c.created_at),
+    }));
 
   // Get recent templates from store as fallback
   const recentTemplates = templates.slice(0, 3);

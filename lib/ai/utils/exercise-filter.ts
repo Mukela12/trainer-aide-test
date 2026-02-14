@@ -69,14 +69,6 @@ export async function filterExercisesForClient(
 
   stats.final_count = filtered.length;
 
-  console.log('📊 Exercise Filtering Stats:');
-  console.log(`   Total available: ${stats.total_available}`);
-  console.log(`   Filtered by equipment: -${stats.filtered_by_equipment}`);
-  console.log(`   Filtered by experience: -${stats.filtered_by_experience}`);
-  console.log(`   Filtered by injuries: -${stats.filtered_by_injuries}`);
-  console.log(`   Filtered by aversions: -${stats.filtered_by_aversions}`);
-  console.log(`   ✅ Final count: ${stats.final_count}`);
-
   return { exercises: filtered, stats };
 }
 

@@ -2,10 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTemplateStore } from '@/lib/stores/template-store';
-import { useSessionStore } from '@/lib/stores/session-store';
+import { useTemplates, useAvailableTemplates, type AvailableTemplate, type GroupedTemplates } from '@/lib/hooks/use-templates';
+import { useClients } from '@/lib/hooks/use-clients';
+import { useStartSession } from '@/lib/hooks/use-sessions';
 import { useUserStore } from '@/lib/stores/user-store';
-import { useExerciseLookup } from '@/hooks/use-exercise';
+import { useExerciseLookup } from '@/lib/hooks/use-exercise';
 import { generateId } from '@/lib/utils/generators';
 import { convertAIWorkoutToSessionBlocks, getAIWorkoutSessionName } from '@/lib/utils/ai-workout-converter';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { SignOffMode, Client, WorkoutTemplate, SessionBlock } from '@/lib/types';
 import type { AIProgram, AIWorkout } from '@/lib/types/ai-program';
 import { Play, FileText, User, Settings, ChevronRight, Search, Sparkles, Building2, UserCircle, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 import { WorkoutSelectorModal } from '@/components/templates/WorkoutSelectorModal';
 
 interface ApiClient {
@@ -25,18 +26,6 @@ interface ApiClient {
   last_name: string;
   email: string;
   phone: string | null;
-}
-
-interface AvailableTemplate {
-  template_id: string;
-  template_name: string;
-  source: 'trainer_toolkit' | 'client_specific' | 'own_template';
-}
-
-interface GroupedTemplates {
-  trainerToolkit: AvailableTemplate[];
-  clientSpecific: AvailableTemplate[];
-  ownTemplates: AvailableTemplate[];
 }
 
 const SIGN_OFF_MODES: { value: SignOffMode; label: string; description: string }[] = [
@@ -60,9 +49,9 @@ const SIGN_OFF_MODES: { value: SignOffMode; label: string; description: string }
 function StartNewSessionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const templates = useTemplateStore((state) => state.templates);
   const currentUser = useUserStore((state) => state.currentUser);
-  const startSession = useSessionStore((state) => state.startSession);
+  const { data: templates = [] } = useTemplates(currentUser?.id);
+  const startSessionMutation = useStartSession();
   const { toast } = useToast();
 
   const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(null);
@@ -77,101 +66,51 @@ function StartNewSessionContent() {
   const [sourceType, setSourceType] = useState<'manual' | 'ai'>('manual');
   const { getExercise } = useExerciseLookup();
 
-  // Real client fetching
-  const [apiClients, setApiClients] = useState<ApiClient[]>([]);
-  const [loadingClients, setLoadingClients] = useState(true);
+  // Real client fetching via hook
+  const { data: rawClients = [], isLoading: loadingClients } = useClients(currentUser?.id);
+  const apiClients: ApiClient[] = rawClients.map(c => ({
+    id: c.id,
+    first_name: c.first_name,
+    last_name: c.last_name,
+    email: c.email,
+    phone: c.phone || null,
+  }));
 
   // Available templates for selected client (grouped by source)
-  const [availableTemplates, setAvailableTemplates] = useState<AvailableTemplate[]>([]);
-  const [groupedTemplates, setGroupedTemplates] = useState<GroupedTemplates>({
-    trainerToolkit: [],
-    clientSpecific: [],
-    ownTemplates: [],
-  });
-  const [loadingAvailableTemplates, setLoadingAvailableTemplates] = useState(false);
   const [selectedAvailableTemplate, setSelectedAvailableTemplate] = useState<AvailableTemplate | null>(null);
 
   // AI Programs state
-  const [aiPrograms, setAIPrograms] = useState<AIProgram[]>([]);
   const [selectedAIProgram, setSelectedAIProgram] = useState<AIProgram | null>(null);
   const [showWorkoutSelector, setShowWorkoutSelector] = useState(false);
 
-  // Fetch real clients from API
-  useEffect(() => {
-    const fetchClients = async () => {
-      setLoadingClients(true);
-      try {
-        const response = await fetch('/api/clients');
-        if (response.ok) {
-          const data = await response.json();
-          setApiClients(data.clients || []);
-        }
-      } catch (error) {
-        console.error('Error fetching clients:', error);
-      } finally {
-        setLoadingClients(false);
-      }
-    };
-    fetchClients();
-  }, []);
+  // Available templates for selected client (grouped by source)
+  const {
+    data: availableTemplatesData,
+    isLoading: loadingAvailableTemplates,
+  } = useAvailableTemplates(selectedClient?.id);
 
-  // Fetch available templates when a client is selected
-  useEffect(() => {
-    const fetchAvailableTemplates = async () => {
-      if (!selectedClient) {
-        // No client selected - just show the trainer's own templates from store
-        setGroupedTemplates({
-          trainerToolkit: [],
-          clientSpecific: [],
-          ownTemplates: templates.map(t => ({
-            template_id: t.id,
-            template_name: t.name,
-            source: 'own_template' as const,
-          })),
-        });
-        setAvailableTemplates(templates.map(t => ({
+  // Derive available templates based on whether a client is selected
+  const availableTemplates = selectedClient
+    ? availableTemplatesData?.templates || []
+    : templates.map(t => ({
+        template_id: t.id,
+        template_name: t.name,
+        source: 'own_template' as const,
+      }));
+
+  const groupedTemplates: GroupedTemplates = selectedClient
+    ? availableTemplatesData?.grouped || { trainerToolkit: [], clientSpecific: [], ownTemplates: [] }
+    : {
+        trainerToolkit: [],
+        clientSpecific: [],
+        ownTemplates: templates.map(t => ({
           template_id: t.id,
           template_name: t.name,
           source: 'own_template' as const,
-        })));
-        return;
-      }
+        })),
+      };
 
-      setLoadingAvailableTemplates(true);
-      try {
-        const response = await fetch(`/api/clients/${selectedClient.id}/available-templates`);
-        if (response.ok) {
-          const data = await response.json();
-          setAvailableTemplates(data.templates || []);
-          setGroupedTemplates(data.grouped || {
-            trainerToolkit: [],
-            clientSpecific: [],
-            ownTemplates: [],
-          });
-          setAIPrograms(data.aiPrograms || []);
-        } else {
-          // Fallback to templates from store
-          setGroupedTemplates({
-            trainerToolkit: [],
-            clientSpecific: [],
-            ownTemplates: templates.map(t => ({
-              template_id: t.id,
-              template_name: t.name,
-              source: 'own_template' as const,
-            })),
-          });
-          setAIPrograms([]);
-        }
-      } catch (error) {
-        console.error('Error fetching available templates:', error);
-        setAIPrograms([]);
-      } finally {
-        setLoadingAvailableTemplates(false);
-      }
-    };
-
-    fetchAvailableTemplates();
-  }, [selectedClient, templates]);
+  const aiPrograms = selectedClient ? availableTemplatesData?.aiPrograms || [] : [];
 
   // Pre-fill from calendar booking or AI template
   useEffect(() => {
@@ -238,7 +177,7 @@ function StartNewSessionContent() {
     if (signOffMode && (signOffMode === 'per_exercise' || signOffMode === 'per_block' || signOffMode === 'full_session')) {
       setSelectedSignOffMode(signOffMode);
     }
-  }, [searchParams, templates, toast, apiClients]);
+  }, [searchParams, templates, toast, rawClients]);
 
   const filteredClients = apiClients.filter((client) =>
     `${client.first_name} ${client.last_name}`.toLowerCase().includes(clientSearch.toLowerCase())
@@ -278,7 +217,7 @@ function StartNewSessionContent() {
         template = undefined; // AI workouts don't have a manual template
 
         // Start session with planned duration from AI workout
-        const sessionId = await startSession({
+        const created = await startSessionMutation.mutateAsync({
           trainerId: currentUser.id,
           clientId: selectedClient?.id,
           client: selectedClient || undefined,
@@ -291,7 +230,7 @@ function StartNewSessionContent() {
           plannedDurationMinutes: aiWorkout.planned_duration_minutes || undefined,
         });
 
-        router.push(`/trainer/sessions/${sessionId}`);
+        router.push(`/trainer/sessions/${created.id}`);
       } catch (error) {
         console.error('Error creating session from AI workout:', error);
         toast({
@@ -332,7 +271,7 @@ function StartNewSessionContent() {
 
       // Start manual template session
       try {
-        const sessionId = await startSession({
+        const created = await startSessionMutation.mutateAsync({
           trainerId: currentUser.id,
           clientId: selectedClient?.id,
           client: selectedClient || undefined,
@@ -343,7 +282,7 @@ function StartNewSessionContent() {
           blocks: sessionBlocks,
         });
 
-        router.push(`/trainer/sessions/${sessionId}`);
+        router.push(`/trainer/sessions/${created.id}`);
       } catch (error) {
         toast({
           variant: "destructive",
@@ -482,7 +421,7 @@ function StartNewSessionContent() {
                       key={program.id}
                       className="cursor-pointer transition-all hover:border-wondrous-magenta dark:hover:border-purple-400"
                       onClick={() => {
-                        setSelectedAIProgram(program);
+                        setSelectedAIProgram(program as AIProgram);
                         setShowWorkoutSelector(true);
                       }}
                     >

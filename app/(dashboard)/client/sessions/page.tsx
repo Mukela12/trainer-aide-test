@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from 'react';
-import { useSessionStore } from '@/lib/stores/session-store';
+import { useSessionData } from '@/lib/hooks/use-sessions';
 import { useUserStore } from '@/lib/stores/user-store';
-import { useExerciseLookup } from '@/hooks/use-exercise';
+import { useExerciseLookup } from '@/lib/hooks/use-exercise';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,8 @@ import { Dumbbell, Calendar, Clock, TrendingUp, ChevronDown, ChevronUp, FileText
 import { format } from 'date-fns';
 
 export default function ClientSessionHistory() {
-  const { sessions } = useSessionStore();
   const { currentUser } = useUserStore();
+  const { sessions } = useSessionData(currentUser.id);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const { getExercise, isLoading: isLoadingExercises } = useExerciseLookup();
 

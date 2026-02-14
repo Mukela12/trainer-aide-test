@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Dumbbell, CheckCircle2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { AIProgram, AIWorkout } from '@/lib/types/ai-program';
+import { useWorkouts } from '@/lib/hooks/use-ai-programs';
 
 interface WorkoutSelectorModalProps {
   program: AIProgram;
@@ -13,32 +14,8 @@ interface WorkoutSelectorModalProps {
 }
 
 export function WorkoutSelectorModal({ program, onClose, onSelectWorkout }: WorkoutSelectorModalProps) {
-  const [workouts, setWorkouts] = useState<AIWorkout[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: workouts = [], isLoading: loading } = useWorkouts(program.id);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchWorkouts() {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/ai-programs/${program.id}/workouts`);
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch workouts');
-        }
-
-        const data = await response.json();
-        setWorkouts(data.workouts || []);
-      } catch (error) {
-        console.error('Error fetching workouts:', error);
-        setWorkouts([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchWorkouts();
-  }, [program.id]);
 
   const handleCreateSession = () => {
     if (!selectedWorkoutId) return;

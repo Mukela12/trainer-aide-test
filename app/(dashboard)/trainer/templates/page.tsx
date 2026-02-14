@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useUserStore } from '@/lib/stores/user-store';
-import { useExerciseLookup } from '@/hooks/use-exercise';
+import { useExerciseLookup } from '@/lib/hooks/use-exercise';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -11,117 +11,31 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ExerciseImageViewer, ExerciseImageButton } from '@/components/shared/ExerciseImageViewer';
 import { AITemplateCard } from '@/components/templates/AITemplateCard';
-import { useToast } from '@/hooks/use-toast';
+import { useTemplates } from '@/lib/hooks/use-templates';
+import { useAIProgramTemplates, useAssignedAIPrograms } from '@/lib/hooks/use-ai-programs';
 import { Search, FileText, ChevronDown, ChevronUp, Play, Sparkles } from 'lucide-react';
-import { WorkoutTemplate } from '@/lib/types';
-import type { AIProgram } from '@/lib/types/ai-program';
 import ContentHeader from '@/components/shared/ContentHeader';
 
 export default function TrainerTemplates() {
-  const { toast } = useToast();
   const currentUser = useUserStore((state) => state.currentUser);
-  const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'standard' | 'resistance_only'>('all');
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
   const [viewingExerciseId, setViewingExerciseId] = useState<string | null>(null);
-  const [aiTemplates, setAITemplates] = useState<AIProgram[]>([]);
-  const [loadingAITemplates, setLoadingAITemplates] = useState(true);
   const { getExercise } = useExerciseLookup();
 
-  // Fetch templates from API
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      if (!currentUser.id) return;
+  // Fetch templates via React Query
+  const { data: templates = [], isLoading } = useTemplates(currentUser?.id);
 
-      setIsLoading(true);
-      try {
-        const response = await fetch('/api/templates');
-        if (response.ok) {
-          const data = await response.json();
-          // Map database format to frontend format
-          const mappedTemplates: WorkoutTemplate[] = (data.templates || []).map((t: {
-            id: string;
-            name: string;
-            description?: string;
-            type?: 'standard' | 'resistance_only';
-            json_definition?: WorkoutTemplate['blocks'];
-            blocks?: WorkoutTemplate['blocks'];
-            studio_id?: string;
-            created_by?: string;
-            created_at?: string;
-            updated_at?: string;
-            sign_off_mode?: string;
-            is_default?: boolean;
-          }) => ({
-            id: t.id,
-            name: t.name,
-            description: t.description || '',
-            type: t.type || 'standard',
-            blocks: t.json_definition || t.blocks || [],
-            assignedStudios: t.studio_id ? [t.studio_id] : [],
-            createdBy: t.created_by || '',
-            createdAt: t.created_at || new Date().toISOString(),
-            updatedAt: t.updated_at || new Date().toISOString(),
-            defaultSignOffMode: t.sign_off_mode as WorkoutTemplate['defaultSignOffMode'],
-            isDefault: t.is_default || false,
-          }));
-          setTemplates(mappedTemplates);
-        }
-      } catch (error) {
-        console.error('Error fetching templates:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTemplates();
-  }, [currentUser.id]);
-
-  // Fetch AI templates (for solo practitioners: all templates; for trainers: assigned templates)
-  useEffect(() => {
-    async function fetchAITemplates() {
-      try {
-        setLoadingAITemplates(true);
-
-        if (currentUser.role === 'solo_practitioner') {
-          // Solo practitioners see all AI templates they created
-          const response = await fetch('/api/ai-programs/templates');
-          if (!response.ok) {
-            throw new Error('Failed to fetch AI templates');
-          }
-          const data = await response.json();
-          setAITemplates(data.templates || []);
-        } else if (currentUser.role === 'trainer') {
-          // Trainers see AI templates assigned to them
-          const response = await fetch('/api/ai-programs/assigned');
-          if (!response.ok) {
-            throw new Error('Failed to fetch assigned AI templates');
-          }
-          const data = await response.json();
-          setAITemplates(data.templates || []);
-        } else {
-          // Other roles don't see AI templates here
-          setAITemplates([]);
-        }
-      } catch (error) {
-        console.error('Error fetching AI templates:', error);
-        setAITemplates([]);
-        toast({
-          variant: 'destructive',
-          title: 'Error Loading AI Templates',
-          description: 'Failed to load AI-generated templates. Please try refreshing the page.',
-        });
-      } finally {
-        setLoadingAITemplates(false);
-      }
-    }
-
-    if (currentUser.id) {
-      fetchAITemplates();
-    }
-  }, [toast, currentUser.role, currentUser.id]);
+  // Fetch AI templates via React Query (call both; React Query caching prevents waste)
+  const aiTemplatesQuery = useAIProgramTemplates();
+  const assignedQuery = useAssignedAIPrograms();
+  const aiTemplates = currentUser.role === 'trainer'
+    ? (assignedQuery.data || [])
+    : (aiTemplatesQuery.data || []);
+  const loadingAITemplates = currentUser.role === 'trainer'
+    ? assignedQuery.isLoading
+    : aiTemplatesQuery.isLoading;
 
   // Filter templates
   const filteredTemplates = templates.filter((template) => {
@@ -202,11 +116,8 @@ export default function TrainerTemplates() {
                 key={template.id}
                 template={template}
                 onUpdate={() => {
-                  // Refresh AI templates
-                  fetch('/api/ai-programs/templates')
-                    .then(res => res.json())
-                    .then(data => setAITemplates(data.templates || []))
-                    .catch(console.error);
+                  aiTemplatesQuery.refetch();
+                  assignedQuery.refetch();
                 }}
               />
             ))}

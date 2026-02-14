@@ -1,309 +1,98 @@
-/**
- * Session Service
- *
- * CRUD operations for ta_sessions table in Wondrous database.
- */
+import { createServiceRoleClient } from '@/lib/supabase/server';
 
-import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server'
-import { Session, SessionBlock, Client } from '@/lib/types'
+// =============================================
+// Types
+// =============================================
 
-/**
- * Database session shape (snake_case)
- */
-interface DbSession {
-  id: string
-  trainer_id: string
-  client_id: string | null
-  template_id: string
-  session_name: string
-  sign_off_mode: 'full_session' | 'per_block' | 'per_exercise'
-  blocks: SessionBlock[]
-  started_at: string
-  completed_at: string | null
-  duration: number | null
-  planned_duration_minutes: number | null
-  overall_rpe: number | null
-  private_notes: string | null
-  public_notes: string | null
-  recommendations: string | null
-  trainer_declaration: boolean
-  completed: boolean
-  studio_id: string | null
-  created_at: string
-  updated_at: string
+interface GetSessionsOptions {
+  completed?: boolean;
+  limit?: number;
 }
 
-/**
- * Convert database session to frontend format
- */
-function dbToSession(db: DbSession, client?: Client | null): Session {
-  return {
-    id: db.id,
-    trainerId: db.trainer_id,
-    clientId: db.client_id || undefined,
-    client: client || undefined,
-    templateId: db.template_id,
-    sessionName: db.session_name,
-    signOffMode: db.sign_off_mode,
-    blocks: db.blocks || [],
-    startedAt: db.started_at,
-    completedAt: db.completed_at || undefined,
-    duration: db.duration || undefined,
-    plannedDurationMinutes: db.planned_duration_minutes || undefined,
-    overallRpe: db.overall_rpe || undefined,
-    privateNotes: db.private_notes || undefined,
-    publicNotes: db.public_notes || undefined,
-    recommendations: db.recommendations || undefined,
-    trainerDeclaration: db.trainer_declaration,
-    completed: db.completed,
-  }
+interface CreateSessionInput {
+  trainerId: string;
+  clientId?: string | null;
+  templateId: string;
+  workoutId?: string | null;
+  sessionName?: string;
+  blocks?: unknown[];
+  signOffMode?: string;
+  plannedDurationMinutes?: number | null;
+  privateNotes?: string | null;
+  publicNotes?: string | null;
+  recommendations?: string | null;
+  startedAt?: string;
+  completedAt?: string | null;
+  overallRpe?: number | null;
+  trainerDeclaration?: boolean;
+  completed?: boolean;
 }
 
-/**
- * Convert frontend session to database format
- */
-function sessionToDb(session: Partial<Session>, studioId?: string | null): Partial<DbSession> {
-  const db: Partial<DbSession> = {}
-
-  if (session.trainerId !== undefined) db.trainer_id = session.trainerId
-  if (session.clientId !== undefined) db.client_id = session.clientId || null
-  if (session.templateId !== undefined) db.template_id = session.templateId
-  if (session.sessionName !== undefined) db.session_name = session.sessionName
-  if (session.signOffMode !== undefined) db.sign_off_mode = session.signOffMode
-  if (session.blocks !== undefined) db.blocks = session.blocks
-  if (session.startedAt !== undefined) db.started_at = session.startedAt
-  if (session.completedAt !== undefined) db.completed_at = session.completedAt || null
-  if (session.duration !== undefined) db.duration = session.duration || null
-  if (session.plannedDurationMinutes !== undefined) db.planned_duration_minutes = session.plannedDurationMinutes || null
-  if (session.overallRpe !== undefined) db.overall_rpe = session.overallRpe || null
-  if (session.privateNotes !== undefined) db.private_notes = session.privateNotes || null
-  if (session.publicNotes !== undefined) db.public_notes = session.publicNotes || null
-  if (session.recommendations !== undefined) db.recommendations = session.recommendations || null
-  if (session.trainerDeclaration !== undefined) db.trainer_declaration = session.trainerDeclaration
-  if (session.completed !== undefined) db.completed = session.completed
-  if (studioId !== undefined) db.studio_id = studioId
-
-  return db
+interface UpdateSessionInput {
+  blocks?: unknown[];
+  signOffMode?: string;
+  privateNotes?: string | null;
+  publicNotes?: string | null;
+  recommendations?: string | null;
+  completedAt?: string | null;
+  overallRpe?: number | null;
+  trainerDeclaration?: boolean;
+  completed?: boolean;
+  sessionName?: string;
+  clientId?: string | null;
 }
 
-/**
- * Get all sessions for a trainer
- */
-export async function getSessions(
-  trainerId: string,
-  options?: {
-    completed?: boolean
-    limit?: number
-    offset?: number
-  }
-): Promise<Session[]> {
-  const supabase = await createServerSupabaseClient()
+// =============================================
+// Read operations
+// =============================================
+
+/** Fetch sessions for a trainer with optional filters. */
+export async function getSessions(trainerId: string, options: GetSessionsOptions = {}) {
+  const supabase = createServiceRoleClient();
 
   let query = supabase
     .from('ta_sessions')
     .select('*')
     .eq('trainer_id', trainerId)
-    .order('started_at', { ascending: false })
+    .order('started_at', { ascending: false });
 
-  if (options?.completed !== undefined) {
-    query = query.eq('completed', options.completed)
+  if (options.completed !== undefined) {
+    query = query.eq('completed', options.completed);
   }
 
-  if (options?.limit) {
-    query = query.limit(options.limit)
+  if (options.limit) {
+    query = query.limit(options.limit);
   }
 
-  if (options?.offset) {
-    query = query.range(options.offset, options.offset + (options.limit || 10) - 1)
-  }
-
-  const { data, error } = await query
+  const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching sessions:', error)
-    return []
+    return { data: null, error: new Error(error.message) };
   }
 
-  return (data as DbSession[]).map(db => dbToSession(db))
+  return { data: data || [], error: null };
 }
 
-/**
- * Get sessions for a client (to show in client dashboard)
- */
-export async function getClientSessions(clientId: string): Promise<Session[]> {
-  const supabase = await createServerSupabaseClient()
-
-  const { data, error } = await supabase
-    .from('ta_sessions')
-    .select('*')
-    .eq('client_id', clientId)
-    .eq('completed', true)
-    .order('completed_at', { ascending: false })
-
-  if (error) {
-    console.error('Error fetching client sessions:', error)
-    return []
-  }
-
-  return (data as DbSession[]).map(db => dbToSession(db))
-}
-
-/**
- * Get a single session by ID
- */
-export async function getSessionById(sessionId: string): Promise<Session | null> {
-  const supabase = await createServerSupabaseClient()
+/** Fetch a single session by ID. */
+export async function getSessionById(sessionId: string) {
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from('ta_sessions')
     .select('*')
     .eq('id', sessionId)
-    .single()
+    .maybeSingle();
 
   if (error) {
-    console.error('Error fetching session:', error)
-    return null
+    return { data: null, error: new Error(error.message) };
   }
 
-  return dbToSession(data as DbSession)
+  return { data, error: null };
 }
 
-/**
- * Start a new session
- */
-export async function startSession(
-  session: Omit<Session, 'id' | 'startedAt' | 'completed' | 'trainerDeclaration'>,
-  studioId?: string | null
-): Promise<Session | null> {
-  const supabase = createServiceRoleClient()
-
-  const dbData = {
-    ...sessionToDb(session, studioId),
-    started_at: new Date().toISOString(),
-    completed: false,
-    trainer_declaration: false,
-  }
-
-  const { data, error } = await supabase
-    .from('ta_sessions')
-    .insert(dbData)
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error starting session:', error)
-    return null
-  }
-
-  return dbToSession(data as DbSession)
-}
-
-/**
- * Update a session (e.g., update blocks during session)
- */
-export async function updateSession(
-  sessionId: string,
-  updates: Partial<Session>
-): Promise<Session | null> {
-  const supabase = createServiceRoleClient()
-
-  const dbData = {
-    ...sessionToDb(updates),
-    updated_at: new Date().toISOString(),
-  }
-
-  const { data, error } = await supabase
-    .from('ta_sessions')
-    .update(dbData)
-    .eq('id', sessionId)
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error updating session:', error)
-    return null
-  }
-
-  return dbToSession(data as DbSession)
-}
-
-/**
- * Complete a session
- */
-export async function completeSession(
-  sessionId: string,
-  completionData: {
-    overallRpe: number
-    privateNotes?: string
-    publicNotes?: string
-    recommendations?: string
-    trainerDeclaration: boolean
-  }
-): Promise<Session | null> {
-  const supabase = createServiceRoleClient()
-
-  // First get the session to calculate duration
-  const { data: existingSession } = await supabase
-    .from('ta_sessions')
-    .select('started_at')
-    .eq('id', sessionId)
-    .single()
-
-  const startedAt = existingSession?.started_at
-    ? new Date(existingSession.started_at)
-    : new Date()
-  const completedAt = new Date()
-  const duration = Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000)
-
-  const { data, error } = await supabase
-    .from('ta_sessions')
-    .update({
-      completed: true,
-      completed_at: completedAt.toISOString(),
-      duration,
-      overall_rpe: completionData.overallRpe,
-      private_notes: completionData.privateNotes || null,
-      public_notes: completionData.publicNotes || null,
-      recommendations: completionData.recommendations || null,
-      trainer_declaration: completionData.trainerDeclaration,
-      updated_at: completedAt.toISOString(),
-    })
-    .eq('id', sessionId)
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error completing session:', error)
-    return null
-  }
-
-  return dbToSession(data as DbSession)
-}
-
-/**
- * Delete a session
- */
-export async function deleteSession(sessionId: string): Promise<boolean> {
-  const supabase = createServiceRoleClient()
-
-  const { error } = await supabase
-    .from('ta_sessions')
-    .delete()
-    .eq('id', sessionId)
-
-  if (error) {
-    console.error('Error deleting session:', error)
-    return false
-  }
-
-  return true
-}
-
-/**
- * Get active (in-progress) session for a trainer
- */
-export async function getActiveSession(trainerId: string): Promise<Session | null> {
-  const supabase = await createServerSupabaseClient()
+/** Fetch the active (in-progress) session for a trainer. */
+export async function getActiveSession(trainerId: string) {
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from('ta_sessions')
@@ -311,87 +100,187 @@ export async function getActiveSession(trainerId: string): Promise<Session | nul
     .eq('trainer_id', trainerId)
     .eq('completed', false)
     .order('started_at', { ascending: false })
-    .limit(1)
-    .single()
+    .limit(1);
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      // No active session found
-      return null
-    }
-    console.error('Error fetching active session:', error)
-    return null
+    return { data: null, error: new Error(error.message) };
   }
 
-  return dbToSession(data as DbSession)
+  return { data: data?.[0] || null, error: null };
 }
 
-/**
- * Get session statistics for a trainer
- */
-export async function getSessionStats(trainerId: string): Promise<{
-  totalSessions: number
-  sessionsToday: number
-  sessionsThisWeek: number
-  sessionsThisMonth: number
-  averageRpe: number | null
-}> {
-  const supabase = await createServerSupabaseClient()
+/** Fetch upcoming bookings for a trainer. */
+export async function getUpcomingSessions(trainerId: string, limit = 5) {
+  const supabase = createServiceRoleClient();
+  const now = new Date();
 
-  const now = new Date()
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-  const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).toISOString()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-  // Get total count
-  const { count: totalCount } = await supabase
-    .from('ta_sessions')
-    .select('*', { count: 'exact', head: true })
+  const { data: bookings, error } = await supabase
+    .from('ta_bookings')
+    .select(`
+      id,
+      scheduled_at,
+      status,
+      fc_clients (id, first_name, last_name, name),
+      ta_services (name)
+    `)
     .eq('trainer_id', trainerId)
-    .eq('completed', true)
+    .gte('scheduled_at', now.toISOString())
+    .in('status', ['confirmed', 'soft-hold'])
+    .order('scheduled_at', { ascending: true })
+    .limit(limit);
 
-  // Get today's sessions
-  const { count: todayCount } = await supabase
-    .from('ta_sessions')
-    .select('*', { count: 'exact', head: true })
-    .eq('trainer_id', trainerId)
-    .eq('completed', true)
-    .gte('completed_at', startOfDay)
-
-  // Get this week's sessions
-  const { count: weekCount } = await supabase
-    .from('ta_sessions')
-    .select('*', { count: 'exact', head: true })
-    .eq('trainer_id', trainerId)
-    .eq('completed', true)
-    .gte('completed_at', startOfWeek)
-
-  // Get this month's sessions
-  const { count: monthCount } = await supabase
-    .from('ta_sessions')
-    .select('*', { count: 'exact', head: true })
-    .eq('trainer_id', trainerId)
-    .eq('completed', true)
-    .gte('completed_at', startOfMonth)
-
-  // Get average RPE
-  const { data: rpeData } = await supabase
-    .from('ta_sessions')
-    .select('overall_rpe')
-    .eq('trainer_id', trainerId)
-    .eq('completed', true)
-    .not('overall_rpe', 'is', null)
-
-  const rpeValues = rpeData?.map(s => s.overall_rpe).filter(Boolean) || []
-  const averageRpe = rpeValues.length > 0
-    ? rpeValues.reduce((a, b) => a + b, 0) / rpeValues.length
-    : null
-
-  return {
-    totalSessions: totalCount || 0,
-    sessionsToday: todayCount || 0,
-    sessionsThisWeek: weekCount || 0,
-    sessionsThisMonth: monthCount || 0,
-    averageRpe,
+  if (error) {
+    return { data: null, error: new Error(error.message) };
   }
+
+  const sessions = (bookings || []).map((booking: Record<string, unknown>) => {
+    const client = booking.fc_clients as { name?: string; first_name?: string; last_name?: string } | null;
+    const service = booking.ta_services as { name?: string } | null;
+
+    return {
+      id: booking.id,
+      clientName: client?.name ||
+        (client?.first_name && client?.last_name
+          ? `${client.first_name} ${client.last_name}`.trim()
+          : 'Client'),
+      scheduledAt: booking.scheduled_at,
+      serviceName: service?.name || 'Session',
+      status: booking.status,
+    };
+  });
+
+  return { data: sessions, error: null };
+}
+
+// =============================================
+// Write operations
+// =============================================
+
+/** Create a new training session. */
+export async function createSession(input: CreateSessionInput) {
+  const supabase = createServiceRoleClient();
+
+  const isAIWorkout = !!input.workoutId;
+
+  const sessionData = {
+    trainer_id: input.trainerId,
+    client_id: input.clientId || null,
+    template_id: isAIWorkout ? null : input.templateId,
+    workout_id: isAIWorkout ? null : input.templateId,
+    ai_workout_id: isAIWorkout ? input.workoutId : null,
+    session_name: input.sessionName || 'Training Session',
+    json_definition: {
+      blocks: input.blocks || [],
+      sign_off_mode: input.signOffMode || 'full_session',
+      planned_duration_minutes: input.plannedDurationMinutes || null,
+      private_notes: input.privateNotes || null,
+      public_notes: input.publicNotes || null,
+      recommendations: input.recommendations || null,
+      is_ai_workout: isAIWorkout,
+    },
+    started_at: input.startedAt || new Date().toISOString(),
+    completed_at: input.completedAt || null,
+    overall_rpe: input.overallRpe || null,
+    notes: input.privateNotes || null,
+    trainer_declaration: input.trainerDeclaration || false,
+    completed: input.completed || false,
+  };
+
+  const { data, error } = await supabase
+    .from('ta_sessions')
+    .insert(sessionData)
+    .select()
+    .single();
+
+  if (error) {
+    return { data: null, error: new Error(error.message) };
+  }
+
+  return { data, error: null };
+}
+
+/** Update a session by ID. Merges json_definition fields with existing data. */
+export async function updateSession(sessionId: string, input: UpdateSessionInput) {
+  const supabase = createServiceRoleClient();
+
+  // Fetch existing session to merge json_definition
+  const { data: existingSession } = await supabase
+    .from('ta_sessions')
+    .select('json_definition')
+    .eq('id', sessionId)
+    .single();
+
+  const existingJsonDef = (existingSession?.json_definition as Record<string, unknown>) || {};
+
+  // Build updated json_definition by merging with existing
+  const jsonDefinition: Record<string, unknown> = { ...existingJsonDef };
+  if (input.blocks !== undefined) jsonDefinition.blocks = input.blocks;
+  if (input.signOffMode !== undefined) jsonDefinition.sign_off_mode = input.signOffMode;
+  if (input.privateNotes !== undefined) jsonDefinition.private_notes = input.privateNotes;
+  if (input.publicNotes !== undefined) jsonDefinition.public_notes = input.publicNotes;
+  if (input.recommendations !== undefined) jsonDefinition.recommendations = input.recommendations;
+
+  const updateData: Record<string, unknown> = {};
+
+  // Set json_definition if any nested fields were updated
+  if (input.blocks !== undefined || input.signOffMode !== undefined ||
+      input.privateNotes !== undefined || input.publicNotes !== undefined ||
+      input.recommendations !== undefined) {
+    updateData.json_definition = jsonDefinition;
+  }
+
+  // Direct column updates
+  if (input.completedAt !== undefined) updateData.completed_at = input.completedAt;
+  if (input.overallRpe !== undefined) updateData.overall_rpe = input.overallRpe;
+  if (input.privateNotes !== undefined) updateData.notes = input.privateNotes;
+  if (input.trainerDeclaration !== undefined) updateData.trainer_declaration = input.trainerDeclaration;
+  if (input.completed !== undefined) updateData.completed = input.completed;
+  if (input.sessionName !== undefined) updateData.session_name = input.sessionName;
+  if (input.clientId !== undefined) updateData.client_id = input.clientId;
+
+  updateData.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('ta_sessions')
+    .update(updateData)
+    .eq('id', sessionId)
+    .select()
+    .single();
+
+  if (error) {
+    return { data: null, error: new Error(error.message) };
+  }
+
+  return { data, error: null };
+}
+
+/** Delete a session by ID. Checks ownership before deleting. */
+export async function deleteSession(sessionId: string, userId: string) {
+  const supabase = createServiceRoleClient();
+
+  // Check ownership
+  const { data: existing } = await supabase
+    .from('ta_sessions')
+    .select('trainer_id')
+    .eq('id', sessionId)
+    .maybeSingle();
+
+  if (!existing) {
+    return { data: null, error: new Error('Session not found') };
+  }
+
+  if (existing.trainer_id !== userId) {
+    return { data: null, error: new Error('Forbidden: You can only delete your own sessions') };
+  }
+
+  const { error } = await supabase
+    .from('ta_sessions')
+    .delete()
+    .eq('id', sessionId);
+
+  if (error) {
+    return { data: null, error: new Error(error.message) };
+  }
+
+  return { data: { success: true }, error: null };
 }

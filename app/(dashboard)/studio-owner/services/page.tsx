@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useServiceStore } from '@/lib/stores/service-store';
+import { useState } from 'react';
+import { useServices, useAddService, useUpdateService } from '@/lib/hooks/use-services';
+import { useCreditBundles, useSaveCreditBundle, useDeleteCreditBundle } from '@/lib/hooks/use-credit-bundles';
+import { useOffers, useSaveOffer, useDeleteOffer } from '@/lib/hooks/use-offers';
 import { useUserStore } from '@/lib/stores/user-store';
 import { Service, ServiceType } from '@/lib/types/service';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -28,34 +30,8 @@ import {
   X,
 } from 'lucide-react';
 import ContentHeader from '@/components/shared/ContentHeader';
-
-// Types
-interface CreditBundle {
-  id: string;
-  name: string;
-  credit_count: number;
-  total_price: number;
-  price_per_credit: number;
-  expiry_days: number | null;
-  is_active: boolean;
-  created_at: string;
-}
-
-interface Offer {
-  id: string;
-  title: string;
-  description: string | null;
-  payment_amount: number;
-  currency: string;
-  max_referrals: number | null;
-  current_referrals: number;
-  expires_at: string | null;
-  credits: number;
-  expiry_days: number | null;
-  is_gift: boolean;
-  is_active: boolean;
-  created_at: string;
-}
+import type { CreditBundle } from '@/lib/types/credit-bundle';
+import type { Offer } from '@/lib/hooks/use-offers';
 
 // Helper functions
 const getTypeIcon = (type: ServiceType) => {
@@ -75,7 +51,9 @@ const getTypeLabel = (type: ServiceType) => {
 };
 
 export default function ServicesPage() {
-  const { services, addService, updateService, fetchServices } = useServiceStore();
+  const { data: services = [] } = useServices(undefined, false);
+  const addServiceMutation = useAddService();
+  const updateServiceMutation = useUpdateService();
   const { currentUser } = useUserStore();
   const [activeTab, setActiveTab] = useState('services');
 
@@ -84,8 +62,9 @@ export default function ServicesPage() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
 
   // Packages state
-  const [bundles, setBundles] = useState<CreditBundle[]>([]);
-  const [bundlesLoading, setBundlesLoading] = useState(false);
+  const { data: bundles = [], isLoading: bundlesLoading } = useCreditBundles();
+  const saveBundleMutation = useSaveCreditBundle();
+  const deleteBundleMutation = useDeleteCreditBundle();
   const [showBundleModal, setShowBundleModal] = useState(false);
   const [editingBundle, setEditingBundle] = useState<CreditBundle | null>(null);
   const [bundleForm, setBundleForm] = useState({
@@ -96,8 +75,9 @@ export default function ServicesPage() {
   });
 
   // Offers state
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [offersLoading, setOffersLoading] = useState(false);
+  const { data: offers = [], isLoading: offersLoading } = useOffers();
+  const saveOfferMutation = useSaveOffer();
+  const deleteOfferMutation = useDeleteOffer();
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
   const [offerForm, setOfferForm] = useState({
@@ -113,54 +93,9 @@ export default function ServicesPage() {
   const activeServices = services.filter(s => s.isActive);
   const inactiveServices = services.filter(s => !s.isActive);
 
-  // Fetch bundles
-  const fetchBundles = async () => {
-    setBundlesLoading(true);
-    try {
-      const response = await fetch('/api/credit-bundles');
-      if (response.ok) {
-        const data = await response.json();
-        setBundles(data.bundles || []);
-      }
-    } catch (error) {
-      console.error('Error fetching bundles:', error);
-    } finally {
-      setBundlesLoading(false);
-    }
-  };
-
-  // Fetch offers
-  const fetchOffers = async () => {
-    setOffersLoading(true);
-    try {
-      const response = await fetch('/api/offers');
-      if (response.ok) {
-        const data = await response.json();
-        setOffers(data.offers || []);
-      }
-    } catch (error) {
-      console.error('Error fetching offers:', error);
-    } finally {
-      setOffersLoading(false);
-    }
-  };
-
-  // Fetch services on mount
-  useEffect(() => {
-    fetchServices(undefined, false); // Fetch all services including inactive
-  }, [fetchServices]);
-
-  useEffect(() => {
-    if (activeTab === 'packages') {
-      fetchBundles();
-    } else if (activeTab === 'offers') {
-      fetchOffers();
-    }
-  }, [activeTab]);
-
   // Service handlers
   const toggleServiceStatus = (serviceId: string, currentStatus: boolean) => {
-    updateService(serviceId, { isActive: !currentStatus });
+    updateServiceMutation.mutate({ id: serviceId, updates: { isActive: !currentStatus } });
   };
 
   const handleAddService = () => {
@@ -180,9 +115,9 @@ export default function ServicesPage() {
     };
 
     if (selectedService) {
-      updateService(serviceWithUser.id, serviceWithUser);
+      updateServiceMutation.mutate({ id: serviceWithUser.id, updates: serviceWithUser });
     } else {
-      addService(serviceWithUser);
+      addServiceMutation.mutate(serviceWithUser);
     }
 
     setIsServiceDialogOpen(false);
@@ -208,39 +143,18 @@ export default function ServicesPage() {
 
   const handleSaveBundle = async () => {
     try {
-      const method = editingBundle ? 'PUT' : 'POST';
-      const body = editingBundle
-        ? { id: editingBundle.id, ...bundleForm }
-        : bundleForm;
-
-      const response = await fetch('/api/credit-bundles', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (response.ok) {
-        setShowBundleModal(false);
-        fetchBundles();
-      }
-    } catch (error) {
-      console.error('Error saving bundle:', error);
+      await saveBundleMutation.mutateAsync(
+        editingBundle ? { id: editingBundle.id, ...bundleForm } : bundleForm
+      );
+      setShowBundleModal(false);
+    } catch {
+      // error handled by mutation
     }
   };
 
-  const handleDeleteBundle = async (bundleId: string) => {
+  const handleDeleteBundle = (bundleId: string) => {
     if (!confirm('Are you sure you want to delete this package?')) return;
-
-    try {
-      const response = await fetch(`/api/credit-bundles?id=${bundleId}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        fetchBundles();
-      }
-    } catch (error) {
-      console.error('Error deleting bundle:', error);
-    }
+    deleteBundleMutation.mutate(bundleId);
   };
 
   // Offer handlers
@@ -273,39 +187,18 @@ export default function ServicesPage() {
 
   const handleSaveOffer = async () => {
     try {
-      const method = editingOffer ? 'PUT' : 'POST';
-      const body = editingOffer
-        ? { id: editingOffer.id, ...offerForm }
-        : offerForm;
-
-      const response = await fetch('/api/offers', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (response.ok) {
-        setShowOfferModal(false);
-        fetchOffers();
-      }
-    } catch (error) {
-      console.error('Error saving offer:', error);
+      await saveOfferMutation.mutateAsync(
+        editingOffer ? { id: editingOffer.id, ...offerForm } : offerForm
+      );
+      setShowOfferModal(false);
+    } catch {
+      // error handled by mutation
     }
   };
 
-  const handleDeleteOffer = async (offerId: string) => {
+  const handleDeleteOffer = (offerId: string) => {
     if (!confirm('Are you sure you want to delete this offer?')) return;
-
-    try {
-      const response = await fetch(`/api/offers?id=${offerId}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        fetchOffers();
-      }
-    } catch (error) {
-      console.error('Error deleting offer:', error);
-    }
+    deleteOfferMutation.mutate(offerId);
   };
 
   return (

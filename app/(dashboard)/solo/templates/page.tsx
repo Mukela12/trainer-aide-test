@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useTemplateStore } from '@/lib/stores/template-store';
+import { useTemplates, useDeleteTemplate, useDuplicateTemplate } from '@/lib/hooks/use-templates';
+import { useAIPrograms, useAIProgramTemplates, useDeleteAIProgram, usePatchAIProgram, useToggleAIProgramTemplate, useDuplicateAIProgram } from '@/lib/hooks/use-ai-programs';
 import { useUserStore } from '@/lib/stores/user-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,12 +74,10 @@ type StatusFilter = 'all' | 'draft' | 'active' | 'archived';
 
 export default function UnifiedTemplatesPage() {
   const router = useRouter();
-  const { deleteTemplate, duplicateTemplate } = useTemplateStore();
+  const deleteTemplateMutation = useDeleteTemplate();
+  const duplicateTemplateMutation = useDuplicateTemplate();
   const { currentUser, currentRole } = useUserStore();
 
-  const [manualTemplates, setManualTemplates] = useState<ManualTemplate[]>([]);
-  const [aiTemplates, setAITemplates] = useState<AIProgram[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -89,70 +88,37 @@ export default function UnifiedTemplatesPage() {
   // Determine base path based on role
   const basePath = currentRole === 'studio_owner' ? '/studio-owner' : '/solo';
 
-  // Fetch all templates on mount
-  useEffect(() => {
-    const fetchAllTemplates = async () => {
-      if (!currentUser.id) return;
+  // Data fetching via React Query
+  const { data: rawManualTemplates = [], isLoading: templatesLoading } = useTemplates(currentUser?.id);
+  const { data: aiTemplatesList = [] } = useAIProgramTemplates();
+  const { data: aiProgramsList = [] } = useAIPrograms();
 
-      setIsLoading(true);
-      try {
-        const [templatesRes, aiTemplatesRes, aiProgramsRes] = await Promise.all([
-          fetch('/api/templates'),
-          fetch('/api/ai-programs/templates'),
-          fetch('/api/ai-programs'),
-        ]);
+  const isLoading = templatesLoading;
 
-        // Process manual templates
-        if (templatesRes.ok) {
-          const data = await templatesRes.json();
-          const mapped = (data.templates || []).map((t: {
-            id: string;
-            name: string;
-            description?: string;
-            type?: string;
-            json_definition?: Array<{ exercises: unknown[] }>;
-            blocks?: Array<{ exercises: unknown[] }>;
-            studio_id?: string;
-            created_at?: string;
-          }) => ({
-            id: t.id,
-            name: t.name,
-            description: t.description || '',
-            type: t.type || 'standard',
-            blocks: t.json_definition || t.blocks || [],
-            assignedStudios: t.studio_id ? [t.studio_id] : [],
-            source: 'manual' as const,
-            created_at: t.created_at,
-          }));
-          setManualTemplates(mapped);
-        }
+  // Compute manualTemplates from rawManualTemplates
+  const manualTemplates: ManualTemplate[] = rawManualTemplates.map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description || '',
+    type: (t.type || 'standard') as 'standard' | 'resistance_only',
+    blocks: t.blocks || [],
+    assignedStudios: t.assignedStudios || [],
+    source: 'manual' as const,
+    created_at: t.createdAt,
+  }));
 
-        // Process AI templates (flagged as template)
-        if (aiTemplatesRes.ok) {
-          const aiData = await aiTemplatesRes.json();
-          setAITemplates(aiData.templates || []);
-        }
+  // Compute aiTemplates by merging templates + programs (deduped)
+  const aiTemplates = useMemo(() => {
+    const templateIds = new Set(aiTemplatesList.map((t) => t.id));
+    const uniquePrograms = aiProgramsList.filter((p) => !templateIds.has(p.id));
+    return [...aiTemplatesList, ...uniquePrograms];
+  }, [aiTemplatesList, aiProgramsList]);
 
-        // Also include AI programs that aren't flagged as templates
-        if (aiProgramsRes.ok) {
-          const programsData = await aiProgramsRes.json();
-          const programs = programsData.programs || [];
-          // Merge with templates, avoiding duplicates
-          setAITemplates(prev => {
-            const templateIds = new Set(prev.map(t => t.id));
-            const uniquePrograms = programs.filter((p: AIProgram) => !templateIds.has(p.id));
-            return [...prev, ...uniquePrograms];
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching templates:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAllTemplates();
-  }, [currentUser.id]);
+  // Mutation hooks
+  const deleteAIMutation = useDeleteAIProgram();
+  const patchAIMutation = usePatchAIProgram();
+  const toggleTemplateMutation = useToggleAIProgramTemplate();
+  const duplicateAIMutation = useDuplicateAIProgram();
 
   // Combine and filter templates
   const unifiedTemplates = useMemo(() => {
@@ -222,24 +188,12 @@ export default function UnifiedTemplatesPage() {
   // Handlers
   const handleDeleteManual = async (templateId: string, templateName: string) => {
     if (confirm(`Are you sure you want to delete "${templateName}"? This action cannot be undone.`)) {
-      await deleteTemplate(templateId);
-      setManualTemplates(prev => prev.filter(t => t.id !== templateId));
+      await deleteTemplateMutation.mutateAsync(templateId);
     }
   };
 
   const handleDuplicateManual = async (templateId: string) => {
-    const duplicated = await duplicateTemplate(templateId);
-    if (duplicated) {
-      setManualTemplates(prev => [...prev, {
-        id: duplicated.id,
-        name: duplicated.name,
-        description: duplicated.description,
-        type: duplicated.type,
-        blocks: duplicated.blocks,
-        assignedStudios: duplicated.assignedStudios,
-        source: 'manual' as const,
-      }]);
-    }
+    await duplicateTemplateMutation.mutateAsync(templateId);
   };
 
   const handleDeleteAI = async (programId: string) => {
@@ -249,17 +203,8 @@ export default function UnifiedTemplatesPage() {
 
     setProcessingId(programId);
     try {
-      const response = await fetch(`/api/ai-programs/${programId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete program');
-      }
-
-      setAITemplates(prev => prev.filter(t => t.id !== programId));
-    } catch (error) {
-      console.error('Error deleting program:', error);
+      await deleteAIMutation.mutateAsync(programId);
+    } catch {
       alert('Failed to delete program');
     } finally {
       setProcessingId(null);
@@ -269,23 +214,11 @@ export default function UnifiedTemplatesPage() {
   const handleArchiveAI = async (program: AIProgram) => {
     setProcessingId(program.id);
     try {
-      const response = await fetch(`/api/ai-programs/${program.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: program.status === 'archived' ? 'draft' : 'archived' }),
+      await patchAIMutation.mutateAsync({
+        programId: program.id,
+        updates: { status: program.status === 'archived' ? 'draft' : 'archived' },
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to archive program');
-      }
-
-      setAITemplates(prev => prev.map(t =>
-        t.id === program.id
-          ? { ...t, status: t.status === 'archived' ? 'draft' : 'archived' }
-          : t
-      ));
-    } catch (error) {
-      console.error('Error archiving program:', error);
+    } catch {
       alert('Failed to archive program');
     } finally {
       setProcessingId(null);
@@ -296,23 +229,11 @@ export default function UnifiedTemplatesPage() {
   const handleToggleTemplate = async (program: AIProgram) => {
     setProcessingId(program.id);
     try {
-      const response = await fetch(`/api/ai-programs/${program.id}/template`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_template: !program.is_template }),
+      await toggleTemplateMutation.mutateAsync({
+        programId: program.id,
+        isTemplate: !program.is_template,
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update template status');
-      }
-
-      setAITemplates(prev => prev.map(t =>
-        t.id === program.id
-          ? { ...t, is_template: !t.is_template }
-          : t
-      ));
-    } catch (error) {
-      console.error('Error updating template status:', error);
+    } catch {
       alert('Failed to update template status');
     } finally {
       setProcessingId(null);
@@ -323,18 +244,8 @@ export default function UnifiedTemplatesPage() {
   const handleDuplicateAI = async (programId: string) => {
     setProcessingId(programId);
     try {
-      const response = await fetch(`/api/ai-programs/${programId}/duplicate`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to duplicate program');
-      }
-
-      const data = await response.json();
-      setAITemplates(prev => [...prev, data.program]);
-    } catch (error) {
-      console.error('Error duplicating program:', error);
+      await duplicateAIMutation.mutateAsync(programId);
+    } catch {
       alert('Failed to duplicate program');
     } finally {
       setProcessingId(null);

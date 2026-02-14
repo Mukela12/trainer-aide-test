@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,90 +17,24 @@ import {
 } from 'lucide-react';
 import { InviteTrainerDialog } from '@/components/studio-owner/InviteTrainerDialog';
 import ContentHeader from '@/components/shared/ContentHeader';
-
-interface StaffMember {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  staff_type: string;
-  is_onboarded: boolean;
-  created_at: string;
-}
-
-interface Invitation {
-  id: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  role: string;
-  status: 'pending' | 'accepted' | 'expired' | 'revoked';
-  expiresAt: string;
-  acceptedAt: string | null;
-  createdAt: string;
-}
+import { useTrainers } from '@/lib/hooks/use-trainers';
+import { useTeamInvitations, useRevokeInvitation, type TeamInvitation } from '@/lib/hooks/use-invitations';
 
 export default function TeamPage() {
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [loadingStaff, setLoadingStaff] = useState(true);
-  const [loadingInvitations, setLoadingInvitations] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
-  const fetchStaff = async () => {
-    try {
-      const response = await fetch('/api/trainers');
-      if (!response.ok) throw new Error('Failed to fetch staff');
-      const data = await response.json();
-      setStaff(data.trainers || []);
-    } catch (error) {
-      console.error('Error fetching staff:', error);
-      setStaff([]);
-    } finally {
-      setLoadingStaff(false);
-    }
-  };
+  const { data: staff = [], isLoading: loadingStaff } = useTrainers();
+  const { data: invitations = [], isLoading: loadingInvitations } = useTeamInvitations();
+  const revokeInvitation = useRevokeInvitation();
 
-  const fetchInvitations = async () => {
-    try {
-      const response = await fetch('/api/invitations');
-      if (!response.ok) throw new Error('Failed to fetch invitations');
-      const data = await response.json();
-      setInvitations(data || []);
-    } catch (error) {
-      console.error('Error fetching invitations:', error);
-      setInvitations([]);
-    } finally {
-      setLoadingInvitations(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchStaff();
-    fetchInvitations();
-  }, []);
-
-  const handleRevokeInvitation = async (invitationId: string) => {
-    try {
-      const response = await fetch(`/api/invitations?id=${invitationId}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to revoke invitation');
-      // Refresh invitations list
-      fetchInvitations();
-    } catch (error) {
-      console.error('Error revoking invitation:', error);
-    }
-  };
-
-  const handleInviteSuccess = () => {
-    fetchInvitations();
+  const handleRevokeInvitation = (invitationId: string) => {
+    revokeInvitation.mutate(invitationId);
   };
 
   const pendingInvitations = invitations.filter(inv => inv.status === 'pending');
   const isLoading = loadingStaff || loadingInvitations;
 
-  const getStatusBadge = (status: Invitation['status']) => {
+  const getStatusBadge = (status: TeamInvitation['status']) => {
     switch (status) {
       case 'pending':
         return (
@@ -272,7 +206,6 @@ export default function TeamPage() {
       <InviteTrainerDialog
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
-        onSuccess={handleInviteSuccess}
       />
     </div>
   );

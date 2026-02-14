@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
+import { useSendEmail } from '@/lib/hooks/use-email';
 import { Send, Mail } from 'lucide-react';
 
 interface SendEmailDialogProps {
@@ -28,7 +29,7 @@ interface SendEmailDialogProps {
 
 export function SendEmailDialog({ open, onOpenChange, recipient }: SendEmailDialogProps) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const sendEmail = useSendEmail();
   const [formData, setFormData] = useState({
     subject: '',
     message: '',
@@ -55,26 +56,14 @@ export function SendEmailDialog({ open, onOpenChange, recipient }: SendEmailDial
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      const response = await fetch('/api/email/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipientEmail: recipient.email,
-          recipientName: recipient.name,
-          subject: formData.subject,
-          message: formData.message,
-          clientId: recipient.id,
-        }),
+      await sendEmail.mutateAsync({
+        recipientEmail: recipient.email,
+        recipientName: recipient.name,
+        subject: formData.subject,
+        message: formData.message,
+        clientId: recipient.id,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send email');
-      }
 
       toast({
         title: 'Email sent',
@@ -88,8 +77,6 @@ export function SendEmailDialog({ open, onOpenChange, recipient }: SendEmailDial
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to send email',
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -151,15 +138,15 @@ export function SendEmailDialog({ open, onOpenChange, recipient }: SendEmailDial
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={sendEmail.isPending}>
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={sendEmail.isPending}
               className="gap-2 bg-wondrous-magenta hover:bg-wondrous-magenta-dark"
             >
-              {isSubmitting ? (
+              {sendEmail.isPending ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Sending...

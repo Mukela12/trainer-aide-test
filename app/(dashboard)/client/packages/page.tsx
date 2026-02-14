@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useUserStore } from '@/lib/stores/user-store';
+import { useClientPackages } from '@/lib/hooks/use-client-bookings';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,52 +17,10 @@ import {
 import { format, formatDistanceToNow } from 'date-fns';
 import ContentHeader from '@/components/shared/ContentHeader';
 
-interface ClientPackage {
-  id: string;
-  packageName: string;
-  sessionsTotal: number;
-  sessionsUsed: number;
-  sessionsRemaining: number;
-  purchasedAt: string;
-  expiresAt: string | null;
-  status: 'active' | 'expired' | 'exhausted';
-}
-
-interface CreditsData {
-  totalCredits: number;
-  creditStatus: 'none' | 'low' | 'medium' | 'good';
-  nearestExpiry: string | null;
-  packages: ClientPackage[];
-}
-
 export default function ClientPackagesPage() {
   const { currentUser } = useUserStore();
-  const [isLoading, setIsLoading] = useState(true);
-  const [creditsData, setCreditsData] = useState<CreditsData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchCredits = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const res = await fetch('/api/client/packages');
-        if (!res.ok) {
-          throw new Error('Failed to fetch credits');
-        }
-        const data = await res.json();
-        setCreditsData(data);
-      } catch (err) {
-        console.error('Error fetching credits:', err);
-        setError('Unable to load your credits. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCredits();
-  }, []);
+  const { data: creditsData, isLoading, error: queryError, refetch } = useClientPackages(currentUser?.id);
+  const error = queryError ? 'Unable to load your credits. Please try again.' : null;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -109,7 +67,7 @@ export default function ClientPackagesPage() {
             Something went wrong
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()}>Try Again</Button>
+          <Button onClick={() => refetch()}>Try Again</Button>
         </Card>
       </div>
     );
@@ -117,7 +75,7 @@ export default function ClientPackagesPage() {
 
   const { totalCredits, creditStatus, nearestExpiry, packages } = creditsData || {
     totalCredits: 0,
-    creditStatus: 'none',
+    creditStatus: 'none' as const,
     nearestExpiry: null,
     packages: [],
   };

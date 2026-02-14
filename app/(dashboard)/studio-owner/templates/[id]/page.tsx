@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Edit, Copy, Trash2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useTemplateStore } from '@/lib/stores/template-store';
-import { MOCK_EXERCISES } from '@/lib/mock-data';
+import { useTemplates, useDeleteTemplate, useDuplicateTemplate } from '@/lib/hooks/use-templates';
+import { useUserStore } from '@/lib/stores/user-store';
+import { useExerciseLookup } from '@/lib/hooks/use-exercise';
 import type { WorkoutTemplate } from '@/lib/types';
 
 export default function TemplateDetailPage() {
@@ -15,13 +15,13 @@ export default function TemplateDetailPage() {
   const router = useRouter();
   const templateId = params.id as string;
 
-  const { getTemplateById, deleteTemplate, duplicateTemplate } = useTemplateStore();
-  const [template, setTemplate] = useState<WorkoutTemplate | null>(null);
+  const { currentUser } = useUserStore();
+  const { data: templates = [] } = useTemplates(currentUser?.id);
+  const deleteTemplateMutation = useDeleteTemplate();
+  const duplicateTemplateMutation = useDuplicateTemplate();
+  const { getExercise } = useExerciseLookup();
 
-  useEffect(() => {
-    const fetchedTemplate = getTemplateById(templateId);
-    setTemplate(fetchedTemplate || null);
-  }, [templateId, getTemplateById]);
+  const template = templates.find(t => t.id === templateId) ?? null;
 
   const handleBack = () => {
     router.push('/studio-owner/templates');
@@ -29,17 +29,16 @@ export default function TemplateDetailPage() {
 
   const handleEdit = () => {
     // TODO: Implement edit functionality when template editor is created
-    console.log('Edit template:', templateId);
   };
 
   const handleDuplicate = () => {
-    duplicateTemplate(templateId);
+    duplicateTemplateMutation.mutate(templateId);
     router.push('/studio-owner/templates');
   };
 
   const handleDelete = () => {
     if (confirm('Are you sure you want to delete this template?')) {
-      deleteTemplate(templateId);
+      deleteTemplateMutation.mutate(templateId);
       router.push('/studio-owner/templates');
     }
   };
@@ -59,9 +58,8 @@ export default function TemplateDetailPage() {
     );
   }
 
-  // Get exercise details from MOCK_EXERCISES
   const getExerciseDetails = (exerciseId: string) => {
-    return MOCK_EXERCISES.find(ex => ex.id === exerciseId || ex.exerciseId === exerciseId);
+    return getExercise(exerciseId);
   };
 
   return (

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { getOnboardingRedirect } from '@/lib/utils/onboarding';
 
 interface OnboardingGuardProps {
   children: React.ReactNode;
@@ -28,18 +29,20 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
       try {
         const supabase = getSupabaseBrowserClient();
 
-        // Check if user has completed onboarding
         const { data: profile } = await supabase
           .from('profiles')
-          .select('is_onboarded, role')
+          .select('is_onboarded, role, onboarding_step')
           .eq('id', user.id)
           .maybeSingle();
 
         if (profile && profile.is_onboarded === false) {
           setNeedsOnboarding(true);
-          // Don't redirect if already on onboarding page
           if (!pathname?.startsWith('/onboarding')) {
-            router.push('/onboarding');
+            const redirect = getOnboardingRedirect(
+              profile.role || '',
+              profile.onboarding_step || 0
+            );
+            router.push(redirect);
             return;
           }
         }
@@ -53,7 +56,6 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     checkOnboardingStatus();
   }, [user, authLoading, router, pathname]);
 
-  // Show loading state while checking
   if (isChecking || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -62,7 +64,6 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     );
   }
 
-  // If needs onboarding and not on onboarding page, show loading (redirect is happening)
   if (needsOnboarding && !pathname?.startsWith('/onboarding')) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">

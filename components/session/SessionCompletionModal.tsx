@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { RPEPicker } from './RPEPicker';
 import { CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { formatDuration } from '@/lib/utils/generators';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 
 interface SessionCompletionModalProps {
   open: boolean;

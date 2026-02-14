@@ -64,8 +64,12 @@ export default function OnboardingRolePage() {
       // Update local store
       setRole(selectedRole);
 
-      // Navigate to next step
-      router.push('/onboarding/profile');
+      // Navigate to role-specific flow
+      if (selectedRole === 'solo_practitioner') {
+        router.push('/onboarding/solo');
+      } else {
+        router.push('/onboarding/studio');
+      }
     } catch (err) {
       console.error('Error saving role:', err);
       setError('An unexpected error occurred. Please try again.');

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getGoalById, updateGoal, deleteGoal } from '@/lib/services/goal-service';
 import type { UpdateGoalInput } from '@/lib/types/client-goals';
 
 /**
@@ -19,25 +20,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
-
-    const { data: goal, error } = await serviceClient
-      .from('ta_client_goals')
-      .select(`
-        *,
-        milestones:ta_goal_milestones(*)
-      `)
-      .eq('id', goalId)
-      .single();
+    const { data: goal, error } = await getGoalById(goalId);
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
-      }
-      console.error('Error fetching goal:', error);
+      const status = error.message === 'Goal not found' ? 404 : 500;
       return NextResponse.json(
-        { error: 'Failed to fetch goal', details: error.message },
-        { status: 500 }
+        { error: error.message },
+        { status }
       );
     }
 
@@ -68,40 +57,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
     const body: UpdateGoalInput = await request.json();
-
-    const updateData: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    };
-
-    if (body.goal_type !== undefined) updateData.goal_type = body.goal_type;
-    if (body.description !== undefined) updateData.description = body.description;
-    if (body.target_value !== undefined) updateData.target_value = body.target_value;
-    if (body.target_unit !== undefined) updateData.target_unit = body.target_unit;
-    if (body.current_value !== undefined) updateData.current_value = body.current_value;
-    if (body.target_date !== undefined) updateData.target_date = body.target_date;
-    if (body.status !== undefined) updateData.status = body.status;
-    if (body.priority !== undefined) updateData.priority = body.priority;
-
-    const { data: goal, error } = await serviceClient
-      .from('ta_client_goals')
-      .update(updateData)
-      .eq('id', goalId)
-      .select(`
-        *,
-        milestones:ta_goal_milestones(*)
-      `)
-      .single();
+    const { data: goal, error } = await updateGoal(goalId, body);
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
-      }
-      console.error('Error updating goal:', error);
+      const status = error.message === 'Goal not found' ? 404 : 500;
       return NextResponse.json(
-        { error: 'Failed to update goal', details: error.message },
-        { status: 500 }
+        { error: error.message },
+        { status }
       );
     }
 
@@ -132,21 +95,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
-
-    // Delete milestones first (cascade should handle this, but being explicit)
-    await serviceClient
-      .from('ta_goal_milestones')
-      .delete()
-      .eq('goal_id', goalId);
-
-    const { error } = await serviceClient
-      .from('ta_client_goals')
-      .delete()
-      .eq('id', goalId);
+    const { error } = await deleteGoal(goalId);
 
     if (error) {
-      console.error('Error deleting goal:', error);
       return NextResponse.json(
         { error: 'Failed to delete goal', details: error.message },
         { status: 500 }

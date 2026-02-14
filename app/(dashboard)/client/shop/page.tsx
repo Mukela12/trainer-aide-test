@@ -1,109 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import ContentHeader from '@/components/shared/ContentHeader';
 import { PackageCard } from '@/components/client/shop/PackageCard';
 import { OfferCard } from '@/components/client/shop/OfferCard';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, Gift, ShoppingBag, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-
-interface ShopPackage {
-  id: string;
-  name: string;
-  description: string | null;
-  sessionCount: number;
-  priceCents: number;
-  validityDays: number | null;
-  perSessionPriceCents: number | null;
-  savingsPercent: number | null;
-  isFree: boolean;
-}
-
-interface ShopOffer {
-  id: string;
-  title: string;
-  description: string | null;
-  paymentAmount: number;
-  currency: string;
-  credits: number;
-  expiryDays: number | null;
-  expiresAt: string | null;
-  remainingSpots: number | null;
-  isGift: boolean;
-  isFree: boolean;
-}
+import { useToast } from '@/lib/hooks/use-toast';
+import { useShopPackages, useShopOffers, useClaimShopItem } from '@/lib/hooks/use-shop';
+import type { ShopPackage, ShopOffer } from '@/lib/hooks/use-shop';
 
 export default function ClientShopPage() {
-  const [packages, setPackages] = useState<ShopPackage[]>([]);
-  const [offers, setOffers] = useState<ShopOffer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: packages = [], isLoading: packagesLoading } = useShopPackages();
+  const { data: offers = [], isLoading: offersLoading } = useShopOffers();
+  const claimMutation = useClaimShopItem();
+  const loading = packagesLoading || offersLoading;
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    fetchShopItems();
-  }, []);
-
-  const fetchShopItems = async () => {
-    setLoading(true);
-    try {
-      const [packagesRes, offersRes] = await Promise.all([
-        fetch('/api/client/shop/packages'),
-        fetch('/api/client/shop/offers'),
-      ]);
-
-      if (packagesRes.ok) {
-        const data = await packagesRes.json();
-        setPackages(data.packages || []);
-      }
-
-      if (offersRes.ok) {
-        const data = await offersRes.json();
-        setOffers(data.offers || []);
-      }
-    } catch (error) {
-      console.error('Error fetching shop items:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load shop items',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleClaimPackage = async (packageId: string) => {
     setClaimingId(packageId);
     try {
-      const res = await fetch('/api/client/shop/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'package', id: packageId }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        toast({
-          title: 'Success!',
-          description: data.message,
-        });
-        // Refresh the shop items
-        fetchShopItems();
-      } else {
-        toast({
-          title: 'Error',
-          description: data.error || 'Failed to claim package',
-          variant: 'destructive',
-        });
-      }
+      const data = await claimMutation.mutateAsync({ type: 'package', id: packageId });
+      toast({ title: 'Success!', description: data.message });
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to claim package',
+        description: error instanceof Error ? error.message : 'Failed to claim package',
         variant: 'destructive',
       });
     } finally {
@@ -114,32 +38,12 @@ export default function ClientShopPage() {
   const handleClaimOffer = async (offerId: string) => {
     setClaimingId(offerId);
     try {
-      const res = await fetch('/api/client/shop/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'offer', id: offerId }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        toast({
-          title: 'Success!',
-          description: data.message,
-        });
-        // Refresh the shop items
-        fetchShopItems();
-      } else {
-        toast({
-          title: 'Error',
-          description: data.error || 'Failed to claim offer',
-          variant: 'destructive',
-        });
-      }
+      const data = await claimMutation.mutateAsync({ type: 'offer', id: offerId });
+      toast({ title: 'Success!', description: data.message });
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to claim offer',
+        description: error instanceof Error ? error.message : 'Failed to claim offer',
         variant: 'destructive',
       });
     } finally {

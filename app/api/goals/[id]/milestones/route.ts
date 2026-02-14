@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import {
+  getMilestones,
+  createMilestone,
+  updateMilestone,
+  deleteMilestone,
+} from '@/lib/services/goal-service';
 import type { CreateMilestoneInput, UpdateMilestoneInput } from '@/lib/types/client-goals';
 
 /**
@@ -19,17 +25,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
-
-    const { data: milestones, error } = await serviceClient
-      .from('ta_goal_milestones')
-      .select('*')
-      .eq('goal_id', goalId)
-      .order('target_date', { ascending: true, nullsFirst: false })
-      .order('created_at', { ascending: true });
+    const { data: milestones, error } = await getMilestones(goalId);
 
     if (error) {
-      console.error('Error fetching milestones:', error);
       return NextResponse.json(
         { error: 'Failed to fetch milestones', details: error.message },
         { status: 500 }
@@ -63,10 +61,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
     const body: CreateMilestoneInput = await request.json();
 
-    // Validate required fields
     if (!body.title) {
       return NextResponse.json(
         { error: 'title is required' },
@@ -74,37 +70,13 @@ export async function POST(
       );
     }
 
-    // Verify goal exists
-    const { data: goal, error: goalError } = await serviceClient
-      .from('ta_client_goals')
-      .select('id')
-      .eq('id', goalId)
-      .single();
-
-    if (goalError || !goal) {
-      return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
-    }
-
-    const milestoneData = {
-      goal_id: goalId,
-      title: body.title,
-      target_value: body.target_value || null,
-      target_date: body.target_date || null,
-      status: 'pending',
-      notes: body.notes || null,
-    };
-
-    const { data: milestone, error } = await serviceClient
-      .from('ta_goal_milestones')
-      .insert(milestoneData)
-      .select()
-      .single();
+    const { data: milestone, error } = await createMilestone(goalId, body);
 
     if (error) {
-      console.error('Error creating milestone:', error);
+      const status = error.message === 'Goal not found' ? 404 : 500;
       return NextResponse.json(
-        { error: 'Failed to create milestone', details: error.message },
-        { status: 500 }
+        { error: error.message },
+        { status }
       );
     }
 
@@ -135,7 +107,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const serviceClient = createServiceRoleClient();
     const body: UpdateMilestoneInput & { milestoneId: string } = await request.json();
 
     if (!body.milestoneId) {
@@ -145,39 +116,13 @@ export async function PATCH(
       );
     }
 
-    const updateData: Record<string, unknown> = {};
-
-    if (body.title !== undefined) updateData.title = body.title;
-    if (body.target_value !== undefined) updateData.target_value = body.target_value;
-    if (body.target_date !== undefined) updateData.target_date = body.target_date;
-    if (body.status !== undefined) {
-      updateData.status = body.status;
-      if (body.status === 'achieved') {
-        updateData.achieved_at = new Date().toISOString();
-        if (body.achieved_value !== undefined) {
-          updateData.achieved_value = body.achieved_value;
-        }
-      }
-    }
-    if (body.achieved_value !== undefined) updateData.achieved_value = body.achieved_value;
-    if (body.notes !== undefined) updateData.notes = body.notes;
-
-    const { data: milestone, error } = await serviceClient
-      .from('ta_goal_milestones')
-      .update(updateData)
-      .eq('id', body.milestoneId)
-      .eq('goal_id', goalId)
-      .select()
-      .single();
+    const { data: milestone, error } = await updateMilestone(goalId, body.milestoneId, body);
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Milestone not found' }, { status: 404 });
-      }
-      console.error('Error updating milestone:', error);
+      const status = error.message === 'Milestone not found' ? 404 : 500;
       return NextResponse.json(
-        { error: 'Failed to update milestone', details: error.message },
-        { status: 500 }
+        { error: error.message },
+        { status }
       );
     }
 
@@ -218,16 +163,9 @@ export async function DELETE(
       );
     }
 
-    const serviceClient = createServiceRoleClient();
-
-    const { error } = await serviceClient
-      .from('ta_goal_milestones')
-      .delete()
-      .eq('id', milestoneId)
-      .eq('goal_id', goalId);
+    const { error } = await deleteMilestone(goalId, milestoneId);
 
     if (error) {
-      console.error('Error deleting milestone:', error);
       return NextResponse.json(
         { error: 'Failed to delete milestone', details: error.message },
         { status: 500 }

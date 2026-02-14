@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSessionStore } from '@/lib/stores/session-store';
+import { useSessionData } from '@/lib/hooks/use-sessions';
 import { useTimerStore } from '@/lib/stores/timer-store';
 import { useUserStore } from '@/lib/stores/user-store';
 import { Clock, ArrowRight } from 'lucide-react';
@@ -11,11 +11,11 @@ import { cn } from '@/lib/utils/cn';
 export function GlobalSessionTimer() {
   const router = useRouter();
   const { currentUser, currentRole } = useUserStore();
-  const { activeSessionId, getSessionById } = useSessionStore();
+  const { sessions, activeSessionId } = useSessionData(currentUser.id);
   const { sessionId: timerSessionId, getSecondsLeft, isTimerActive } = useTimerStore();
   const [secondsLeft, setSecondsLeft] = useState(0);
 
-  const activeSession = activeSessionId ? getSessionById(activeSessionId) : null;
+  const activeSession = activeSessionId ? sessions.find(s => s.id === activeSessionId) ?? null : null;
 
   // Only show timer if session belongs to current user
   const shouldShowTimer = isTimerActive() &&
