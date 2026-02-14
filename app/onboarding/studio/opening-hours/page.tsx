@@ -56,12 +56,12 @@ export default function StudioOpeningHoursPage() {
 
   return (
     <OnboardingStepWrapper
-      title="Set your studio's operating hours"
-      subtitle="Define when your studio is open for sessions."
+      title="Operating hours"
+      subtitle="Set the hours your studio is open for sessions."
       onBack={() => router.push('/onboarding/studio/booking-model')}
       onNext={handleContinue}
       isLoading={isLoading}
-      tipText="Individual trainers can set their own availability within these hours."
+      tipText="Trainers can set their own availability within these hours."
     >
       <AvailabilitySetupForm
         userId={currentUser.id}

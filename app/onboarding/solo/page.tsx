@@ -52,12 +52,12 @@ export default function SoloBusinessPage() {
 
   return (
     <OnboardingStepWrapper
-      title="Let's set up your booking page"
-      subtitle="Create your unique booking link for clients"
+      title="Your booking page"
+      subtitle="Set up your booking link so clients can find and book with you."
       onNext={handleContinue}
       nextDisabled={!finalSlug || slugAvailable === false}
       isLoading={isLoading}
-      tipText="Share this link with clients so they can book sessions with you directly. You can always change it later in settings."
+      tipText="You can change your booking link at any time in Settings."
     >
       <Card>
         <CardHeader>

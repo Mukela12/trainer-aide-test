@@ -116,10 +116,10 @@ export default function OnboardingRolePage() {
       {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-          What best describes you?
+          How do you work?
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">
-          This helps us configure the right tools for how you operate.
+          This helps us set up the right experience for you.
         </p>
       </div>
 

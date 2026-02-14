@@ -50,8 +50,8 @@ export default function StudioBookingProtectionPage() {
 
   return (
     <OnboardingStepWrapper
-      title="Protect your bookings"
-      subtitle="Set up holds and waitlists to reduce no-shows and manage demand."
+      title="Booking safeguards"
+      subtitle="Optional tools for managing holds and waitlists."
       onBack={() => router.push('/onboarding/studio/opening-hours')}
       onNext={handleContinue}
       isLoading={isLoading}

@@ -64,8 +64,8 @@ export default function StudioStructurePage() {
 
   return (
     <OnboardingStepWrapper
-      title="How is your studio set up?"
-      subtitle="Tell us about your studio so we can configure the right tools."
+      title="Studio setup"
+      subtitle="A few details about your studio to tailor the experience."
       onNext={handleContinue}
       isLoading={isLoading}
     >

@@ -52,8 +52,8 @@ export default function StudioSessionTypesPage() {
 
   return (
     <OnboardingStepWrapper
-      title="What types of sessions does your studio offer?"
-      subtitle="Select all that apply. You can change these later."
+      title="Session types"
+      subtitle="Select the session types your studio offers. You can update these any time."
       onBack={() => router.push('/onboarding/studio')}
       onNext={handleContinue}
       nextDisabled={selectedTypes.length === 0}

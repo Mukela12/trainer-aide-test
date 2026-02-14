@@ -67,12 +67,12 @@ export default function SoloAvailabilityPage() {
 
   return (
     <OnboardingStepWrapper
-      title="When do you typically train clients?"
-      subtitle="Set your default hours. You can always adjust this later."
+      title="Your availability"
+      subtitle="Set the hours you're typically available. You can adjust this later."
       onBack={() => router.push('/onboarding/solo/services')}
       onNext={handleContinue}
       isLoading={isLoading}
-      tipText="You can add multiple time slots per day (e.g., morning and evening availability). You can also block specific dates later from your calendar."
+      tipText="You can set multiple slots per day and block specific dates from your calendar."
     >
       <AvailabilitySetupForm
         userId={currentUser.id}

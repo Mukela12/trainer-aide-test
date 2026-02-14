@@ -80,8 +80,8 @@ export default function StudioCancellationPage() {
 
   return (
     <OnboardingStepWrapper
-      title="Set your cancellation rules"
-      subtitle="Define your cancellation window and how refunds are handled."
+      title="Cancellation policy"
+      subtitle="Configure your cancellation window and refund handling."
       onBack={() => router.push('/onboarding/studio/booking-protection')}
       onNext={handleContinue}
       isLoading={isLoading}

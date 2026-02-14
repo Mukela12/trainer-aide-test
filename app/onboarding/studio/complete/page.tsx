@@ -103,10 +103,10 @@ export default function StudioCompletePage() {
           <CheckCircle2 className="text-green-600 dark:text-green-400" size={48} />
         </div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-          Your studio is ready!
+          Your studio is ready
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">
-          Here&apos;s a summary of what you configured.
+          Here&apos;s a summary of your configuration. You can adjust these in Settings.
         </p>
       </div>
 

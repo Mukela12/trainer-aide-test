@@ -106,10 +106,10 @@ export default function SoloCompletePage() {
           <CheckCircle2 className="text-green-600 dark:text-green-400" size={48} />
         </div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-          You&apos;re all set!
+          You&apos;re ready
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">
-          Your account is ready. Here&apos;s what you can do next.
+          Your account is set up. Here are some suggested next steps.
         </p>
       </div>
 
@@ -123,7 +123,7 @@ export default function SoloCompletePage() {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                  Your Booking Page is Live!
+                  Your booking page is live
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   Share this link with clients so they can book sessions with you

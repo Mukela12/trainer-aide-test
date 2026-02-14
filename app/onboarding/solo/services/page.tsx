@@ -67,8 +67,8 @@ export default function SoloServicesPage() {
 
   return (
     <OnboardingStepWrapper
-      title="Let's set up your first service"
-      subtitle="Services are what clients book. Start with one — you can add more anytime."
+      title="Your services"
+      subtitle="Define what you offer. You can add more services at any time."
       onBack={() => router.push('/onboarding/solo')}
       onNext={handleContinue}
       nextLabel={services.length === 0 ? 'Skip for Now' : 'Continue'}

@@ -62,8 +62,8 @@ export default function StudioBookingModelPage() {
 
   return (
     <OnboardingStepWrapper
-      title="Who controls the booking?"
-      subtitle="Choose how sessions get booked at your studio."
+      title="Booking model"
+      subtitle="Choose how bookings are handled at your studio."
       onBack={() => router.push('/onboarding/studio/session-types')}
       onNext={handleContinue}
       isLoading={isLoading}
