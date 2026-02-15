@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Clock, PoundSterling, Users } from 'lucide-react';
+import { Plus, Clock, PoundSterling, Users } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils/cn';
 
@@ -20,34 +20,113 @@ export interface ServiceDraft {
   priceInPounds: string;
   isIntro: boolean;
   isPublic: boolean;
+  isActive: boolean;
 }
 
 const DURATION_OPTIONS = [30, 45, 60, 75, 90];
 
-const SERVICE_TEMPLATES = [
+const DEFAULT_SERVICE_SET: Omit<ServiceDraft, 'id'>[] = [
+  // 1-2-1 sessions
   {
     name: 'Free Intro Session',
-    description: 'A complimentary consultation to discuss your fitness goals and see if we\'re a good fit.',
+    description: 'A complimentary consultation to discuss goals and see if we\'re a good fit.',
     duration: 30,
-    type: '1-2-1' as const,
+    type: '1-2-1',
+    maxCapacity: 1,
     priceInPounds: '0',
     isIntro: true,
+    isPublic: true,
+    isActive: true,
   },
   {
-    name: '1-2-1 PT Session',
-    description: 'Personalized training session focused on your specific goals.',
+    name: '30-Minute PT',
+    description: 'A focused personal training session.',
+    duration: 30,
+    type: '1-2-1',
+    maxCapacity: 1,
+    priceInPounds: '30',
+    isIntro: false,
+    isPublic: true,
+    isActive: true,
+  },
+  {
+    name: '45-Minute PT',
+    description: 'A personal training session with warm-up and cool-down.',
+    duration: 45,
+    type: '1-2-1',
+    maxCapacity: 1,
+    priceInPounds: '40',
+    isIntro: false,
+    isPublic: true,
+    isActive: true,
+  },
+  {
+    name: '60-Minute PT',
+    description: 'A full personal training session.',
     duration: 60,
-    type: '1-2-1' as const,
+    type: '1-2-1',
+    maxCapacity: 1,
     priceInPounds: '50',
     isIntro: false,
+    isPublic: true,
+    isActive: true,
   },
   {
-    name: 'Partner Training',
-    description: 'Train with a friend or partner. Split the cost, double the motivation!',
-    duration: 60,
-    type: 'duet' as const,
+    name: '90-Minute PT',
+    description: 'An extended personal training session.',
+    duration: 90,
+    type: '1-2-1',
+    maxCapacity: 1,
     priceInPounds: '70',
     isIntro: false,
+    isPublic: true,
+    isActive: true,
+  },
+  // Duet sessions
+  {
+    name: 'Duet Session (45 min)',
+    description: 'Semi-private partner training session for two.',
+    duration: 45,
+    type: 'duet',
+    maxCapacity: 2,
+    priceInPounds: '60',
+    isIntro: false,
+    isPublic: true,
+    isActive: true,
+  },
+  {
+    name: 'Duet Session (60 min)',
+    description: 'Extended partner training session for two.',
+    duration: 60,
+    type: 'duet',
+    maxCapacity: 2,
+    priceInPounds: '70',
+    isIntro: false,
+    isPublic: true,
+    isActive: true,
+  },
+  // Group sessions
+  {
+    name: 'Group Training (45 min)',
+    description: 'Small group training session.',
+    duration: 45,
+    type: 'group',
+    maxCapacity: 8,
+    priceInPounds: '15',
+    isIntro: false,
+    isPublic: true,
+    isActive: true,
+  },
+  {
+    name: 'Group Training (60 min)',
+    description: 'Extended small group training session.',
+    duration: 60,
+    type: 'group',
+    maxCapacity: 10,
+    priceInPounds: '20',
+    isIntro: false,
+    isPublic: true,
+    isActive: true,
   },
 ];
 
@@ -69,9 +148,10 @@ export function ServiceSetupForm({ userId, services, onServicesChange }: Props) 
     priceInPounds: '',
     isIntro: false,
     isPublic: true,
+    isActive: true,
   });
 
-  // Load existing services on mount
+  // Load existing services or pre-populate defaults
   useEffect(() => {
     const loadServices = async () => {
       const supabase = getSupabaseBrowserClient();
@@ -92,6 +172,7 @@ export function ServiceSetupForm({ userId, services, onServicesChange }: Props) 
             price_cents: number | null;
             is_intro_session: boolean | null;
             is_public: boolean | null;
+            is_active: boolean | null;
           }) => ({
             id: s.id,
             name: s.name,
@@ -102,6 +183,15 @@ export function ServiceSetupForm({ userId, services, onServicesChange }: Props) 
             priceInPounds: s.price_cents ? (s.price_cents / 100).toString() : '0',
             isIntro: s.is_intro_session || false,
             isPublic: s.is_public !== false,
+            isActive: s.is_active !== false,
+          }))
+        );
+      } else {
+        // Pre-populate with full service set
+        onServicesChange(
+          DEFAULT_SERVICE_SET.map((s, i: number) => ({
+            ...s,
+            id: `default-${i}`,
           }))
         );
       }
@@ -109,19 +199,12 @@ export function ServiceSetupForm({ userId, services, onServicesChange }: Props) 
     loadServices();
   }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const addTemplateService = (template: typeof SERVICE_TEMPLATES[0]) => {
-    const newSvc: ServiceDraft = {
-      id: `temp-${Date.now()}`,
-      name: template.name,
-      description: template.description,
-      duration: template.duration,
-      type: template.type,
-      maxCapacity: template.type === '1-2-1' ? 1 : template.type === 'duet' ? 2 : 10,
-      priceInPounds: template.priceInPounds,
-      isIntro: template.isIntro,
-      isPublic: true,
-    };
-    onServicesChange([...services, newSvc]);
+  const toggleService = (id: string) => {
+    onServicesChange(
+      services.map((s: ServiceDraft) =>
+        s.id === id ? { ...s, isActive: !s.isActive } : s
+      )
+    );
   };
 
   const addCustomService = () => {
@@ -143,129 +226,107 @@ export function ServiceSetupForm({ userId, services, onServicesChange }: Props) 
       priceInPounds: '',
       isIntro: false,
       isPublic: true,
+      isActive: true,
     });
     setShowAddForm(false);
   };
 
-  const removeService = (id: string) => {
-    onServicesChange(services.filter((s) => s.id !== id));
-  };
+  const activeCount = services.filter((s: ServiceDraft) => s.isActive).length;
 
   return (
     <>
-      {/* Quick Add Templates */}
-      {services.length === 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Start Templates</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-500 mb-4">
-              Click to add common service types
-            </p>
-            <div className="grid gap-3 md:grid-cols-3">
-              {SERVICE_TEMPLATES.map((template) => (
-                <button
-                  key={template.name}
-                  onClick={() => addTemplateService(template)}
-                  className="p-4 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:border-wondrous-blue hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                >
-                  <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">
-                    {template.name}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {template.duration} min •{' '}
-                    {template.priceInPounds === '0' ? 'Free' : `£${template.priceInPounds}`}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {activeCount} of {services.length} active
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowAddForm(true)}
+        >
+          <Plus className="mr-2" size={16} />
+          Add Custom
+        </Button>
+      </div>
 
       {/* Services List */}
-      {services.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Your Services ({services.length})
-            </h2>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAddForm(true)}
-            >
-              <Plus className="mr-2" size={16} />
-              Add Service
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {services.map((service) => (
-              <Card key={service.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                          {service.name}
-                        </h3>
-                        {service.isIntro && (
-                          <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">
-                            Intro
-                          </span>
-                        )}
-                      </div>
-                      {service.description && (
-                        <p className="text-sm text-gray-500 mb-2">
-                          {service.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                        <span className="flex items-center gap-1">
-                          <Clock size={14} />
-                          {service.duration} min
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <PoundSterling size={14} />
-                          {service.priceInPounds === '0' || !service.priceInPounds
-                            ? 'Free'
-                            : `£${service.priceInPounds}`}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users size={14} />
-                          {service.type === '1-2-1'
-                            ? '1-2-1'
-                            : service.type === 'duet'
-                            ? 'Duet (2)'
-                            : `Group (${service.maxCapacity})`}
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeService(service.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
+      <div className="space-y-3">
+        {services.map((service) => (
+          <Card
+            key={service.id}
+            className={cn(
+              'transition-opacity',
+              !service.isActive && 'opacity-50'
+            )}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                      {service.name}
+                    </h3>
+                    {service.isIntro && (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                        Intro
+                      </span>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+                  {service.description && (
+                    <p className="text-sm text-gray-500 mb-2">
+                      {service.description}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <Clock size={14} />
+                      {service.duration} min
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <PoundSterling size={14} />
+                      {service.priceInPounds === '0' || !service.priceInPounds
+                        ? 'Free'
+                        : `£${service.priceInPounds}`}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users size={14} />
+                      {service.type === '1-2-1'
+                        ? '1-2-1'
+                        : service.type === 'duet'
+                        ? 'Duet (2)'
+                        : `Group (${service.maxCapacity})`}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleService(service.id)}
+                  className={cn(
+                    'relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 mt-1',
+                    service.isActive ? 'bg-wondrous-blue' : 'bg-gray-200 dark:bg-gray-700'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                      service.isActive ? 'translate-x-6' : 'translate-x-1'
+                    )}
+                  />
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-      {/* Add Service Form */}
+      {/* Add Custom Service Form */}
       {showAddForm && (
         <Card>
-          <CardHeader>
-            <CardTitle>Add Custom Service</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-6 space-y-4">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+              Add Custom Service
+            </h3>
+
             <div className="space-y-2">
               <Label htmlFor="serviceName">Service Name *</Label>
               <Input

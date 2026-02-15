@@ -15,17 +15,6 @@ export default function SoloServicesPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleContinue = async () => {
-    if (services.length === 0) {
-      // Allow skipping
-      const supabase = getSupabaseBrowserClient();
-      await supabase
-        .from('profiles')
-        .update({ onboarding_step: 3 })
-        .eq('id', currentUser.id);
-      router.push('/onboarding/solo/availability');
-      return;
-    }
-
     setIsLoading(true);
     try {
       const supabase = getSupabaseBrowserClient();
@@ -33,24 +22,26 @@ export default function SoloServicesPage() {
       // Delete existing services created during onboarding
       await supabase.from('ta_services').delete().eq('created_by', currentUser.id);
 
-      // Insert all services
-      const servicesToInsert = services.map((s: ServiceDraft) => ({
-        name: s.name,
-        description: s.description || null,
-        duration: s.duration,
-        type: s.type,
-        max_capacity: s.maxCapacity,
-        credits_required: 1,
-        price_cents: s.priceInPounds ? Math.round(parseFloat(s.priceInPounds) * 100) : null,
-        is_intro_session: s.isIntro,
-        is_public: s.isPublic,
-        is_active: true,
-        created_by: currentUser.id,
-        studio_id: currentUser.id,
-      }));
+      // Insert all services with their active/inactive state
+      if (services.length > 0) {
+        const servicesToInsert = services.map((s: ServiceDraft) => ({
+          name: s.name,
+          description: s.description || null,
+          duration: s.duration,
+          type: s.type,
+          max_capacity: s.maxCapacity,
+          credits_required: 1,
+          price_cents: s.priceInPounds ? Math.round(parseFloat(s.priceInPounds) * 100) : null,
+          is_intro_session: s.isIntro,
+          is_public: s.isPublic,
+          is_active: s.isActive,
+          created_by: currentUser.id,
+          studio_id: currentUser.id,
+        }));
 
-      const { error } = await supabase.from('ta_services').insert(servicesToInsert);
-      if (error) throw error;
+        const { error } = await supabase.from('ta_services').insert(servicesToInsert);
+        if (error) throw error;
+      }
 
       await supabase
         .from('profiles')
@@ -71,7 +62,7 @@ export default function SoloServicesPage() {
       subtitle="Define what you offer. You can add more services at any time."
       onBack={() => router.push('/onboarding/solo')}
       onNext={handleContinue}
-      nextLabel={services.length === 0 ? 'Skip for Now' : 'Continue'}
+      nextLabel="Continue"
       isLoading={isLoading}
     >
       <ServiceSetupForm
