@@ -1,148 +1,219 @@
 # allwondrous
 
-A standalone, high-quality demo of the allwondrous fitness platform.
+A full-stack fitness platform for personal trainers, studio owners, and their clients. Built with Next.js, Supabase, and Stripe.
 
-## 🎯 Project Overview
+## Overview
 
-This is a **frontend-only demo** showcasing a complete redesign of the Trainer Aide feature for the allwondrous fitness platform. It demonstrates:
+allwondrous is a multi-role booking, session management, and AI workout generation platform. It supports four user roles — **solo practitioners**, **studio owners**, **trainers** (studio employees), and **clients** — each with a dedicated dashboard and feature set.
 
-- **Studio Owner** workflow: Create and manage workout templates
-- **Trainer** workflow: Run training sessions with clients using templates
-- **Client** view: View session history and progress
+### Solo Practitioner
 
-## 🎨 Design Philosophy
-
-- ✅ **No gradients** - Clean, solid colors only
-- ✅ **Mobile-first** - Optimized for trainers working on phones in the gym
-- ✅ **User intuitive** - Flexible workout builder with freedom to customize
-- ✅ **High quality** - Better than reference projects (wellness-frontend, class-dash-demo)
-
-## 📋 Complete Requirements
-
-👉 **See [TRAINER_AIDE_DEMO_REQUIREMENTS.md](./TRAINER_AIDE_DEMO_REQUIREMENTS.md)** for the complete development guide.
-
-This comprehensive document includes:
-- Tech stack and project setup
-- Design system (brand colors, typography, components)
-- Complete data models and mock data
-- Feature specifications for all user roles
-- Component architecture with code examples
-- Mobile design patterns
-- 7-day implementation workflow
-- Quality checklist
-
-## 🎨 Brand Colors
-
-```
-Primary Magenta: #a71075
-Cyan: #45f2ff
-Blue: #00bafc
-Dark Blue: #0085c4
-```
-
-## 🚀 Key Features
+- Manage clients, services, and availability
+- Public booking page with shareable link
+- Run training sessions with timer and sign-off modes
+- Create workout templates (manual or AI-generated)
+- Credit packages and session bundles
 
 ### Studio Owner
-- Create workout templates (3-block standard OR resistance-only)
-- Assign templates to studios
-- Manage exercise library
-- View all session history
 
-### Trainer
-- View assigned templates (read-only)
-- Start sessions with three sign-off modes:
-  - **Full Session**: Complete all at once
-  - **Per Block**: Sign off after each block
-  - **Per Exercise**: Check off each exercise individually
-- 30-minute timer with auto-complete
-- RPE (Rate of Perceived Exertion) tracking
-- Session notes and client progress
+- Everything a solo practitioner has, plus:
+- Multi-trainer team management with invitations
+- Studio-wide analytics and session monitoring
+- Centralised client and service management
+- Configurable booking model (trainer-led, client self-book, or hybrid)
+- Cancellation policies and booking safeguards
+
+### Trainer (Studio Employee)
+
+- Calendar with day/week views and inline booking
+- Run sessions with three sign-off modes (full session, per block, per exercise)
+- RPE tracking, session notes, and client progress
+- View assigned templates and AI programs
 
 ### Client
-- View upcoming sessions
-- Browse complete session history
-- See workout details and trainer notes
 
-## 📱 Mobile Optimization
+- Self-book sessions from trainer availability
+- View upcoming and past sessions
+- Purchase packages and claim offers
+- Track fitness progress and goals
 
-- Touch-friendly interface (44x44px minimum tap targets)
-- Swipe gestures for navigation
-- Bottom navigation
-- Optimized forms
-- Separate mobile UX patterns
+## Tech Stack
 
-## 🛠️ Tech Stack
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript 5 (strict) |
+| Database & Auth | Supabase (PostgreSQL + Auth + SSR) |
+| Styling | Tailwind CSS 3 + Radix UI + shadcn/ui |
+| State | Zustand (client) + React Query (server) |
+| Forms | React Hook Form + Zod |
+| AI | Anthropic Claude (streaming workout generation) |
+| Payments | Stripe (Checkout + Connect) |
+| Images | Cloudinary |
+| Email | Elastic Email |
+| Icons | Lucide React |
+| Hosting | Netlify |
 
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: shadcn/ui (Radix UI)
-- **State**: Zustand + React Context
-- **Forms**: React Hook Form + Zod
-- **Icons**: Lucide React
-- **Storage**: LocalStorage (demo only)
-
-## 📂 Project Structure
+## Project Structure
 
 ```
 trainer-aide-demo/
-├── app/                    # Next.js app router pages
-│   ├── studio-owner/      # Studio owner features
-│   ├── trainer/           # Trainer features
-│   └── client/            # Client features
-├── components/            # React components
-│   ├── layout/           # Sidebar, navigation
-│   ├── studio-owner/     # Template builder, etc.
-│   ├── trainer/          # Session runner, etc.
-│   ├── shared/           # Reusable components
-│   └── ui/               # shadcn/ui components
+├── app/
+│   ├── (auth)/                 # Login, OAuth callback
+│   ├── (dashboard)/            # Protected role-based dashboards
+│   │   ├── solo/               # Solo practitioner pages
+│   │   ├── studio-owner/       # Studio owner pages
+│   │   ├── trainer/            # Trainer pages
+│   │   ├── client/             # Client pages
+│   │   └── settings/           # Profile settings
+│   ├── api/                    # ~70 API routes
+│   ├── book/[slug]/            # Public booking flow
+│   ├── onboarding/             # Role-specific onboarding
+│   ├── invite/                 # Staff invitation acceptance
+│   └── client-invite/          # Client invitation acceptance
+├── components/
+│   ├── ui/                     # shadcn/ui primitives
+│   ├── shared/                 # Reusable components
+│   ├── onboarding/             # Onboarding step components
+│   ├── session/                # Session runner UI
+│   ├── templates/              # Template builder/list
+│   ├── ai-programs/            # AI program management
+│   ├── exercise/               # Exercise library
+│   ├── providers/              # Auth, Query, Onboarding providers
+│   └── layout/                 # Sidebar, navigation
 ├── lib/
-│   ├── mock-data/        # Mock exercises, templates, sessions
-│   ├── stores/           # Zustand stores
-│   ├── types/            # TypeScript types
-│   └── utils/            # Helper functions
-└── styles/               # Global CSS
+│   ├── services/               # ~35 service modules (business logic)
+│   ├── hooks/                  # ~24 React Query hooks
+│   ├── stores/                 # Zustand stores (user, timer)
+│   ├── types/                  # TypeScript type definitions
+│   ├── supabase/               # DB clients (main + images)
+│   ├── ai/                     # Anthropic client + prompts
+│   ├── stripe/                 # Stripe SDK config
+│   ├── permissions/            # Role-based access control
+│   ├── notifications/          # Email service + templates
+│   └── utils/                  # Helpers (cn, cloudinary, adapters)
+├── docs/                       # System documentation
+├── middleware.ts               # Auth middleware (route protection)
+├── netlify.toml                # Deployment config
+└── tailwind.config.ts          # Brand colours + custom theme
 ```
 
-## 🎯 Success Criteria
+## Architecture
 
-This demo is successful when:
+### Service Layer
 
-1. ✅ **Visually Stunning**: Clean, modern design that impresses immediately
-2. ✅ **Fully Functional**: All features work without bugs
-3. ✅ **Mobile Excellence**: Perfect mobile experience, not just responsive
-4. ✅ **Better Than References**: Clearly superior to wellness-frontend and class-dash-demo
-5. ✅ **Client Delight**: Client sees their vision come to life
+Business logic lives in `lib/services/` as standalone async functions. Each returns `Promise<{ data: T | null; error: Error | null }>`. API routes are thin wrappers: auth check, parse input, call service, return response.
 
-## 📖 Getting Started
+### Database
 
-**For the AI agent building this:**
+Two Supabase projects:
+- **Main** — Auth, profiles, bookings, sessions, templates, credits, invitations, payments
+- **Images** — Exercise library media (separate for scaling)
 
-1. Read `TRAINER_AIDE_DEMO_REQUIREMENTS.md` thoroughly
-2. Follow the 7-day implementation workflow
-3. Use the provided mock data and component examples
-4. Maintain the design system consistently
-5. Test on mobile devices throughout development
+Key table prefixes:
+- `ta_` — Trainer Aide (services, bookings, sessions, availability, templates)
+- `bs_` — Business (studios, staff)
+- `fc_` — Fitness Clients
 
-## 🎬 Demo Flow
+### Permissions
 
-1. **Studio Owner**: Create a workout template
-2. **Trainer**: View template, start session with client
-3. **Trainer**: Run through workout with one of three sign-off modes
-4. **Trainer**: Complete session with RPE and notes
-5. **Client**: View completed session in history
+Eight roles with a permission matrix: `super_admin`, `solo_practitioner`, `studio_owner`, `studio_manager`, `trainer`, `receptionist`, `finance_manager`, `client`. Role-based routing sends each user to their dashboard (`/solo`, `/studio-owner`, `/trainer`, `/client`).
 
-## 📝 Notes
+### AI Integration
 
-- This is a **demo only** - no backend integration
-- Data persists in LocalStorage for demo continuity
-- All user interactions are fully functional
-- Mock data creates realistic testing scenarios
+AI workout programs are generated via Claude with streaming responses. Programs include weekly workouts, exercises, sets/reps, and optional nutrition plans. Programs can be converted to reusable templates.
 
----
+## Getting Started
 
-**Ready to build something amazing! 💪**
+### Prerequisites
 
-For complete specifications, see: [TRAINER_AIDE_DEMO_REQUIREMENTS.md](./TRAINER_AIDE_DEMO_REQUIREMENTS.md)
+- Node.js 18+
+- npm
+- A Supabase project with the schema applied
+- API keys for: Supabase, Anthropic, Stripe, Cloudinary, Elastic Email, Google OAuth
 
-.
+### Install
+
+```bash
+npm install
+```
+
+### Environment Variables
+
+Create a `.env.local` with:
+
+```
+# Supabase (main)
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Supabase (images)
+NEXT_PUBLIC_IMAGES_SUPABASE_URL=
+NEXT_PUBLIC_IMAGES_SUPABASE_KEY=
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Google OAuth
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Cloudinary
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+
+# Anthropic (AI)
+ANTHROPIC_API_KEY=
+
+# Stripe
+STRIPE_PUBLISHABLE_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_CONNECT_WEBHOOK_SECRET=
+
+# Email (Elastic Email)
+ELASTIC_EMAIL_API_KEY=
+EMAIL_FROM=
+FROM_NAME=
+```
+
+### Run
+
+```bash
+npm run dev
+```
+
+### Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm run start` | Run production server |
+| `npm run lint` | Run ESLint |
+
+## Brand
+
+| Colour | Hex |
+|--------|-----|
+| Primary Magenta | `#A71075` |
+| Blue | `#12229D` |
+| Dark Blue | `#0A1466` |
+| Cyan | `#B8E6F0` |
+| Orange | `#F4B324` |
+
+Typography: Bodoni Moda (display), Montserrat (headings), Lato (body).
+
+## Deployment
+
+Hosted on Netlify with `@netlify/plugin-nextjs`. Serverless function timeout is 60 seconds (Business plan).
+
+## Documentation
+
+Additional documentation is in the `docs/` directory:
+- `schema-documentation.md` — Database schema reference
+- `SYSTEM-ANALYSIS.md` — Architecture analysis
+- `COMPREHENSIVE-SYSTEM-DOCUMENTATION.md` — Full system docs
+- `ISSUES-AND-ACTION-ITEMS.md` — Known issues and backlog
