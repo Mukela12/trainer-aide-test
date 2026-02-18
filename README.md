@@ -216,4 +216,4 @@ Additional documentation is in the `docs/` directory:
 - `schema-documentation.md` — Database schema reference
 - `SYSTEM-ANALYSIS.md` — Architecture analysis
 - `COMPREHENSIVE-SYSTEM-DOCUMENTATION.md` — Full system docs
-- `ISSUES-AND-ACTION-ITEMS.md` — Known issues and backlog
+- `ISSUES-AND-ACTION-ITEMS.md` — Known issues and backlog.
