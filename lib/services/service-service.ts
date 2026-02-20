@@ -20,6 +20,7 @@ interface ServiceRow {
   credits_required: number;
   color: string;
   is_active: boolean;
+  requires_approval: boolean;
   created_by: string;
   created_at: string;
 }
@@ -35,6 +36,8 @@ export interface CreateServiceInput {
   credits_required?: number;
   color?: string;
   isActive?: boolean;
+  requiresApproval?: boolean;
+  requires_approval?: boolean;
 }
 
 export interface UpdateServiceInput {
@@ -49,6 +52,8 @@ export interface UpdateServiceInput {
   color?: string;
   isActive?: boolean;
   is_active?: boolean;
+  requiresApproval?: boolean;
+  requires_approval?: boolean;
 }
 
 // ── Default services seeded for new studios/practitioners ────────────────────
@@ -140,6 +145,7 @@ export async function createService(
       credits_required: input.creditsRequired || input.credits_required || 1,
       color: input.color || '#12229D',
       is_active: input.isActive !== undefined ? input.isActive : true,
+      requires_approval: input.requiresApproval ?? input.requires_approval ?? false,
       created_by: userId,
     };
 
@@ -183,6 +189,9 @@ export async function updateService(
     if (input.color !== undefined) updateData.color = input.color;
     if (input.isActive !== undefined || input.is_active !== undefined) {
       updateData.is_active = input.isActive !== undefined ? input.isActive : input.is_active;
+    }
+    if (input.requiresApproval !== undefined || input.requires_approval !== undefined) {
+      updateData.requires_approval = input.requiresApproval !== undefined ? input.requiresApproval : input.requires_approval;
     }
 
     const { data, error } = await supabase

@@ -8,6 +8,7 @@
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendBookingConfirmationEmail, queueNotification } from '@/lib/notifications/email-service';
 import { getStudioConfig, isWithinOpeningHours } from '@/lib/services/studio-service';
+import { createBookingRequest } from '@/lib/services/booking-request-service';
 
 /**
  * Check for booking time conflicts with existing bookings.
@@ -302,7 +303,9 @@ export async function createPublicBooking(params: {
   phone?: string;
 }): Promise<{
   data: {
-    bookingId: string;
+    type: 'booking' | 'request';
+    bookingId?: string;
+    requestId?: string;
     status: string;
     requiresPayment: boolean;
     priceCents: number;
@@ -317,7 +320,7 @@ export async function createPublicBooking(params: {
     // Get service details
     const { data: service, error: serviceError } = await supabase
       .from('ta_services')
-      .select('duration, price_cents, is_intro_session')
+      .select('duration, price_cents, is_intro_session, requires_approval')
       .eq('id', params.serviceId)
       .eq('is_public', true)
       .eq('is_active', true)
@@ -339,13 +342,11 @@ export async function createPublicBooking(params: {
     // Fetch studio config for booking model, opening hours, and soft-hold length
     const publicStudioConfig = studioId ? (await getStudioConfig(studioId)).data : null;
 
-    // Enforce booking model — trainer-led studios don't accept public bookings
-    if (publicStudioConfig?.booking_model === 'trainer-led') {
-      return {
-        data: null,
-        error: new Error('This studio does not accept online bookings. Please contact the studio directly.'),
-      };
-    }
+    // Determine if this booking requires trainer approval
+    const bookingModel = publicStudioConfig?.booking_model || 'client-self-book';
+    const needsRequest =
+      bookingModel === 'trainer-led' ||
+      (bookingModel === 'hybrid' && (service.requires_approval as boolean));
 
     // Validate against studio opening hours
     if (publicStudioConfig?.opening_hours) {
@@ -449,7 +450,40 @@ export async function createPublicBooking(params: {
       }
     }
 
-    // Create booking
+    // If trainer approval is needed, create a booking request instead of a booking
+    if (needsRequest) {
+      const { data: request, error: requestError } = await createBookingRequest(
+        studioId || params.trainerId,
+        params.trainerId,
+        {
+          clientId,
+          trainerId: params.trainerId,
+          serviceId: params.serviceId,
+          preferredTimes: [params.scheduledAt],
+          notes: `Booking request via public page. Guest: ${params.firstName} ${params.lastName} (${params.email})`,
+        }
+      );
+
+      if (requestError || !request) {
+        console.error('Error creating booking request:', requestError);
+        return { data: null, error: requestError || new Error('Failed to create booking request') };
+      }
+
+      return {
+        data: {
+          type: 'request' as const,
+          requestId: request.id,
+          status: 'pending',
+          requiresPayment: false,
+          priceCents: service.price_cents,
+          hasExistingAccount: isExistingAuthUser,
+          clientId,
+        },
+        error: null,
+      };
+    }
+
+    // Create booking (auto-confirm path)
     const isFree = !service.price_cents || service.price_cents === 0 || service.is_intro_session;
 
     let bookingStatus: string;
@@ -491,6 +525,7 @@ export async function createPublicBooking(params: {
 
     return {
       data: {
+        type: 'booking' as const,
         bookingId: booking.id,
         status: bookingStatus,
         requiresPayment: !isFree,

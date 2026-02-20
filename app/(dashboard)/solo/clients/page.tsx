@@ -317,7 +317,7 @@ export default function SoloClientsPage() {
               </Button>
               <Button
                 onClick={() => setAddDialogOpen(true)}
-                className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                className="gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-blue/90 hover:to-wondrous-magenta/90"
               >
                 <UserPlus size={18} />
                 <span className="hidden sm:inline">Add Client</span>
@@ -409,7 +409,7 @@ export default function SoloClientsPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowCreditFilter(!showCreditFilter)}
-                    className={cn('gap-2', creditFilter !== 'all' && 'border-purple-500 bg-purple-50 dark:bg-purple-900/20')}
+                    className={cn('gap-2', creditFilter !== 'all' && 'border-wondrous-blue bg-wondrous-blue-light dark:bg-wondrous-blue/10')}
                   >
                     <CreditCard size={14} />
                     Credits: {creditFilter === 'all' ? 'All' : creditFilter === 'with-credits' ? 'Has' : creditFilter === 'low-credits' ? 'Low' : 'None'}
@@ -426,7 +426,7 @@ export default function SoloClientsPage() {
                           }}
                           className={cn(
                             'w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700',
-                            creditFilter === filter && 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
+                            creditFilter === filter && 'bg-wondrous-blue-light dark:bg-wondrous-blue/10 text-wondrous-dark-blue dark:text-wondrous-blue'
                           )}
                         >
                           {filter === 'all' ? 'All' : filter === 'with-credits' ? 'Has Credits' : filter === 'low-credits' ? 'Low (1-3)' : 'No Credits'}
@@ -442,7 +442,7 @@ export default function SoloClientsPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowStatusFilter(!showStatusFilter)}
-                    className={cn('gap-2', statusFilter !== 'all' && 'border-purple-500 bg-purple-50 dark:bg-purple-900/20')}
+                    className={cn('gap-2', statusFilter !== 'all' && 'border-wondrous-blue bg-wondrous-blue-light dark:bg-wondrous-blue/10')}
                   >
                     <Users size={14} />
                     Status: {statusFilter === 'all' ? 'All' : statusFilter === 'active' ? 'Active' : 'Pending'}
@@ -459,7 +459,7 @@ export default function SoloClientsPage() {
                           }}
                           className={cn(
                             'w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700',
-                            statusFilter === filter && 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
+                            statusFilter === filter && 'bg-wondrous-blue-light dark:bg-wondrous-blue/10 text-wondrous-dark-blue dark:text-wondrous-blue'
                           )}
                         >
                           {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
@@ -640,12 +640,12 @@ export default function SoloClientsPage() {
             Add your first client
           </h2>
           <p className="text-gray-500 dark:text-gray-400 text-center max-w-md mb-8">
-            Clients are the foundation of your studio. Add one manually or invite them to join.
+            Start building the foundations of your business — let&apos;s invite your first client. You can also import clients in bulk via CSV.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Button
               onClick={() => setAddDialogOpen(true)}
-              className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              className="gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-blue/90 hover:to-wondrous-magenta/90"
             >
               <UserPlus size={18} />
               Add client manually
@@ -847,7 +847,7 @@ export default function SoloClientsPage() {
               {/* Actions */}
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
                 <Button
-                  className="w-full gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                  className="w-full gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-blue/90 hover:to-wondrous-magenta/90"
                   onClick={() => {
                     setRewardCreditsClient(selectedClient);
                     closeClientDrawer();

@@ -12,7 +12,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/lib/hooks/use-toast';
 import { useCreateClient } from '@/lib/hooks/use-clients';
 
@@ -25,7 +24,6 @@ interface AddClientDialogProps {
 export function AddClientDialog({ open, onOpenChange, onSuccess }: AddClientDialogProps) {
   const { toast } = useToast();
   const createClient = useCreateClient();
-  const [sendWelcomeEmail, setSendWelcomeEmail] = useState(true);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -47,22 +45,17 @@ export function AddClientDialog({ open, onOpenChange, onSuccess }: AddClientDial
     }
 
     try {
-      const data = await createClient.mutateAsync({ ...formData, sendWelcomeEmail });
+      const data = await createClient.mutateAsync({ ...formData, sendWelcomeEmail: true });
 
-      if (sendWelcomeEmail && data.emailSent) {
+      if (data.emailSent) {
         toast({
           title: 'Client added',
           description: `${formData.firstName} ${formData.lastName} has been added and a welcome email was sent.`,
         });
-      } else if (sendWelcomeEmail && !data.emailSent) {
-        toast({
-          title: 'Client added',
-          description: `${formData.firstName} ${formData.lastName} was added, but the welcome email could not be sent.`,
-        });
       } else {
         toast({
           title: 'Client added',
-          description: `${formData.firstName} ${formData.lastName} has been added successfully.`,
+          description: `${formData.firstName} ${formData.lastName} was added, but the welcome email could not be sent.`,
         });
       }
 
@@ -74,7 +67,6 @@ export function AddClientDialog({ open, onOpenChange, onSuccess }: AddClientDial
         phone: '',
         credits: 0,
       });
-      setSendWelcomeEmail(true);
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -141,31 +133,9 @@ export function AddClientDialog({ open, onOpenChange, onSuccess }: AddClientDial
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="credits">Initial Credits</Label>
-            <Input
-              id="credits"
-              type="number"
-              min="0"
-              value={formData.credits}
-              onChange={(e) => setFormData({ ...formData, credits: parseInt(e.target.value) || 0 })}
-              placeholder="0"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2 pt-2">
-            <Checkbox
-              id="sendWelcomeEmail"
-              checked={sendWelcomeEmail}
-              onCheckedChange={(checked) => setSendWelcomeEmail(checked === true)}
-            />
-            <Label
-              htmlFor="sendWelcomeEmail"
-              className="text-sm font-normal cursor-pointer"
-            >
-              Send welcome email to set up account
-            </Label>
-          </div>
+          <p className="text-xs text-muted-foreground pt-2">
+            A welcome email will be sent so the client can set up their account.
+          </p>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

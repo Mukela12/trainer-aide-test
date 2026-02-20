@@ -517,7 +517,7 @@ export default function UnifiedTemplatesPage() {
         actions={
           <Button
             onClick={() => setShowCreateModal(true)}
-            className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+            className="gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-blue/90 hover:to-wondrous-magenta/90 text-white"
           >
             <Plus size={20} />
             <span className="hidden sm:inline">Create Template</span>

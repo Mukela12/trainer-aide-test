@@ -35,7 +35,6 @@ export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTra
     lastName: '',
     role: 'trainer',
     message: '',
-    commissionPercent: 70,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const inviteTrainer = useInviteTrainer();
@@ -48,7 +47,6 @@ export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTra
       lastName: '',
       role: 'trainer',
       message: '',
-      commissionPercent: 70,
     });
     setErrors({});
     setIsSuccess(false);
@@ -69,10 +67,6 @@ export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTra
       newErrors.email = 'Please enter a valid email';
     }
 
-    if (formData.commissionPercent < 0 || formData.commissionPercent > 100) {
-      newErrors.commissionPercent = 'Commission must be between 0-100%';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -89,7 +83,6 @@ export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTra
         lastName: formData.lastName || null,
         role: formData.role,
         message: formData.message || null,
-        commissionPercent: formData.commissionPercent,
       });
 
       setIsSuccess(true);
@@ -204,28 +197,6 @@ export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTra
                 </Button>
               ))}
             </div>
-          </div>
-
-          {/* Commission */}
-          <div>
-            <Label htmlFor="commission">Commission %</Label>
-            <Input
-              id="commission"
-              type="number"
-              min={0}
-              max={100}
-              value={formData.commissionPercent}
-              onChange={(e) =>
-                setFormData({ ...formData, commissionPercent: parseInt(e.target.value) || 0 })
-              }
-              className={cn('mt-1', errors.commissionPercent && 'border-red-500')}
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Percentage of session revenue the trainer receives
-            </p>
-            {errors.commissionPercent && (
-              <p className="text-xs text-red-500 mt-1">{errors.commissionPercent}</p>
-            )}
           </div>
 
           {/* Message */}

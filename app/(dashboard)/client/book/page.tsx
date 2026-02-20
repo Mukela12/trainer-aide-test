@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,8 @@ import {
   User,
   Clock,
   CreditCard,
+  Shield,
+  Loader2,
 } from 'lucide-react';
 import ContentHeader from '@/components/shared/ContentHeader';
 import { ServiceSelector } from '@/components/client/booking/ServiceSelector';
@@ -43,6 +45,29 @@ export default function ClientBookPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<BookingStep>('service');
   const [error, setError] = useState<string | null>(null);
+
+  // Health check gate state
+  const [healthCheckStatus, setHealthCheckStatus] = useState<'loading' | 'valid' | 'required'>('loading');
+
+  useEffect(() => {
+    const checkHealthStatus = async () => {
+      try {
+        const response = await fetch('/api/client/health-check');
+        const result = await response.json();
+
+        if (result.valid) {
+          setHealthCheckStatus('valid');
+        } else {
+          setHealthCheckStatus('required');
+        }
+      } catch {
+        // If we can't check, allow booking (don't block on network errors)
+        setHealthCheckStatus('valid');
+      }
+    };
+
+    checkHealthStatus();
+  }, []);
 
   // Selected values
   const [selectedService, setSelectedService] = useState<ClientService | null>(null);
@@ -116,6 +141,48 @@ export default function ClientBookPage() {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
     }
   };
+
+  // Health check loading state
+  if (healthCheckStatus === 'loading') {
+    return (
+      <div className="p-4 lg:p-8 max-w-4xl mx-auto flex items-center justify-center h-96">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-wondrous-blue mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Checking your account...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Health check gate
+  if (healthCheckStatus === 'required') {
+    return (
+      <div className="p-4 lg:p-8 max-w-2xl mx-auto">
+        <Card className="border-2 border-blue-200 dark:border-blue-800">
+          <CardContent className="p-8 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-wondrous-blue to-wondrous-magenta rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <Shield className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+              Complete Your Health Check
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+              Before booking your first session, we need you to complete a quick
+              health and safety questionnaire. This takes about 2 minutes and
+              helps your trainer keep you safe.
+            </p>
+            <Button
+              onClick={() => router.push('/client/health-check?returnTo=/client/book')}
+              className="bg-gradient-to-r from-wondrous-blue to-wondrous-magenta text-white font-semibold px-8 py-3 shadow-lg hover:shadow-xl transition-all"
+            >
+              <Shield className="w-4 h-4 mr-2" />
+              Complete Health Check
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-8 max-w-4xl mx-auto">

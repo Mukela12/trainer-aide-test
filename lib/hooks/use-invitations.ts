@@ -99,7 +99,6 @@ interface InviteTrainerInput {
   lastName?: string | null;
   role: string;
   message?: string | null;
-  commissionPercent: number;
 }
 
 async function createTrainerInvitationApi(input: InviteTrainerInput): Promise<{ invitation: unknown; emailSent: boolean }> {

@@ -103,8 +103,12 @@ export default function CheckoutPage() {
       // Clear session storage
       sessionStorage.removeItem('booking_selection');
 
-      // Redirect to confirmation page
-      router.push(`/book/${slug}/confirm/${data.bookingId}`);
+      // Redirect to confirmation page with type indicator
+      if (data.type === 'request') {
+        router.push(`/book/${slug}/confirm/${data.requestId}?type=request`);
+      } else {
+        router.push(`/book/${slug}/confirm/${data.bookingId}`);
+      }
     } catch (error) {
       console.error('Checkout error:', error);
       setErrors({ submit: error instanceof Error ? error.message : 'Failed to complete booking. Please try again.' });

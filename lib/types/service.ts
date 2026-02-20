@@ -15,6 +15,7 @@ export interface Service {
   creditsRequired: number; // How many credits this service costs
   color: string; // For visual identification
   isActive: boolean;
+  requiresApproval?: boolean; // When true, clients must submit a booking request (hybrid model)
   createdBy: string; // Studio owner ID
   assignedStudios: string[]; // Which studios offer this service
   createdAt: string;

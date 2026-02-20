@@ -15,6 +15,7 @@ import {
   BookOpen,
   User,
   Users,
+  UsersRound,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -73,6 +74,7 @@ const studioOwnerGroups: NavGroup[] = [
     title: 'OPERATE',
     links: [
       { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+      { href: '/studio-owner/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
       { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
       { href: '/studio-owner/clients', label: 'Clients', icon: <Users size={20} /> },
       { href: '/studio-owner/sessions', label: 'All Sessions', icon: <Dumbbell size={20} /> },
@@ -83,8 +85,7 @@ const studioOwnerGroups: NavGroup[] = [
     links: [
       { href: '/studio-owner/packages', label: 'Packages', icon: <Package size={20} /> },
       { href: '/studio-owner/templates', label: 'Templates', icon: <FileText size={20} />, badge: 'AI' },
-      { href: '/studio-owner/trainers', label: 'Trainers', icon: <UserPlus size={20} /> },
-      { href: '/studio-owner/team', label: 'Team', icon: <UserPlus size={20} /> },
+      { href: '/studio-owner/staff', label: 'Staff', icon: <UsersRound size={20} /> },
     ],
   },
   {
@@ -130,12 +131,27 @@ const clientGroups: NavGroup[] = [
   },
 ];
 
+/** Check if a nav link should be active based on the current pathname. */
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === '/solo' || href === '/trainer' || href === '/studio-owner' || href === '/client') {
+    return pathname === href;
+  }
+  return pathname === href || pathname.startsWith(href + '/');
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { currentRole, currentUser } = useUserStore();
   const { signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleToggleCollapse = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    // Update CSS variable so the layout can adjust its margin
+    document.documentElement.style.setProperty('--sidebar-width', next ? '5rem' : '16rem');
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -190,7 +206,7 @@ export function Sidebar() {
 
         {/* Toggle Button */}
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={handleToggleCollapse}
           className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-600 shadow-sm transition-colors"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -204,13 +220,13 @@ export function Sidebar() {
           <div key={group.title}>
             {/* Section Header */}
             {!collapsed && (
-              <div className="px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              <div className="px-3 py-2 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                 {group.title}
               </div>
             )}
             <div className="space-y-1">
               {group.links.map((link) => {
-                const isActive = pathname === link.href;
+                const isActive = isNavActive(pathname, link.href);
 
                 return (
                   <Link
@@ -221,17 +237,17 @@ export function Sidebar() {
                       collapsed ? "px-2 py-2.5 justify-center" : "px-3 py-2.5",
                       isActive
                         ? "bg-slate-100 dark:bg-slate-800 text-gray-900 dark:text-gray-100"
-                        : "text-gray-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-gray-200"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200"
                     )}
                     title={collapsed ? link.label : undefined}
                   >
                     {/* Subtle accent indicator for active state */}
                     {isActive && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-gradient-to-b from-wondrous-blue to-wondrous-magenta rounded-full" />
                     )}
                     <span className={cn(
                       "transition-colors",
-                      isActive ? "text-gray-900 dark:text-gray-100" : "text-gray-500 dark:text-gray-400"
+                      isActive ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
                     )}>
                       {link.icon}
                     </span>

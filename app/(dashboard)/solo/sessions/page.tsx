@@ -165,13 +165,13 @@ export default function ServicesPage() {
         stats={headerStats}
         actions={
           mainTab === 'services' ? (
-            <Button onClick={handleAddService} className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+            <Button onClick={handleAddService} className="gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-blue/90 hover:to-wondrous-magenta/90">
               <Plus size={20} />
               <span className="hidden sm:inline">Add Service</span>
             </Button>
           ) : (
             <Link href="/trainer/sessions/new">
-              <Button className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+              <Button className="gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-blue/90 hover:to-wondrous-magenta/90">
                 <Plus size={20} />
                 <span className="hidden sm:inline">New Session</span>
               </Button>

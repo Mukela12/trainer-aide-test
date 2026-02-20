@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { getStudioConfig, isWithinOpeningHours } from '@/lib/services/studio-service';
 import type { StudioConfig } from '@/lib/services/studio-service';
+import { createBookingRequest } from '@/lib/services/booking-request-service';
 
 // =============================================
 // Types
@@ -22,7 +23,9 @@ interface CreateClientBookingInput {
 }
 
 interface CreateClientBookingResult {
-  booking: ClientBooking;
+  type: 'booking' | 'request';
+  booking?: ClientBooking;
+  requestId?: string;
   remainingCredits: number;
 }
 
@@ -141,7 +144,7 @@ async function checkBookingConflicts(
     .from('ta_bookings')
     .select('id')
     .eq('trainer_id', trainerId)
-    .in('status', ['confirmed', 'pending'])
+    .in('status', ['confirmed', 'soft-hold', 'checked-in'])
     .lt('scheduled_at', endTime.toISOString())
     .gte('scheduled_at', new Date(scheduledDate.getTime() - 120 * 60 * 1000).toISOString());
 
@@ -151,7 +154,7 @@ async function checkBookingConflicts(
     .from('ta_bookings')
     .select('id, scheduled_at, duration')
     .eq('trainer_id', trainerId)
-    .in('status', ['confirmed', 'pending'])
+    .in('status', ['confirmed', 'soft-hold', 'checked-in'])
     .gte('scheduled_at', new Date(scheduledDate.getTime() - 120 * 60 * 1000).toISOString())
     .lte('scheduled_at', endTime.toISOString());
 
@@ -261,22 +264,13 @@ export async function createClientBooking(
     clientStudioConfig = cfg;
   }
 
-  // Enforce booking model — trainer-led studios require booking requests
-  if (clientStudioConfig?.booking_model === 'trainer-led') {
-    return {
-      data: null,
-      error: new Error('This studio requires trainer-approved bookings. Please submit a booking request instead.'),
-      status: 403,
-    };
-  }
-
   const simpleCredits = (client.credits as number) || 0;
   const lookupIds = await buildLookupIds(supabase, client as { id: string; studio_id: string | null; invited_by: string | null });
 
-  // Validate service
+  // Validate service (fetch before booking model check so we can check requires_approval)
   const { data: service, error: serviceError } = await supabase
     .from('ta_services')
-    .select('id, name, duration, credits_required, studio_id, created_by, is_active, is_public')
+    .select('id, name, duration, credits_required, studio_id, created_by, is_active, is_public, requires_approval')
     .eq('id', serviceId)
     .single();
 
@@ -312,6 +306,42 @@ export async function createClientBooking(
   const trainerName = trainerProfile
     ? `${trainerProfile.first_name || ''} ${trainerProfile.last_name || ''}`.trim() || 'Trainer'
     : 'Trainer';
+
+  // Determine if this booking requires a request (trainer approval)
+  const bookingModel = clientStudioConfig?.booking_model || 'client-self-book';
+  const needsRequest =
+    bookingModel === 'trainer-led' ||
+    (bookingModel === 'hybrid' && (service.requires_approval as boolean));
+
+  // If a request is needed, create a booking request instead of a confirmed booking
+  if (needsRequest) {
+    const bookingStudioId = (client.studio_id as string) || (service.studio_id as string) || (service.created_by as string) || trainerId;
+
+    const { data: request, error: requestError } = await createBookingRequest(
+      bookingStudioId,
+      trainerId,
+      {
+        clientId: client.id as string,
+        trainerId,
+        serviceId,
+        preferredTimes: [scheduledAt],
+        notes: null,
+      }
+    );
+
+    if (requestError || !request) {
+      return { data: null, error: requestError || new Error('Failed to create booking request'), status: 500 };
+    }
+
+    return {
+      data: {
+        type: 'request' as const,
+        requestId: request.id,
+        remainingCredits: 0,
+      },
+      error: null,
+    };
+  }
 
   // Check credits
   const { data: packages } = await supabase
@@ -361,8 +391,16 @@ export async function createClientBooking(
     };
   }
 
-  // Create booking
+  // Create booking — respect soft-hold setting from studio config
   const bookingStudioId = (client.studio_id as string) || (service.studio_id as string) || (service.created_by as string) || trainerId;
+
+  let bookingStatus = 'confirmed';
+  let holdExpiry: string | null = null;
+
+  if (clientStudioConfig?.soft_hold_length != null) {
+    bookingStatus = 'soft-hold';
+    holdExpiry = new Date(Date.now() + clientStudioConfig.soft_hold_length * 60 * 1000).toISOString();
+  }
 
   const { data: booking, error: bookingError } = await supabase
     .from('ta_bookings')
@@ -373,7 +411,8 @@ export async function createClientBooking(
       studio_id: bookingStudioId,
       scheduled_at: scheduledAt,
       duration: service.duration,
-      status: 'confirmed',
+      status: bookingStatus,
+      hold_expiry: holdExpiry,
     })
     .select()
     .single();
@@ -423,6 +462,7 @@ export async function createClientBooking(
 
   return {
     data: {
+      type: 'booking' as const,
       booking: {
         id: (booking as Record<string, unknown>).id as string,
         scheduledAt: (booking as Record<string, unknown>).scheduled_at as string,
