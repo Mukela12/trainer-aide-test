@@ -222,7 +222,7 @@ function mapRole(role: string | null): string {
 async function lookupUserProfile(
   supabase: ReturnType<typeof getSupabaseBrowserClient>,
   user: { id: string; email?: string }
-): Promise<{ id: string; email: string; firstName: string; lastName: string; role: string; studioId?: string; isOnboarded?: boolean; businessSlug?: string } | null> {
+): Promise<{ id: string; email: string; firstName: string; lastName: string; role: string; studioId?: string; isOnboarded?: boolean; businessSlug?: string; businessName?: string } | null> {
 
   // 1. Check profiles table first
   const { data: profile } = await supabase
@@ -240,6 +240,7 @@ async function lookupUserProfile(
       role: mapRole(profile.role),
       isOnboarded: profile.is_onboarded === true,
       businessSlug: profile.business_slug || undefined,
+      businessName: profile.business_name || undefined,
     }
   }
 
@@ -260,6 +261,7 @@ async function lookupUserProfile(
         role: mapRole(profileByEmail.role),
         isOnboarded: profileByEmail.is_onboarded === true,
         businessSlug: profileByEmail.business_slug || undefined,
+        businessName: profileByEmail.business_name || undefined,
       }
     }
   }

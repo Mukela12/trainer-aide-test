@@ -67,7 +67,7 @@ function TierTwoActions() {
 }
 
 export default function SoloPractitionerDashboard() {
-  const { currentUser, businessSlug } = useUserStore();
+  const { currentUser, businessSlug, businessName } = useUserStore();
   const { sessions: calendarSessions } = useBookings(currentUser.id);
 
   // React Query hooks
@@ -130,7 +130,7 @@ export default function SoloPractitionerDashboard() {
           <div>
             <p className="text-white/70 text-sm font-medium mb-1">{dateString}</p>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-              Welcome back, {currentUser.firstName}
+              Welcome back{businessName || currentUser.firstName ? `, ${businessName || currentUser.firstName}` : ''}
             </h1>
             <p className="text-white/70">
               This week: <span className="text-white font-medium">£{isLoading ? '...' : (stats.earningsThisWeek / 100).toFixed(0)} earned</span>

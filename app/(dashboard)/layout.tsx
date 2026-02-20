@@ -16,10 +16,10 @@ export default function DashboardLayout({
 }) {
   return (
     <OnboardingGuard>
-      <div className="min-h-screen overflow-x-hidden pb-20 lg:pb-0">
+      <div className="min-h-screen pb-20 lg:pb-0">
         <Sidebar />
         <MobileNav />
-        <main className="pt-14 lg:pt-0 transition-all duration-300" style={{ marginLeft: 'var(--sidebar-width, 16rem)' } as React.CSSProperties}>
+        <main className="pt-14 lg:pt-0 transition-all duration-300 overflow-x-hidden" style={{ marginLeft: 'var(--sidebar-width, 16rem)' } as React.CSSProperties}>
           <style>{`@media (max-width: 1023px) { main { margin-left: 0 !important; } }`}</style>
           {children}
         </main>
