@@ -459,12 +459,12 @@ export default function ClientsPage() {
             Add your first client
           </h2>
           <p className="text-gray-500 dark:text-gray-400 text-center max-w-md mb-8">
-            Clients are the foundation of your studio. Add one manually or invite them to join.
+            Start building the foundations of your business — let&apos;s invite your first client. You can also import clients in bulk via CSV.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <Button
               onClick={() => setAddDialogOpen(true)}
-              className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              className="gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-blue/90 hover:to-wondrous-magenta/90"
             >
               <UserPlus size={18} />
               Add client manually

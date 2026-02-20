@@ -818,7 +818,7 @@ export default function TrainerCalendar() {
                 className={cn(
                   "px-3 py-1 text-[11px] lg:text-xs font-medium transition-all",
                   viewMode === "day"
-                    ? "text-gray-900 dark:text-gray-100 border-b-2 border-gray-900 dark:border-gray-100"
+                    ? "text-gray-900 dark:text-gray-100 border-b-2 border-wondrous-blue dark:border-wondrous-blue"
                     : "text-gray-500 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-700 dark:hover:text-gray-300"
                 )}
                 aria-label="Day view"
@@ -831,7 +831,7 @@ export default function TrainerCalendar() {
                 className={cn(
                   "px-3 py-1 text-[11px] lg:text-xs font-medium transition-all",
                   viewMode === "week"
-                    ? "text-gray-900 dark:text-gray-100 border-b-2 border-gray-900 dark:border-gray-100"
+                    ? "text-gray-900 dark:text-gray-100 border-b-2 border-wondrous-blue dark:border-wondrous-blue"
                     : "text-gray-500 dark:text-gray-400 border-b-2 border-transparent hover:text-gray-700 dark:hover:text-gray-300"
                 )}
                 aria-label="Week view"
@@ -921,7 +921,7 @@ export default function TrainerCalendar() {
                         now.setMinutes(0, 0, 0);
                         handleQuickSlotClick(now);
                       }}
-                      className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                      className="gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-dark-blue hover:to-wondrous-primary-hover"
                     >
                       <Plus size={16} />
                       Book a session
@@ -1849,7 +1849,7 @@ export default function TrainerCalendar() {
                         className={cn(
                           "border-2 rounded-xl p-3 text-left hover:opacity-90 transition-all",
                           selectedSignOffMode === mode.value
-                            ? "bg-blue-500 border-blue-500 text-white"
+                            ? "bg-wondrous-blue border-wondrous-blue text-white"
                             : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                         )}
                       >
@@ -2112,7 +2112,7 @@ export default function TrainerCalendar() {
                         className={cn(
                           "border-2 rounded-xl p-3 text-left hover:opacity-90 transition-all",
                           setupSignOffMode === mode.value
-                            ? "bg-blue-500 border-blue-500 text-white"
+                            ? "bg-wondrous-blue border-wondrous-blue text-white"
                             : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                         )}
                       >
@@ -2345,7 +2345,7 @@ export default function TrainerCalendar() {
                       className={cn(
                         "border-2 rounded-xl p-3 text-left hover:opacity-90 transition-all",
                         blockReason === reason.value
-                          ? "bg-gray-700 border-gray-700 text-white"
+                          ? "bg-slate-600 border-slate-600 text-white"
                           : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                       )}
                     >
@@ -2414,7 +2414,7 @@ export default function TrainerCalendar() {
             // Empty day: Primary action is to open availability
             <button
               onClick={openBlockTimePanel}
-              className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-pink-600 transition-all flex items-center justify-center"
+              className="w-14 h-14 rounded-full bg-gradient-to-r from-wondrous-blue to-wondrous-magenta text-white shadow-lg hover:shadow-xl hover:from-wondrous-dark-blue hover:to-wondrous-primary-hover transition-all flex items-center justify-center"
               aria-label="Set availability"
               title="Set availability"
             >
@@ -2424,7 +2424,7 @@ export default function TrainerCalendar() {
             // Busy day: Primary action is to book a session
             <button
               onClick={() => handleQuickSlotClick(new Date())}
-              className="w-14 h-14 rounded-full bg-amber-400 text-amber-900 shadow-lg hover:shadow-xl hover:bg-amber-500 transition-all flex items-center justify-center"
+              className="w-14 h-14 rounded-full bg-wondrous-orange text-white shadow-lg hover:shadow-xl hover:brightness-110 transition-all flex items-center justify-center"
               aria-label="Quick book"
               title="Quick book"
             >

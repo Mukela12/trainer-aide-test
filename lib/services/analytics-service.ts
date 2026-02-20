@@ -7,6 +7,177 @@
 
 import { createServiceRoleClient } from '@/lib/supabase/server';
 
+// ---------------------------------------------------------------------------
+// Studio Owner / Operator analytics
+// ---------------------------------------------------------------------------
+
+export interface OperatorStats {
+  todaySessions: number;
+  activeTrainers: number;
+  activeClients: number;
+  pendingActions: number;
+}
+
+export interface UpcomingSessionRow {
+  id: string;
+  clientName: string;
+  trainerName: string | null;
+  scheduledAt: string;
+  serviceName: string;
+  status: string;
+}
+
+/**
+ * Count sessions scheduled for today across the studio.
+ */
+export async function getTodaySessionCount(studioId: string): Promise<number> {
+  const supabase = createServiceRoleClient();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const { count, error } = await supabase
+    .from('ta_bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('studio_id', studioId)
+    .gte('scheduled_at', todayStart.toISOString())
+    .lte('scheduled_at', todayEnd.toISOString())
+    .in('status', ['confirmed', 'soft-hold', 'checked-in', 'completed']);
+
+  if (error) {
+    console.error('Error fetching today sessions:', error);
+    return 0;
+  }
+  return count || 0;
+}
+
+/**
+ * Count active trainers (staff members linked to the studio).
+ */
+export async function getActiveTrainerCount(studioId: string): Promise<number> {
+  const supabase = createServiceRoleClient();
+
+  const { count, error } = await supabase
+    .from('bs_staff')
+    .select('id', { count: 'exact', head: true })
+    .eq('studio_id', studioId)
+    .eq('staff_type', 'trainer');
+
+  if (error) {
+    console.error('Error fetching active trainers:', error);
+    return 0;
+  }
+  return count || 0;
+}
+
+/**
+ * Count pending actions: booking requests + expired health checks.
+ */
+export async function getPendingActionsCount(studioId: string): Promise<number> {
+  const supabase = createServiceRoleClient();
+
+  // Pending booking requests
+  const { count: pendingBookings } = await supabase
+    .from('ta_bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('studio_id', studioId)
+    .eq('status', 'pending');
+
+  // Expired soft holds
+  const { count: expiredHolds } = await supabase
+    .from('ta_bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('studio_id', studioId)
+    .eq('status', 'soft-hold')
+    .lt('hold_expiry', new Date().toISOString());
+
+  return (pendingBookings || 0) + (expiredHolds || 0);
+}
+
+/**
+ * Get the next N upcoming sessions for a studio.
+ */
+export async function getUpcomingSessions(studioId: string, limit = 5): Promise<UpcomingSessionRow[]> {
+  const supabase = createServiceRoleClient();
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('ta_bookings')
+    .select(`
+      id,
+      scheduled_at,
+      status,
+      duration,
+      client:client_id ( first_name, last_name ),
+      trainer:trainer_id ( first_name, last_name ),
+      service:service_id ( name )
+    `)
+    .eq('studio_id', studioId)
+    .gte('scheduled_at', now)
+    .in('status', ['confirmed', 'soft-hold'])
+    .order('scheduled_at', { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching upcoming sessions:', error);
+    return [];
+  }
+
+  return (data || []).map((row: Record<string, unknown>) => {
+    const client = row.client as { first_name?: string; last_name?: string } | null;
+    const trainer = row.trainer as { first_name?: string; last_name?: string } | null;
+    const service = row.service as { name?: string } | null;
+    return {
+      id: row.id as string,
+      clientName: client ? `${client.first_name || ''} ${client.last_name || ''}`.trim() : 'Unknown',
+      trainerName: trainer ? `${trainer.first_name || ''} ${trainer.last_name || ''}`.trim() : null,
+      scheduledAt: row.scheduled_at as string,
+      serviceName: service?.name || 'Session',
+      status: row.status as string,
+    };
+  });
+}
+
+/**
+ * Get aggregated operator stats for the studio owner dashboard.
+ */
+export async function getOperatorStats(studioId: string): Promise<{
+  data: OperatorStats | null;
+  error: Error | null;
+}> {
+  try {
+    const [todaySessions, activeTrainers, pendingActions] = await Promise.all([
+      getTodaySessionCount(studioId),
+      getActiveTrainerCount(studioId),
+      getPendingActionsCount(studioId),
+    ]);
+
+    // Active clients from fc_clients linked to the studio
+    const supabase = createServiceRoleClient();
+    const { count: activeClients } = await supabase
+      .from('fc_clients')
+      .select('id', { count: 'exact', head: true })
+      .eq('studio_id', studioId);
+
+    return {
+      data: {
+        todaySessions,
+        activeTrainers,
+        activeClients: activeClients || 0,
+        pendingActions,
+      },
+      error: null,
+    };
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err : new Error(String(err)) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trainer analytics (existing)
+// ---------------------------------------------------------------------------
+
 export interface DashboardAnalytics {
   earningsThisWeek: number;
   earningsThisMonth: number;

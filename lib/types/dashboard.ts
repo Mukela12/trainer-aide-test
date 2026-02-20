@@ -15,6 +15,22 @@ export interface StudioOwnerDashboardStats {
   totalClients: number;
 }
 
+export interface OperatorDashboardStats {
+  todaySessions: number;
+  activeTrainers: number;
+  activeClients: number;
+  pendingActions: number;
+}
+
+export interface OperatorUpcomingSession {
+  id: string;
+  clientName: string;
+  trainerName: string | null;
+  scheduledAt: string;
+  serviceName: string;
+  status: string;
+}
+
 export interface SoloDashboardStats {
   earningsThisWeek: number;
   sessionsThisWeek: number;

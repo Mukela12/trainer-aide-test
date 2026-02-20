@@ -61,3 +61,7 @@ Thumbs.db
 # Temporary folders
 tmp/
 temp/
+
+# Data exports / scratch files
+*.csv
+health stepper/

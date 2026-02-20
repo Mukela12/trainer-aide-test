@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Service, ServiceType, ServiceDuration } from '@/lib/types/service';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils/cn';
 import { Clock, User, Users, UsersRound } from 'lucide-react';
 
@@ -43,6 +44,7 @@ export function ServiceFormDialog({ open, onClose, onSave, service }: ServiceFor
     maxCapacity: 1,
     creditsRequired: 1,
     color: PRESET_COLORS[0],
+    requiresApproval: false,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -58,6 +60,7 @@ export function ServiceFormDialog({ open, onClose, onSave, service }: ServiceFor
         maxCapacity: service.maxCapacity,
         creditsRequired: service.creditsRequired,
         color: service.color,
+        requiresApproval: service.requiresApproval ?? false,
       });
     } else {
       // Reset form when creating new
@@ -69,6 +72,7 @@ export function ServiceFormDialog({ open, onClose, onSave, service }: ServiceFor
         maxCapacity: 1,
         creditsRequired: 1,
         color: PRESET_COLORS[0],
+        requiresApproval: false,
       });
     }
     setErrors({});
@@ -267,6 +271,25 @@ export function ServiceFormDialog({ open, onClose, onSave, service }: ServiceFor
               How many credits clients need to book this service
             </p>
             {errors.creditsRequired && <p className="text-xs text-red-500 mt-1">{errors.creditsRequired}</p>}
+          </div>
+
+          {/* Requires Approval */}
+          <div>
+            <div className="flex items-start gap-3 mt-1">
+              <Checkbox
+                id="requiresApproval"
+                checked={formData.requiresApproval}
+                onCheckedChange={(checked) => setFormData({ ...formData, requiresApproval: checked as boolean })}
+              />
+              <div>
+                <label htmlFor="requiresApproval" className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer">
+                  Requires Trainer Approval
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  When enabled, clients must submit a booking request for this service. Only applies to Hybrid booking model.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Color */}

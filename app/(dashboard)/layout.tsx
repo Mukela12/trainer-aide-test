@@ -19,7 +19,8 @@ export default function DashboardLayout({
       <div className="min-h-screen overflow-x-hidden pb-20 lg:pb-0">
         <Sidebar />
         <MobileNav />
-        <main className="lg:ml-64 pt-14 lg:pt-0">
+        <main className="pt-14 lg:pt-0 transition-all duration-300" style={{ marginLeft: 'var(--sidebar-width, 16rem)' } as React.CSSProperties}>
+          <style>{`@media (max-width: 1023px) { main { margin-left: 0 !important; } }`}</style>
           {children}
         </main>
         <MobileBottomNav />

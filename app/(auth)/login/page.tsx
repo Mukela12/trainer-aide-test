@@ -23,7 +23,6 @@ function LoginPageContent() {
   // Form state - pre-fill email if provided
   const [email, setEmail] = useState(prefillEmail || '')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword]  = useState('')
 
   // Build callback URL with returnTo parameter
   const getCallbackUrl = () => {
@@ -40,13 +39,6 @@ function LoginPageContent() {
       const supabase = getSupabaseBrowserClient()
 
       if (isSignUp) {
-        // Validate passwords match
-        if (password !== confirmPassword) {
-          setError('Passwords do not match')
-          setIsLoading(false)
-          return
-        }
-
         // Sign up with email - include returnTo in callback URL
         const callbackUrl = `${window.location.origin}${getCallbackUrl()}`
         const { data, error } = await supabase.auth.signUp({
@@ -161,26 +153,17 @@ function LoginPageContent() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo and Header */}
-        <div className="text-center mb-8">
-          <div className="relative w-48 h-16 mx-auto mb-6">
+        <div className="text-center mb-8 mt-4">
+          <div className="relative w-64 h-24 mx-auto mb-6">
             <Image
               src="/images/all-wondrous-logo.svg"
               alt="All Wondrous"
               fill
-              sizes="192px"
+              sizes="256px"
               className="object-contain"
               priority
             />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 font-heading mb-2">
-            allwondrous
-          </h1>
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-            Built for modern studio operators
-          </p>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
-            {isSignUp ? 'Create your account' : 'Welcome back'}
-          </p>
         </div>
 
         {/* Login Card */}
@@ -285,27 +268,6 @@ function LoginPageContent() {
               </div>
             </div>
 
-            {isSignUp && (
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Confirm Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    id="confirmPassword"
-                    type={showPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    className="w-full pl-10 pr-12 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Confirm your password"
-                  />
-                </div>
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={isLoading || isGoogleLoading}
@@ -340,7 +302,6 @@ function LoginPageContent() {
                 onClick={() => {
                   setIsSignUp(!isSignUp)
                   setError(null)
-                  setConfirmPassword('')
                 }}
                 className="ml-1 text-purple-600 dark:text-purple-400 hover:text-pink-600 dark:hover:text-pink-400 font-medium transition-colors"
               >
@@ -350,9 +311,11 @@ function LoginPageContent() {
           </div>
         </div>
 
-        {/* Footer - Minimal */}
+        {/* Footer - Terms & Privacy */}
         <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
-          Terms · Privacy
+          <a href="https://allwondrous.com/legal/terms" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 dark:hover:text-gray-300 underline">Terms</a>
+          {' · '}
+          <a href="https://allwondrous.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 dark:hover:text-gray-300 underline">Privacy Policy</a>
         </p>
       </div>
     </div>

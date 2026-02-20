@@ -171,7 +171,7 @@ export default function SoloPractitionerDashboard() {
           color="magenta"
         />
         <StatCard
-          title="Utilization"
+          title="Utilisation"
           value={isLoading ? '...' : `${stats.utilizationPercent}%`}
           icon={TrendingUp}
           color="orange"
@@ -237,113 +237,8 @@ export default function SoloPractitionerDashboard() {
         </div>
       )}
 
-      {/* Quick Actions - Tiered Structure */}
+      {/* Upcoming Sessions - moved higher */}
       <div className="mb-8">
-        {/* TIER 1: Core Daily Actions (Always visible, prominent) */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-heading-2 dark:text-gray-100">Quick Actions</h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            <Link href="/solo/sessions/new" className="group">
-              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
-                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Plus className="text-purple-600 dark:text-purple-400" size={22} strokeWidth={2.5} />
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Start Session</span>
-                </div>
-              </div>
-            </Link>
-            <Link href="/solo/calendar" className="group">
-              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
-                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Calendar className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">View Calendar</span>
-                </div>
-              </div>
-            </Link>
-            <Link href="/solo/clients" className="group">
-              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
-                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <UserPlus className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Add Client</span>
-                </div>
-              </div>
-            </Link>
-            <Link href="/solo/packages" className="group">
-              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
-                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Package className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Sell Package</span>
-                </div>
-              </div>
-            </Link>
-          </div>
-        </div>
-
-        {/* TIER 2: Build & Setup (Collapsible) */}
-        <TierTwoActions />
-
-        {/* Public Booking Link */}
-        {businessSlug && (
-          <div className="mt-6">
-            <PublicBookingLink
-              businessSlug={businessSlug}
-              businessName={`${currentUser.firstName} ${currentUser.lastName}`}
-            />
-          </div>
-        )}
-
-        {/* TIER 3: AI Enhancements */}
-        <div className="mt-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="text-purple-500" size={16} />
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Enhance your workflow</span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Link href="/solo/programs" className="group">
-              <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200/30 dark:border-purple-700/30 rounded-xl p-4 hover:shadow-md active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Sparkles className="text-purple-600 dark:text-purple-400" size={18} />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">AI Programs</span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Generate training plans</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-            <Link href="/solo/templates/builder" className="group">
-              <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200/30 dark:border-purple-700/30 rounded-xl p-4 hover:shadow-md active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <FileText className="text-purple-600 dark:text-purple-400" size={18} />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">AI Templates</span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Create workout templates</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Upcoming Sessions */}
-      <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-heading-2 dark:text-gray-100">Upcoming Sessions</h2>
           <Link href="/solo/calendar">
@@ -402,6 +297,111 @@ export default function SoloPractitionerDashboard() {
         )}
       </div>
 
+      {/* Quick Actions - Tiered Structure */}
+      <div className="mb-8">
+        {/* TIER 1: Core Daily Actions (Always visible, prominent) */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-heading-2 dark:text-gray-100">Quick Actions</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <Link href="/solo/sessions/new" className="group">
+              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
+                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Plus className="text-purple-600 dark:text-purple-400" size={22} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Start Session</span>
+                </div>
+              </div>
+            </Link>
+            <Link href="/solo/calendar" className="group">
+              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
+                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Calendar className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">View Calendar</span>
+                </div>
+              </div>
+            </Link>
+            <Link href="/solo/clients" className="group">
+              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
+                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <UserPlus className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Add Client</span>
+                </div>
+              </div>
+            </Link>
+            <Link href="/solo/packages" className="group">
+              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
+                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
+                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Package className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Sell Package</span>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* TIER 2: Build & Setup (Collapsible) */}
+        <TierTwoActions />
+
+        {/* TIER 3: AI Enhancements */}
+        <div className="mt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="text-purple-500" size={16} />
+            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Enhance your workflow</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/solo/programs" className="group">
+              <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200/30 dark:border-purple-700/30 rounded-xl p-4 hover:shadow-md active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Sparkles className="text-purple-600 dark:text-purple-400" size={18} />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">AI Programs</span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Generate training plans</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+            <Link href="/solo/templates/builder" className="group">
+              <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200/30 dark:border-purple-700/30 rounded-xl p-4 hover:shadow-md active:scale-[0.98] transition-all duration-200 cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <FileText className="text-purple-600 dark:text-purple-400" size={18} />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">AI Templates</span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Create workout templates</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Public Booking Link - less prominent, at bottom */}
+      {businessSlug && (
+        <div className="mb-8 opacity-80">
+          <PublicBookingLink
+            businessSlug={businessSlug}
+            businessName={`${currentUser.firstName} ${currentUser.lastName}`}
+          />
+        </div>
+      )}
+
       {/* Recent Clients */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
@@ -450,7 +450,10 @@ export default function SoloPractitionerDashboard() {
             <div className="text-center text-gray-500 dark:text-gray-400">
               <Users className="mx-auto mb-4 text-gray-400 dark:text-gray-500" size={48} />
               <p className="text-lg font-medium mb-2 dark:text-gray-300">No clients yet</p>
-              <p className="text-sm mb-4 dark:text-gray-400">Add or invite clients to get started</p>
+              <p className="text-sm mb-4 dark:text-gray-400">
+                Start building the foundations of your business — let&apos;s invite your first client.
+                You can also import clients in bulk via CSV.
+              </p>
               <Link href="/solo/clients">
                 <Button>Add Client</Button>
               </Link>

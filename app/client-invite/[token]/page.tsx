@@ -114,7 +114,7 @@ export default function ClientInvitePage() {
 
       // Redirect to client dashboard after a short delay
       setTimeout(() => {
-        router.push('/client');
+        router.push('/client/shop');
       }, 2000);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to accept invitation');

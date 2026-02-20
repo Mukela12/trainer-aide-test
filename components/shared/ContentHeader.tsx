@@ -104,7 +104,7 @@ export default function ContentHeader({
             'bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm',
             'border-b border-gray-100 dark:border-gray-800 shadow-sm',
             'transition-all duration-200 ease-out',
-            'lg:left-64', // Account for sidebar
+            'lg:left-[var(--sidebar-width,16rem)]', // Account for sidebar (collapses with CSS var)
             showStickyBar
               ? 'opacity-100 translate-y-0'
               : 'opacity-0 -translate-y-full pointer-events-none'
