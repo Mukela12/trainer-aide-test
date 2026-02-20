@@ -11,6 +11,7 @@ interface ProfileData {
   studioId?: string;
   isOnboarded?: boolean;
   businessSlug?: string;
+  businessName?: string;
 }
 
 // Default empty user (unauthenticated state)
@@ -29,6 +30,7 @@ interface UserState {
   isOnboarded: boolean;
   studioId: string | null;
   businessSlug: string | null;
+  businessName: string | null;
   setUser: (user: User) => void;
   setRole: (role: UserRole) => void;
   setUserFromProfile: (profile: ProfileData) => void;
@@ -53,6 +55,7 @@ export const useUserStore = create<UserState>()(
       isOnboarded: false,
       studioId: null,
       businessSlug: null,
+      businessName: null,
 
       setUser: (user) => set({ currentUser: user, currentRole: user.role, isAuthenticated: true }),
 
@@ -75,6 +78,7 @@ export const useUserStore = create<UserState>()(
         isOnboarded: profile.isOnboarded || false,
         studioId: profile.studioId || null,
         businessSlug: profile.businessSlug || null,
+        businessName: profile.businessName || null,
       }),
 
       setOnboarded: (isOnboarded: boolean) => set({ isOnboarded }),
@@ -96,6 +100,7 @@ export const useUserStore = create<UserState>()(
           isOnboarded: false,
           studioId: null,
           businessSlug: null,
+          businessName: null,
         });
       },
 
@@ -106,6 +111,7 @@ export const useUserStore = create<UserState>()(
         isOnboarded: false,
         studioId: null,
         businessSlug: null,
+        businessName: null,
       }),
 
       // Permission methods

@@ -142,7 +142,7 @@ function isNavActive(pathname: string, href: string): boolean {
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentRole, currentUser } = useUserStore();
+  const { currentRole, currentUser, businessName } = useUserStore();
   const { signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -283,7 +283,7 @@ export function Sidebar() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                  {currentUser.firstName} {currentUser.lastName}
+                  {businessName || `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'My Account'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 capitalize truncate">
                   {currentRole.replace('_', ' ')}
@@ -305,7 +305,7 @@ export function Sidebar() {
                 <User size={20} className="text-wondrous-dark-blue dark:text-wondrous-dark-blue" />
               </div>
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white dark:text-gray-100 text-sm rounded-lg whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-lg z-50">
-                {currentUser.firstName} {currentUser.lastName}
+                {businessName || `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'My Account'}
               </div>
             </div>
             <button

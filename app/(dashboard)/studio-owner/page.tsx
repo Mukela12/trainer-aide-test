@@ -33,7 +33,7 @@ async function fetchOperatorAnalytics(): Promise<{
 }
 
 export default function StudioOwnerDashboard() {
-  const { currentUser, businessSlug } = useUserStore();
+  const { currentUser, businessSlug, businessName } = useUserStore();
   const { data: templates = [] } = useTemplates(currentUser.id);
   const { data: pendingRequests = [] } = useBookingRequests(currentUser?.id, 'pending');
   const { data: clients = [], isLoading: clientsLoading } = useClients(currentUser?.id);
@@ -75,7 +75,7 @@ export default function StudioOwnerDashboard() {
           <div>
             <p className="text-white/70 text-sm font-medium mb-1">{dateString}</p>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-              Welcome back, {currentUser.firstName}
+              Welcome back{businessName || currentUser.firstName ? `, ${businessName || currentUser.firstName}` : ''}
             </h1>
             <p className="text-white/70">
               {isLoading ? 'Loading...' : (

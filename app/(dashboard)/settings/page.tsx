@@ -965,7 +965,7 @@ export default function SettingsPage() {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Desktop: Left tab navigation */}
         <nav className="hidden lg:block w-56 shrink-0">
-          <div className="sticky top-8 space-y-1">
+          <div className="sticky top-6 space-y-1">
             {visibleTabs.map((tab) => (
               <button
                 key={tab.id}
