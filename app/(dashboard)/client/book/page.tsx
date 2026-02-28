@@ -100,16 +100,31 @@ export default function ClientBookPage() {
     }
   };
 
+  // Skip trainer step if only 1 trainer (solo PT)
+  const isSoloPT = trainers.length <= 1;
+
   const handleNext = () => {
     if (!canProceed()) return;
-    const nextIndex = currentStepIndex + 1;
+    let nextIndex = currentStepIndex + 1;
+    // Skip trainer step for solo PT
+    if (isSoloPT && STEPS[nextIndex]?.id === 'trainer') {
+      // Auto-select the single trainer
+      if (trainers.length === 1) {
+        setSelectedTrainer(trainers[0]);
+      }
+      nextIndex++;
+    }
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex].id);
     }
   };
 
   const handleBack = () => {
-    const prevIndex = currentStepIndex - 1;
+    let prevIndex = currentStepIndex - 1;
+    // Skip trainer step for solo PT
+    if (isSoloPT && STEPS[prevIndex]?.id === 'trainer') {
+      prevIndex--;
+    }
     if (prevIndex >= 0) {
       setCurrentStep(STEPS[prevIndex].id);
     }

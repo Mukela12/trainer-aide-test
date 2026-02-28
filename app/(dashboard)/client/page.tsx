@@ -4,31 +4,23 @@ import Link from 'next/link';
 import { useSessionData } from '@/lib/hooks/use-sessions';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useClientBookings, useClientPackages } from '@/lib/hooks/use-client-bookings';
-import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dumbbell, TrendingUp, Calendar, Clock, History, CreditCard, CalendarCheck, CalendarPlus, ShoppingBag } from 'lucide-react';
-import { format } from 'date-fns';
+import {
+  Dumbbell, TrendingUp, Calendar, Clock, CreditCard, CalendarPlus,
+  ChevronRight, ShoppingBag, Flame,
+} from 'lucide-react';
+import { format, isThisMonth } from 'date-fns';
 import { formatDuration } from '@/lib/utils/generators';
-
-// Format today's date
-const today = new Date();
-const dateString = format(today, 'EEEE, MMMM d');
 
 // Helper function to get time-based greeting
 function getTimeBasedGreeting(): string {
   const hour = new Date().getHours();
-
-  if (hour >= 5 && hour < 12) {
-    return 'Good morning';
-  } else if (hour >= 12 && hour < 17) {
-    return 'Good afternoon';
-  } else if (hour >= 17 && hour < 21) {
-    return 'Good evening';
-  } else {
-    return 'Welcome back';
-  }
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  if (hour >= 17 && hour < 21) return 'Good evening';
+  return 'Welcome back';
 }
 
 export default function ClientDashboard() {
@@ -40,26 +32,22 @@ export default function ClientDashboard() {
   const { data: bookings = [] } = useClientBookings(currentUser?.id);
 
   const credits = packageData?.totalCredits ?? null;
-  const upcomingBookingsCount = bookings.filter(
-    (b) => new Date(b.scheduledAt) > new Date() && b.status !== 'cancelled'
-  ).length;
+  const upcomingBookings = bookings
+    .filter((b) => new Date(b.scheduledAt) > new Date() && b.status !== 'cancelled')
+    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
-  // Use the authenticated user's ID to filter sessions
-  // The client sees sessions where they are the client
-  const clientId = currentUser.id;
+  const nextBooking = upcomingBookings[0];
 
   // Filter sessions for this client
+  const clientId = currentUser.id;
   const clientSessions = sessions.filter((s) => s.clientId === clientId);
   const completedSessions = clientSessions.filter((s) => s.completed);
 
   // Calculate stats
   const totalSessions = completedSessions.length;
-  const thisWeekStart = new Date();
-  thisWeekStart.setDate(thisWeekStart.getDate() - 7);
-  const sessionsThisWeek = completedSessions.filter(
-    (s) => new Date(s.completedAt || 0) >= thisWeekStart
+  const sessionsThisMonth = completedSessions.filter(
+    (s) => s.completedAt && isThisMonth(new Date(s.completedAt))
   ).length;
-
   const averageRpe =
     completedSessions.length > 0
       ? Math.round(
@@ -67,264 +55,288 @@ export default function ClientDashboard() {
         )
       : 0;
 
-  const totalDuration = completedSessions.reduce((acc, s) => acc + (s.duration || 0), 0);
-  const averageDuration = completedSessions.length > 0 ? Math.round(totalDuration / completedSessions.length) : 0;
+  // Week streak calculation (simplified: consecutive weeks with at least 1 session)
+  const weekStreak = (() => {
+    if (completedSessions.length === 0) return 0;
+    let streak = 0;
+    const now = new Date();
+    const oneWeek = 7 * 24 * 60 * 60 * 1000;
+    for (let i = 0; i < 12; i++) {
+      const weekStart = new Date(now.getTime() - (i + 1) * oneWeek);
+      const weekEnd = new Date(now.getTime() - i * oneWeek);
+      const hasSession = completedSessions.some((s) => {
+        const d = new Date(s.completedAt || 0);
+        return d >= weekStart && d < weekEnd;
+      });
+      if (hasSession) streak++;
+      else break;
+    }
+    return streak;
+  })();
 
-  // Get next session (in-progress sessions)
-  const inProgressSession = clientSessions.find((s) => !s.completed);
+  // Consistency percentage (sessions this month / 5 target)
+  const consistencyTarget = 5;
+  const consistencyPercent = Math.min(100, Math.round((sessionsThisMonth / consistencyTarget) * 100));
 
-  // Get recent completed sessions
+  // Low credit detection
+  const isLowCredits = credits !== null && credits <= 2;
+
+  // Recent completed sessions
   const recentSessions = completedSessions
     .sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime())
     .slice(0, 3);
 
   return (
-    <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A71075] via-[#8a0d60] to-[#0A1466] p-6 md:p-8 mb-8">
-        {/* Subtle pattern overlay */}
-        <div className="absolute inset-0 opacity-[0.05]" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        }} />
-
-        {/* Decorative circles */}
+    <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
+      {/* Hero Banner */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#6B21A8] via-[#A71075] to-[#F97316] p-6 md:p-8 mb-6">
         <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-[#A71075]/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 w-48 h-48 bg-white/5 rounded-full blur-3xl" />
 
-        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <p className="text-white/70 text-sm font-medium mb-1">{dateString}</p>
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-              {greeting}, {currentUser.firstName}
-            </h1>
-            <p className="text-white/70">
-              Upcoming: <span className="text-white font-medium">{upcomingBookingsCount} session{upcomingBookingsCount !== 1 ? 's' : ''} booked</span>
-            </p>
+        <div className="relative">
+          <p className="text-white/70 text-sm mb-1">
+            {format(new Date(), 'EEEE, MMMM d')}
+          </p>
+          <h1 className="text-2xl md:text-3xl font-bold text-white mb-4">
+            {greeting}, {currentUser.firstName} <span className="inline-block">👋</span>
+          </h1>
+
+          {/* Stats row */}
+          <div className="flex flex-wrap items-center gap-4 md:gap-6">
+            <div className="flex items-center gap-2 bg-white/10 rounded-full px-3 py-1.5">
+              <Flame size={16} className="text-orange-300" />
+              <span className="text-white text-sm font-medium">{weekStreak} week streak</span>
+            </div>
+            <div className="flex items-center gap-2 bg-white/10 rounded-full px-3 py-1.5">
+              <Dumbbell size={16} className="text-white/70" />
+              <span className="text-white text-sm font-medium">{totalSessions} total sessions</span>
+            </div>
+            <div className="flex items-center gap-2 bg-white/10 rounded-full px-3 py-1.5">
+              <Calendar size={16} className="text-white/70" />
+              <span className="text-white text-sm font-medium">{sessionsThisMonth} this month</span>
+            </div>
           </div>
 
-          {/* Quick Stat Display */}
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-white/70 text-sm">Session Credits</p>
-              <p className="text-3xl font-bold text-white">{credits !== null ? credits : '-'}</p>
-            </div>
-            <div className="h-16 w-16 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20">
-              <CreditCard className="h-7 w-7 text-white" />
-            </div>
+          {/* Credit Pill */}
+          <div className="absolute top-0 right-0">
+            <Link href="/client/shop">
+              <div className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all hover:scale-105 ${
+                isLowCredits
+                  ? 'bg-red-500/90 text-white'
+                  : 'bg-white/20 text-white backdrop-blur-sm'
+              }`}>
+                <CreditCard size={14} />
+                <span>{credits ?? '-'} credits</span>
+                {isLowCredits && <ChevronRight size={14} />}
+              </div>
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
-        <StatCard
-          title="Credits"
-          value={credits !== null ? credits : '-'}
-          icon={CreditCard}
-          color="magenta"
-        />
-        <StatCard
-          title="Upcoming"
-          value={upcomingBookingsCount}
-          icon={CalendarCheck}
-          color="green"
-        />
-        <StatCard
-          title="Total"
-          value={totalSessions}
-          icon={Dumbbell}
-          color="blue"
-        />
-        <StatCard
-          title="This Week"
-          value={sessionsThisWeek}
-          icon={Calendar}
-          color="orange"
-        />
-        <StatCard
-          title="Avg RPE"
-          value={averageRpe > 0 ? `${averageRpe}/10` : 'N/A'}
-          icon={TrendingUp}
-          color="orange"
-        />
-        <StatCard
-          title="Duration"
-          value={averageDuration > 0 ? formatDuration(averageDuration) : 'N/A'}
-          icon={Clock}
-          color="blue"
-        />
-      </div>
-
-      {/* Next Session / In Progress */}
-      {inProgressSession && (
-        <Card className="mb-8 border-2 border-wondrous-primary bg-blue-50/30">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Session in Progress</CardTitle>
-              <Badge variant="default">Active</Badge>
+      {/* Low Credit Upsell Banner */}
+      {isLowCredits && (
+        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                You&apos;re down to {credits} credit{credits !== 1 ? 's' : ''}
+                {weekStreak > 0 && ` — Don't break your ${weekStreak}-week streak!`}
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Top up now to keep training
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">{inProgressSession.sessionName}</h3>
-                <p className="text-sm text-gray-600">{inProgressSession.template?.name || 'Custom Session'}</p>
-              </div>
-              <div className="flex items-center gap-4 text-sm text-gray-600">
-                <span className="flex items-center gap-1">
-                  <Calendar size={14} />
-                  {format(new Date(inProgressSession.startedAt), 'MMM d, yyyy')}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock size={14} />
-                  {format(new Date(inProgressSession.startedAt), 'h:mm a')}
-                </span>
-              </div>
-              <div className="pt-2">
-                <p className="text-sm text-gray-700 mb-2">
-                  Your trainer has started this session and is tracking your progress.
-                </p>
-                <p className="text-xs text-gray-500 italic">
-                  You&apos;ll be able to view the full details once the session is completed.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            <Link href="/client/shop">
+              <Button size="sm" className="bg-gradient-to-r from-[#12229D] via-[#6B21A8] to-[#A71075] text-white hover:opacity-90 gap-1">
+                <ShoppingBag size={14} />
+                View Packages
+              </Button>
+            </Link>
+          </div>
+        </div>
       )}
 
-      {/* Quick Actions */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-heading-2 dark:text-gray-100">Quick Actions</h2>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
-          <Link href="/client/book" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-cyan-200/50 dark:border-cyan-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-cyan-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <CalendarPlus className="text-cyan-600 dark:text-cyan-400" size={22} strokeWidth={2.5} />
+      {/* Two Cards: Next Session + Book CTA */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* YOUR NEXT SESSION */}
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardContent className="p-5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
+              Your Next Session
+            </p>
+            {nextBooking ? (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                      {format(new Date(nextBooking.scheduledAt), 'EEEE, MMM d')}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {nextBooking.serviceName || 'Session'} · {format(new Date(nextBooking.scheduledAt), 'h:mm a')}
+                    </p>
+                  </div>
+                  {nextBooking.status === 'soft-hold' && (
+                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      Pending
+                    </Badge>
+                  )}
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Book Session</span>
-              </div>
-            </div>
-          </Link>
-          <Link href="/client/bookings" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-green-200/50 dark:border-green-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-green-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <CalendarCheck className="text-green-600 dark:text-green-400" size={22} strokeWidth={2.5} />
+                <div className="flex gap-2">
+                  <Link href="/client/bookings" className="flex-1">
+                    <Button size="sm" variant="outline" className="w-full text-xs">
+                      View Details
+                    </Button>
+                  </Link>
                 </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">My Bookings</span>
               </div>
-            </div>
-          </Link>
-          <Link href="/client/shop" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-orange-200/50 dark:border-orange-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-orange-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <ShoppingBag className="text-orange-600 dark:text-orange-400" size={22} strokeWidth={2.5} />
-                </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Shop</span>
+            ) : (
+              <div className="text-center py-4">
+                <Calendar className="mx-auto mb-2 text-gray-400" size={32} />
+                <p className="text-sm text-gray-500 dark:text-gray-400">No upcoming sessions</p>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* READY TO TRAIN? */}
+        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200/50 dark:border-purple-800/50">
+          <CardContent className="p-5 flex flex-col justify-between h-full">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-500 dark:text-purple-400 mb-3">
+                Ready to Train?
+              </p>
+              <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">
+                Book your next session
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                {credits !== null && credits > 0
+                  ? `You have ${credits} credit${credits !== 1 ? 's' : ''} available`
+                  : 'Purchase credits to get started'
+                }
+              </p>
             </div>
-          </Link>
-          <Link href="/client/packages" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-magenta-200/50 dark:border-magenta-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-pink-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-pink-500/20 to-pink-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <CreditCard className="text-wondrous-magenta dark:text-pink-400" size={22} strokeWidth={2.5} />
-                </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">My Credits</span>
+            <Link href="/client/book">
+              <Button className="w-full bg-gradient-to-r from-[#12229D] via-[#6B21A8] to-[#A71075] text-white hover:opacity-90 gap-2">
+                <CalendarPlus size={16} />
+                Book a Session
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Your Progress */}
+      <div className="mb-6">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-3">Your Progress</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Consistency */}
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Consistency</p>
+                <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{consistencyPercent}%</span>
               </div>
-            </div>
-          </Link>
-          <Link href="/client/sessions" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-blue-200/50 dark:border-blue-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-blue-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <History className="text-wondrous-blue dark:text-blue-400" size={22} strokeWidth={2.5} />
-                </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Session History</span>
+              <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all"
+                  style={{ width: `${consistencyPercent}%` }}
+                />
               </div>
-            </div>
-          </Link>
-          <Link href="/client/progress" className="group">
-            <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-purple-200/50 dark:border-purple-800/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-              <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-purple-500/10 to-transparent opacity-50" />
-              <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <TrendingUp className="text-purple-600 dark:text-purple-400" size={22} strokeWidth={2.5} />
-                </div>
-                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">My Progress</span>
+            </CardContent>
+          </Card>
+
+          {/* Sessions This Month */}
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Sessions This Month</p>
+                <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{sessionsThisMonth}/{consistencyTarget}</span>
               </div>
-            </div>
-          </Link>
+              <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, (sessionsThisMonth / consistencyTarget) * 100)}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Credits Remaining */}
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Credits Remaining</p>
+                <span className={`text-sm font-bold ${isLowCredits ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                  {credits ?? '-'}
+                </span>
+              </div>
+              <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${isLowCredits ? 'bg-red-500' : 'bg-gradient-to-r from-green-500 to-emerald-500'}`}
+                  style={{ width: credits !== null ? `${Math.min(100, (credits / 10) * 100)}%` : '0%' }}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
       {/* Recent Sessions */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-heading-2 dark:text-gray-100">Recent Sessions</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Recent Sessions</h2>
           <Link href="/client/sessions">
-            <Button variant="ghost" size="sm">
-              View All
+            <Button variant="ghost" size="sm" className="text-xs gap-1">
+              View All <ChevronRight size={14} />
             </Button>
           </Link>
         </div>
 
         {recentSessions.length > 0 ? (
-          <div className="space-y-4">
+          <Card className="dark:bg-gray-800 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
             {recentSessions.map((session) => (
-              <Card key={session.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1">{session.sessionName}</h3>
-                      <p className="text-sm text-gray-600 mb-2">{session.template?.name || 'Custom Session'}</p>
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <Calendar size={12} />
-                          {session.completedAt && format(new Date(session.completedAt), 'MMM d, yyyy')}
-                        </span>
-                        {session.duration && (
-                          <span className="flex items-center gap-1">
-                            <Clock size={12} />
-                            {formatDuration(session.duration)}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <TrendingUp size={12} />
-                          RPE {session.overallRpe}/10
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="success">Completed</Badge>
-                    </div>
+              <div key={session.id} className="px-4 py-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                  <Dumbbell size={18} className="text-purple-600 dark:text-purple-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                    {session.sessionName}
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    {session.completedAt && (
+                      <span>{format(new Date(session.completedAt), 'MMM d')}</span>
+                    )}
+                    {session.publicNotes && (
+                      <>
+                        <span className="text-gray-300 dark:text-gray-600">·</span>
+                        <span className="truncate">{session.publicNotes}</span>
+                      </>
+                    )}
                   </div>
-                  {session.publicNotes && (
-                    <div className="mt-3 pt-3 border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-1">Trainer Notes:</p>
-                      <p className="text-sm text-gray-700 dark:text-gray-300 italic">&quot;{session.publicNotes}&quot;</p>
-                    </div>
+                </div>
+                <div className="shrink-0">
+                  {(session.overallRpe ?? 0) > 0 && (
+                    <span className={`text-sm font-bold ${
+                      (session.overallRpe ?? 0) >= 8 ? 'text-red-500' :
+                      (session.overallRpe ?? 0) >= 6 ? 'text-orange-500' :
+                      (session.overallRpe ?? 0) >= 4 ? 'text-yellow-500' :
+                      'text-green-500'
+                    }`}>
+                      {session.overallRpe}/10
+                    </span>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
-          </div>
+          </Card>
         ) : (
-          <Card className="p-8">
-            <div className="text-center text-gray-500">
-              <Dumbbell className="mx-auto mb-4 text-gray-400" size={48} />
-              <p className="text-lg font-medium mb-2">No sessions yet</p>
-              <p className="text-sm">Your completed training sessions will appear here</p>
+          <Card className="p-6 dark:bg-gray-800 dark:border-gray-700">
+            <div className="text-center text-gray-500 dark:text-gray-400">
+              <Dumbbell className="mx-auto mb-3 text-gray-400 dark:text-gray-600" size={36} />
+              <p className="text-sm font-medium mb-1 text-gray-900 dark:text-gray-100">No sessions yet</p>
+              <p className="text-xs">Your completed sessions will appear here</p>
             </div>
           </Card>
         )}

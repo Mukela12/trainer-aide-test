@@ -25,6 +25,10 @@ import {
   CreditCard,
   UserPlus,
   ShoppingBag,
+  DollarSign,
+  Lock,
+  Megaphone,
+  Banknote,
 } from 'lucide-react';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -49,15 +53,21 @@ const soloPractitionerGroups: NavGroup[] = [
     links: [
       { href: '/solo', label: 'Dashboard', icon: <Home size={20} /> },
       { href: '/solo/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
-      { href: '/solo/sessions', label: 'Services', icon: <Clock size={20} /> },
       { href: '/solo/clients', label: 'Clients', icon: <Users size={20} /> },
+      { href: '/solo/sessions', label: 'Services', icon: <Clock size={20} /> },
+    ],
+  },
+  {
+    title: 'MONEY',
+    links: [
+      { href: '/solo/revenue', label: 'Revenue', icon: <DollarSign size={20} /> },
     ],
   },
   {
     title: 'GROW',
     links: [
-      { href: '/solo/packages', label: 'Packages', icon: <Package size={20} /> },
       { href: '/solo/templates', label: 'Templates', icon: <FileText size={20} />, badge: 'AI' },
+      { href: '#', label: 'Campaigns', icon: <Megaphone size={20} />, badge: '🔒' },
     ],
   },
   {
@@ -75,17 +85,28 @@ const studioOwnerGroups: NavGroup[] = [
     links: [
       { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
       { href: '/studio-owner/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
-      { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
       { href: '/studio-owner/clients', label: 'Clients', icon: <Users size={20} /> },
-      { href: '/studio-owner/sessions', label: 'All Sessions', icon: <Dumbbell size={20} /> },
+      { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
+    ],
+  },
+  {
+    title: 'MONEY',
+    links: [
+      { href: '/studio-owner/revenue', label: 'Revenue', icon: <DollarSign size={20} /> },
+    ],
+  },
+  {
+    title: 'BUSINESS',
+    links: [
+      { href: '/studio-owner/staff', label: 'Staff', icon: <UsersRound size={20} /> },
+      { href: '#', label: 'Payroll', icon: <Banknote size={20} />, badge: '🔒' },
     ],
   },
   {
     title: 'GROW',
     links: [
-      { href: '/studio-owner/packages', label: 'Packages', icon: <Package size={20} /> },
       { href: '/studio-owner/templates', label: 'Templates', icon: <FileText size={20} />, badge: 'AI' },
-      { href: '/studio-owner/staff', label: 'Staff', icon: <UsersRound size={20} /> },
+      { href: '#', label: 'Campaigns', icon: <Megaphone size={20} />, badge: '🔒' },
     ],
   },
   {

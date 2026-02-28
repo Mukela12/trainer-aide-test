@@ -52,11 +52,11 @@ export function isTimeAvailable(
 }
 
 /**
- * Get session duration based on service type
+ * Get session duration in minutes.
+ * Uses the session's own duration field, or falls back to 30 minutes.
  */
-export function getSessionDuration(session: CalendarSession): number {
-  // This will be enhanced with actual service type lookup
-  return 30; // Default duration
+export function getSessionDuration(session: CalendarSession & { duration?: number }): number {
+  return session.duration || 30;
 }
 
 /**

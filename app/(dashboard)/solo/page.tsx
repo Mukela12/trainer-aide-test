@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useBookings } from '@/lib/hooks/use-bookings';
@@ -8,72 +7,26 @@ import { useAnalytics } from '@/lib/hooks/use-analytics';
 import { useBookingRequests } from '@/lib/hooks/use-booking-requests';
 import { useUpcomingSessions } from '@/lib/hooks/use-upcoming-sessions';
 import { useClients } from '@/lib/hooks/use-clients';
-import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dumbbell, Calendar, Plus, Users, DollarSign, Clock, TrendingUp, Package, Inbox, FileText, UserPlus, Sparkles, Settings, ChevronDown, ChevronUp } from 'lucide-react';
-import { format } from 'date-fns';
-import { PublicBookingLink } from '@/components/shared/PublicBookingLink';
+import {
+  Calendar, Plus, Users, DollarSign, Clock, TrendingUp,
+  Zap, UserPlus, ChevronRight, AlertCircle, Megaphone, Lock,
+  Copy, ExternalLink, CheckCircle2,
+} from 'lucide-react';
+import { format, isToday } from 'date-fns';
+import { useState } from 'react';
 import type { SoloDashboardStats, UpcomingSession, RecentClient } from '@/lib/types/dashboard';
-
-// Format today's date
-const today = new Date();
-const dateString = format(today, 'EEEE, MMMM d');
-
-// Tier 2 collapsible actions component
-function TierTwoActions() {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  return (
-    <div>
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-      >
-        <span className="font-medium">Build & Setup</span>
-        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-      </button>
-
-      {isExpanded && (
-        <div className="grid grid-cols-3 gap-3 mt-2">
-          <Link href="/solo/packages" className="group">
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:shadow-sm transition-all">
-              <div className="flex items-center gap-2">
-                <Package className="text-gray-400" size={16} />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Packages</span>
-              </div>
-            </div>
-          </Link>
-          <Link href="/solo/templates" className="group">
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:shadow-sm transition-all">
-              <div className="flex items-center gap-2">
-                <FileText className="text-gray-400" size={16} />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Templates</span>
-              </div>
-            </div>
-          </Link>
-          <Link href="/settings" className="group">
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:shadow-sm transition-all">
-              <div className="flex items-center gap-2">
-                <Settings className="text-gray-400" size={16} />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Settings</span>
-              </div>
-            </div>
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function SoloPractitionerDashboard() {
   const { currentUser, businessSlug, businessName } = useUserStore();
   const { sessions: calendarSessions } = useBookings(currentUser.id);
+  const [copied, setCopied] = useState(false);
 
   // React Query hooks
   const { data: analyticsData, isLoading: analyticsLoading } = useAnalytics(currentUser?.id);
   const { data: pendingRequests = [] } = useBookingRequests(currentUser?.id, 'pending');
-  const { data: upcomingSessionsData = [], isLoading: sessionsLoading } = useUpcomingSessions(currentUser?.id, 5);
+  const { data: upcomingSessionsData = [], isLoading: sessionsLoading } = useUpcomingSessions(currentUser?.id, 10);
   const { data: clients = [], isLoading: clientsLoading } = useClients(currentUser?.id);
 
   const isLoading = analyticsLoading || sessionsLoading || clientsLoading;
@@ -97,9 +50,12 @@ export default function SoloPractitionerDashboard() {
     status: s.status,
   }));
 
+  // Filter to today's sessions
+  const todaySessions = upcomingSessions.filter(s => isToday(s.scheduledAt));
+
   const recentClients: RecentClient[] = [...clients]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 5)
+    .slice(0, 6)
     .map(c => ({
       id: c.id,
       firstName: c.first_name || '',
@@ -109,358 +65,400 @@ export default function SoloPractitionerDashboard() {
       createdAt: new Date(c.created_at),
     }));
 
-  // Also use calendar store data as fallback for soft holds
-  const softHoldsFromStore = calendarSessions.filter(s => s.status === 'soft-hold').length;
-  const displaySoftHolds = stats.softHoldsCount || softHoldsFromStore;
+  // Soft holds from calendar data
+  const softHoldsFromStore = calendarSessions.filter(s => s.status === 'soft-hold');
+  const displaySoftHolds = stats.softHoldsCount || softHoldsFromStore.length;
+  const firstSoftHold = softHoldsFromStore[0];
+
+  // Low credit clients (credits <= 1)
+  const lowCreditClientsList = clients.filter(c => (c.credits || 0) <= 1 && (c.credits || 0) >= 0);
+
+  // Greeting based on time of day
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  const bookingUrl = businessSlug ? `${typeof window !== 'undefined' ? window.location.origin : ''}/book/${businessSlug}` : '';
+
+  const handleCopyLink = () => {
+    if (bookingUrl) {
+      navigator.clipboard.writeText(bookingUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A71075] via-[#8a0d60] to-[#0A1466] p-6 md:p-8 mb-8">
-        {/* Subtle pattern overlay */}
-        <div className="absolute inset-0 opacity-[0.05]" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        }} />
-
-        {/* Decorative circles */}
-        <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-[#A71075]/20 rounded-full blur-3xl" />
-
-        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <p className="text-white/70 text-sm font-medium mb-1">{dateString}</p>
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-              Welcome back{businessName || currentUser.firstName ? `, ${businessName || currentUser.firstName}` : ''}
-            </h1>
-            <p className="text-white/70">
-              This week: <span className="text-white font-medium">£{isLoading ? '...' : (stats.earningsThisWeek / 100).toFixed(0)} earned</span>
-            </p>
-          </div>
-
-          {/* Quick Stat Display */}
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-white/70 text-sm">Active Clients</p>
-              <p className="text-3xl font-bold text-white">{isLoading ? '...' : stats.activeClients}</p>
-            </div>
-            <div className="h-16 w-16 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20">
-              <Users className="h-7 w-7 text-white" />
-            </div>
-          </div>
-        </div>
+      {/* Top Bar: Date + Greeting */}
+      <div className="mb-6">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {format(new Date(), 'EEEE, MMMM d, yyyy')}
+        </p>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">
+          {greeting}{currentUser.firstName ? `, ${currentUser.firstName}` : ''} <span className="inline-block">👋</span>
+        </h1>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-8">
-        <StatCard
-          title="Sessions (This Week)"
-          value={isLoading ? '...' : stats.sessionsThisWeek}
-          icon={Dumbbell}
-          color="blue"
-        />
-        <StatCard
-          title="Earnings (This Week)"
-          value={isLoading ? '...' : `£${(stats.earningsThisWeek / 100).toFixed(0)}`}
-          icon={DollarSign}
-          color="green"
-        />
-        <StatCard
-          title="Active Clients"
-          value={isLoading ? '...' : stats.activeClients}
-          icon={Users}
-          color="magenta"
-        />
-        <StatCard
-          title="Utilisation"
-          value={isLoading ? '...' : `${stats.utilizationPercent}%`}
-          icon={TrendingUp}
-          color="orange"
-        />
-      </div>
-
-      {/* Secondary Stats Row */}
-      {(stats.outstandingCredits > 0 || displaySoftHolds > 0 || stats.pendingRequests > 0) && (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 mb-8">
-          {stats.pendingRequests > 0 && (
-            <Link href="/solo/requests">
-              <Card className="border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-900/10 hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                    <Inbox className="text-blue-600 dark:text-blue-400" size={20} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-blue-700 dark:text-blue-400 font-medium">
-                      {stats.pendingRequests} Booking Request{stats.pendingRequests !== 1 ? 's' : ''}
-                    </p>
-                    <p className="text-xs text-blue-600 dark:text-blue-500">
-                      Awaiting your response
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+      {/* Soft Hold Action Banner */}
+      {displaySoftHolds > 0 && (
+        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+                <AlertCircle className="text-amber-600 dark:text-amber-400" size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  {displaySoftHolds} Soft Hold{displaySoftHolds !== 1 ? 's' : ''} — Action Required
+                </p>
+                {firstSoftHold && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {firstSoftHold.clientName} · {format(firstSoftHold.datetime, 'h:mm a')}
+                  </p>
+                )}
+              </div>
+            </div>
+            <Link href="/solo/calendar">
+              <Button size="sm" variant="outline" className="border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40">
+                Chase Payment <ChevronRight size={14} />
+              </Button>
             </Link>
-          )}
-          {displaySoftHolds > 0 && (
-            <Card className="border-yellow-200 dark:border-yellow-800/50 bg-yellow-50/50 dark:bg-yellow-900/10">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                  <Clock className="text-yellow-600 dark:text-yellow-400" size={20} />
-                </div>
-                <div>
-                  <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">
-                    {displaySoftHolds} Soft Hold{displaySoftHolds !== 1 ? 's' : ''}
-                  </p>
-                  <p className="text-xs text-yellow-600 dark:text-yellow-500">
-                    Awaiting payment
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          {stats.outstandingCredits > 0 && (
-            <Card className="border-purple-200 dark:border-purple-800/50 bg-purple-50/50 dark:bg-purple-900/10">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                  <Package className="text-purple-600 dark:text-purple-400" size={20} />
-                </div>
-                <div>
-                  <p className="text-sm text-purple-700 dark:text-purple-400 font-medium">
-                    {stats.outstandingCredits} Credits Outstanding
-                  </p>
-                  <p className="text-xs text-purple-600 dark:text-purple-500">
-                    {stats.lowCreditClients} client{stats.lowCreditClients !== 1 ? 's' : ''} low on credits
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          </div>
         </div>
       )}
 
-      {/* Upcoming Sessions - moved higher */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-heading-2 dark:text-gray-100">Upcoming Sessions</h2>
-          <Link href="/solo/calendar">
-            <Button variant="ghost" size="sm">View Calendar</Button>
-          </Link>
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : upcomingSessions.length > 0 ? (
-          <div className="space-y-4">
-            {upcomingSessions.map((session) => (
-              <Card key={session.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-5 lg:p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                          {session.clientName}
-                        </h3>
-                        {session.status === 'soft-hold' && (
-                          <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
-                            Soft Hold
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                        <span>
-                          {format(session.scheduledAt, 'EEE, MMM d')} at {format(session.scheduledAt, 'h:mm a')}
-                        </span>
-                        <span className="text-gray-400">•</span>
-                        <span>{session.serviceName}</span>
-                      </div>
-                    </div>
-                    <Link href="/solo/calendar">
-                      <Button size="sm" variant="outline">Details</Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="p-8">
-            <div className="text-center text-gray-500 dark:text-gray-400">
-              <Calendar className="mx-auto mb-4 text-gray-400 dark:text-gray-500" size={48} />
-              <p className="text-lg font-medium mb-2 dark:text-gray-300">No upcoming sessions</p>
-              <p className="text-sm mb-4 dark:text-gray-400">Schedule your next session to get started</p>
-              <Link href="/solo/calendar">
-                <Button>View Calendar</Button>
-              </Link>
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                <Calendar className="text-blue-600 dark:text-blue-400" size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {isLoading ? '...' : todaySessions.length}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Sessions Today</p>
+              </div>
             </div>
-          </Card>
-        )}
+          </CardContent>
+        </Card>
+
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                <DollarSign className="text-green-600 dark:text-green-400" size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {isLoading ? '...' : `£${(stats.earningsThisWeek / 100).toFixed(0)}`}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Revenue This Week</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                <Users className="text-purple-600 dark:text-purple-400" size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {isLoading ? '...' : stats.activeClients}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Active Clients</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="dark:bg-gray-800 dark:border-gray-700">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
+                <Clock className="text-orange-600 dark:text-orange-400" size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {isLoading ? '...' : stats.pendingRequests}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Pending</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Quick Actions - Tiered Structure */}
-      <div className="mb-8">
-        {/* TIER 1: Core Daily Actions (Always visible, prominent) */}
-        <div className="mb-6">
+      {/* Two-column layout: Today's Sessions + Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Today's Sessions */}
+        <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-heading-2 dark:text-gray-100">Quick Actions</h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            <Link href="/solo/sessions/new" className="group">
-              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
-                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Plus className="text-purple-600 dark:text-purple-400" size={22} strokeWidth={2.5} />
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Start Session</span>
-                </div>
-              </div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Today&apos;s Sessions</h2>
+            <Link href="/solo/calendar">
+              <Button variant="ghost" size="sm" className="text-xs gap-1">
+                View Calendar <ChevronRight size={14} />
+              </Button>
             </Link>
-            <Link href="/solo/calendar" className="group">
-              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
-                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Calendar className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
-                  </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">View Calendar</span>
-                </div>
+          </div>
+
+          {isLoading ? (
+            <Card className="p-6 dark:bg-gray-800 dark:border-gray-700">
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
               </div>
+            </Card>
+          ) : todaySessions.length > 0 ? (
+            <Card className="dark:bg-gray-800 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+              {todaySessions.map((session) => (
+                <div key={session.id} className="px-4 py-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                      {session.clientName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {format(session.scheduledAt, 'h:mm a')} - {session.clientName}
+                      </p>
+                      {session.status === 'soft-hold' && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded-full shrink-0">
+                          Hold
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {session.serviceName}
+                    </p>
+                  </div>
+                  <Link href="/solo/calendar">
+                    <Button size="sm" variant="ghost" className="text-xs text-gray-500">
+                      Details
+                    </Button>
+                  </Link>
+                </div>
+              ))}
+            </Card>
+          ) : (
+            <Card className="p-6 dark:bg-gray-800 dark:border-gray-700">
+              <div className="text-center text-gray-500 dark:text-gray-400">
+                <Calendar className="mx-auto mb-3 text-gray-400 dark:text-gray-600" size={36} />
+                <p className="text-sm font-medium mb-1 text-gray-900 dark:text-gray-100">No sessions today</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Enjoy your free time or book new sessions</p>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-3">Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/solo/sessions/new" className="group">
+              <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer h-full">
+                <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Plus className="text-purple-600 dark:text-purple-400" size={22} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">New Booking</span>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/solo/sessions/quick" className="group">
+              <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer h-full">
+                <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Zap className="text-amber-600 dark:text-amber-400" size={22} />
+                  </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Quick Session</span>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">Log an unplanned session</p>
+                </CardContent>
+              </Card>
             </Link>
             <Link href="/solo/clients" className="group">
-              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
-                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <UserPlus className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
+              <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer h-full">
+                <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <UserPlus className="text-blue-600 dark:text-blue-400" size={22} />
                   </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Add Client</span>
-                </div>
-              </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Add Client</span>
+                </CardContent>
+              </Card>
             </Link>
-            <Link href="/solo/packages" className="group">
-              <div className="relative overflow-hidden backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-slate-200/50 dark:border-slate-700/50 rounded-xl lg:rounded-2xl p-4 lg:p-6 hover:shadow-lg active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="absolute top-0 right-0 w-24 h-24 lg:w-32 lg:h-32 bg-gradient-to-bl from-slate-500/5 to-transparent opacity-50" />
-                <div className="relative flex flex-col items-center gap-2 lg:gap-3 text-center">
-                  <div className="w-11 h-11 lg:w-14 lg:h-14 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Package className="text-slate-600 dark:text-slate-300" size={22} strokeWidth={2.5} />
+            <Link href="/solo/calendar" className="group">
+              <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer h-full">
+                <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Calendar className="text-green-600 dark:text-green-400" size={22} />
                   </div>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm lg:text-base">Sell Package</span>
-                </div>
-              </div>
-            </Link>
-          </div>
-        </div>
-
-        {/* TIER 2: Build & Setup (Collapsible) */}
-        <TierTwoActions />
-
-        {/* TIER 3: AI Enhancements */}
-        <div className="mt-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="text-purple-500" size={16} />
-            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Enhance your workflow</span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Link href="/solo/programs" className="group">
-              <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200/30 dark:border-purple-700/30 rounded-xl p-4 hover:shadow-md active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Sparkles className="text-purple-600 dark:text-purple-400" size={18} />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">AI Programs</span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Generate training plans</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
-            <Link href="/solo/templates/builder" className="group">
-              <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200/30 dark:border-purple-700/30 rounded-xl p-4 hover:shadow-md active:scale-[0.98] transition-all duration-200 cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <FileText className="text-purple-600 dark:text-purple-400" size={18} />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">AI Templates</span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Create workout templates</p>
-                  </div>
-                </div>
-              </div>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">View Calendar</span>
+                </CardContent>
+              </Card>
             </Link>
           </div>
         </div>
       </div>
 
-      {/* Public Booking Link - less prominent, at bottom */}
+      {/* Two-column: Clients + Revenue */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Clients */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Clients</h2>
+            <Link href="/solo/clients">
+              <Button variant="ghost" size="sm" className="text-xs gap-1">
+                View All <ChevronRight size={14} />
+              </Button>
+            </Link>
+          </div>
+
+          {isLoading ? (
+            <Card className="p-6 dark:bg-gray-800 dark:border-gray-700">
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+              </div>
+            </Card>
+          ) : recentClients.length > 0 ? (
+            <Card className="dark:bg-gray-800 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+              {recentClients.map((client) => (
+                <div key={client.id} className="px-4 py-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">
+                      {client.firstName?.[0]}{client.lastName?.[0]}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                      {client.firstName} {client.lastName}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {client.credits <= 1 && (
+                        <span className="text-[10px] font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-1.5 py-0.5 rounded-full">
+                          Low credits
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className={`text-sm font-semibold ${client.credits <= 1 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                      {client.credits}
+                    </span>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">credits</p>
+                  </div>
+                </div>
+              ))}
+            </Card>
+          ) : (
+            <Card className="p-6 dark:bg-gray-800 dark:border-gray-700">
+              <div className="text-center text-gray-500 dark:text-gray-400">
+                <Users className="mx-auto mb-3 text-gray-400 dark:text-gray-600" size={36} />
+                <p className="text-sm font-medium mb-1 text-gray-900 dark:text-gray-100">No clients yet</p>
+                <p className="text-xs mb-3">Add your first client to get started</p>
+                <Link href="/solo/clients">
+                  <Button size="sm">Add Client</Button>
+                </Link>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Revenue This Week */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Revenue This Week</h2>
+            <Link href="/solo/revenue">
+              <Button variant="ghost" size="sm" className="text-xs gap-1">
+                View Full Revenue <ChevronRight size={14} />
+              </Button>
+            </Link>
+          </div>
+
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <TrendingUp className="text-green-600 dark:text-green-400" size={24} />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                    {isLoading ? '...' : `£${(stats.earningsThisWeek / 100).toFixed(0)}`}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{stats.sessionsThisWeek} sessions this week</p>
+                </div>
+              </div>
+              {/* Simple bar visualization */}
+              <div className="flex items-end gap-1 h-16">
+                {[40, 65, 50, 80, 55, 70, 30].map((h, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 rounded-t bg-gradient-to-t from-green-500 to-green-400 dark:from-green-600 dark:to-green-500 opacity-60"
+                    style={{ height: `${h}%` }}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between mt-1 text-[10px] text-gray-400 dark:text-gray-500">
+                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Public Booking Link */}
       {businessSlug && (
-        <div className="mb-8 opacity-80">
-          <PublicBookingLink
-            businessSlug={businessSlug}
-            businessName={`${currentUser.firstName} ${currentUser.lastName}`}
-          />
+        <div className="mb-6">
+          <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                    <ExternalLink className="text-purple-600 dark:text-purple-400" size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Public Booking Link</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{bookingUrl}</p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopyLink}
+                  className="gap-2 shrink-0"
+                >
+                  {copied ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
+                  {copied ? 'Copied!' : 'Copy Link'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* Recent Clients */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-heading-2 dark:text-gray-100">Recent Clients</h2>
-          <Link href="/solo/clients">
-            <Button variant="ghost" size="sm">View All</Button>
-          </Link>
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : recentClients.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {recentClients.map((client) => (
-              <Card key={client.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-wondrous-blue-light flex items-center justify-center flex-shrink-0">
-                      <span className="text-sm font-semibold text-wondrous-dark-blue">
-                        {client.firstName?.[0]}{client.lastName?.[0]}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                        {client.firstName} {client.lastName}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                        {client.email}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {client.credits}
-                      </span>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">credits</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="p-8">
-            <div className="text-center text-gray-500 dark:text-gray-400">
-              <Users className="mx-auto mb-4 text-gray-400 dark:text-gray-500" size={48} />
-              <p className="text-lg font-medium mb-2 dark:text-gray-300">No clients yet</p>
-              <p className="text-sm mb-4 dark:text-gray-400">
-                Start building the foundations of your business — let&apos;s invite your first client.
-                You can also import clients in bulk via CSV.
-              </p>
-              <Link href="/solo/clients">
-                <Button>Add Client</Button>
-              </Link>
+      {/* Unlock Growth Tools CTA */}
+      <Card className="bg-gradient-to-r from-[#12229D] via-[#6B21A8] to-[#A71075] border-0">
+        <CardContent className="p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                <Megaphone className="text-white" size={22} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Unlock Growth Tools</h3>
+                <p className="text-xs text-white/70">Launch automated campaigns to grow your client base and increase retention.</p>
+              </div>
             </div>
-          </Card>
-        )}
-      </div>
+            <Button size="sm" className="bg-white text-purple-700 hover:bg-white/90 gap-1 shrink-0">
+              <Lock size={14} /> Coming Soon
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

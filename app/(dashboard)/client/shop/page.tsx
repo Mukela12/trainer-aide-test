@@ -1,23 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import ContentHeader from '@/components/shared/ContentHeader';
 import { PackageCard } from '@/components/client/shop/PackageCard';
 import { OfferCard } from '@/components/client/shop/OfferCard';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Gift, ShoppingBag, Loader2 } from 'lucide-react';
+import { Package, Gift, ShoppingBag, Loader2, AlertCircle, Lock, Shield } from 'lucide-react';
 import { useToast } from '@/lib/hooks/use-toast';
 import { useShopPackages, useShopOffers, useClaimShopItem } from '@/lib/hooks/use-shop';
-import type { ShopPackage, ShopOffer } from '@/lib/hooks/use-shop';
+import { useClientPackages } from '@/lib/hooks/use-client-bookings';
+import { useUserStore } from '@/lib/stores/user-store';
 
 export default function ClientShopPage() {
+  const { currentUser } = useUserStore();
   const { data: packages = [], isLoading: packagesLoading } = useShopPackages();
   const { data: offers = [], isLoading: offersLoading } = useShopOffers();
+  const { data: packageData } = useClientPackages(currentUser?.id);
   const claimMutation = useClaimShopItem();
   const loading = packagesLoading || offersLoading;
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const credits = packageData?.totalCredits ?? null;
+  const isLowCredits = credits !== null && credits <= 2;
 
   const handleClaimPackage = async (packageId: string) => {
     setClaimingId(packageId);
@@ -60,9 +65,7 @@ export default function ClientShopPage() {
     return (
       <div className="p-4 lg:p-8 max-w-7xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Shop</h1>
-        <ContentHeader
-          context="Browse packages and special offers from your studio"
-        />
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Browse packages and special offers</p>
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </div>
@@ -73,15 +76,28 @@ export default function ClientShopPage() {
   const hasItems = packages.length > 0 || offers.length > 0;
 
   return (
-    <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Shop</h1>
-      <ContentHeader
-        context="Browse packages and special offers from your studio"
-        stats={[
-          { label: 'packages', value: packages.length, color: 'primary' },
-          { label: 'offers', value: offers.length, color: 'magenta' },
-        ]}
-      />
+    <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Shop</h1>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Browse packages and special offers</p>
+
+      {/* Low Credit Banner */}
+      {isLowCredits && (
+        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+              <AlertCircle className="text-amber-600 dark:text-amber-400" size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                You have {credits} credit{credits !== 1 ? 's' : ''} remaining
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Stock up now to keep your training momentum going
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!hasItems ? (
         <Card className="p-8 text-center">
@@ -205,6 +221,15 @@ export default function ClientShopPage() {
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Security Footer */}
+      <div className="mt-8 flex items-center justify-center gap-4 text-xs text-gray-400 dark:text-gray-500">
+        <span className="flex items-center gap-1"><Lock size={12} /> Secure payment</span>
+        <span>·</span>
+        <span>Credits never expire</span>
+        <span>·</span>
+        <span>Cancel anytime</span>
+      </div>
     </div>
   );
 }

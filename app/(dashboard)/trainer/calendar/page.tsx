@@ -10,7 +10,7 @@ import { useToast } from "@/lib/hooks/use-toast";
 import { useUserStore } from "@/lib/stores/user-store";
 import { useBookings, useAddSession, useUpdateSession, useCancelBooking } from "@/lib/hooks/use-bookings";
 import { useTemplates } from "@/lib/hooks/use-templates";
-import { useAvailability, useAddBlock, getBlockedBlocks as getBlockedBlocksUtil } from "@/lib/hooks/use-availability";
+import { useAvailability, useAddBlock, useDeleteBlock, getBlockedBlocks as getBlockedBlocksUtil, getBlocksForDate } from "@/lib/hooks/use-availability";
 import { useServices } from "@/lib/hooks/use-services";
 import { useBookingRequests, useAcceptBookingRequest, useDeclineBookingRequest } from "@/lib/hooks/use-booking-requests";
 import { useClients } from "@/lib/hooks/use-clients";
@@ -46,6 +46,7 @@ export default function TrainerCalendar() {
   const { data: templates = [] } = useTemplates(currentUser?.id);
   const { data: trainerAvailability } = useAvailability(currentUser?.id);
   const addBlockMutation = useAddBlock();
+  const deleteBlockMutation = useDeleteBlock();
   const { data: services = [] } = useServices();
   const { data: bookingRequests = [] } = useBookingRequests(currentUser?.id, 'pending');
   const acceptRequestMutation = useAcceptBookingRequest();
@@ -147,6 +148,17 @@ export default function TrainerCalendar() {
   // Client-side only flag to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false);
 
+  // Responsive hour height: 48px on mobile, 64px on desktop (matches grid row height)
+  const [hourHeight, setHourHeight] = useState(48);
+  useEffect(() => {
+    const updateHourHeight = () => {
+      setHourHeight(window.innerWidth >= 1024 ? 64 : 48);
+    };
+    updateHourHeight();
+    window.addEventListener('resize', updateHourHeight);
+    return () => window.removeEventListener('resize', updateHourHeight);
+  }, []);
+
   // Local state
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");
@@ -190,6 +202,9 @@ export default function TrainerCalendar() {
 
   // Block time panel state
   const [showBlockTimePanel, setShowBlockTimePanel] = useState(false);
+
+  // Block removal confirmation
+  const [removingBlockId, setRemovingBlockId] = useState<string | null>(null);
 
   // Legend collapsed state (collapsed by default for experienced users)
   const [showLegend, setShowLegend] = useState(false);
@@ -286,8 +301,16 @@ export default function TrainerCalendar() {
 
   // Handle quick slot click
   const handleQuickSlotClick = (datetime: Date) => {
+    if (isTimePast(datetime)) {
+      toast({
+        variant: "destructive",
+        title: "Cannot Book in the Past",
+        description: "Please select a future time slot",
+      });
+      return;
+    }
     setSelectedSlot(datetime);
-    setSelectedServiceType(services[0].id);
+    setSelectedServiceType(services[0]?.id || null);
     setShowBookingPanel(true);
     setSearchClient("");
   };
@@ -766,6 +789,79 @@ export default function TrainerCalendar() {
     });
   };
 
+  // Get label for a blocked time slot
+  const getBlockLabel = (datetime: Date): string => {
+    if (!trainerAvailability) return 'BLOCKED';
+    const dateStr = datetime.toISOString().split('T')[0];
+    const dayOfWeek = datetime.getDay();
+    const timeInMinutes = datetime.getHours() * 60 + datetime.getMinutes();
+
+    const matchingBlock = trainerAvailability.blocks.find((block) => {
+      if (block.blockType !== 'blocked') return false;
+      const blockStart = block.startHour * 60 + block.startMinute;
+      const blockEnd = block.endHour * 60 + block.endMinute;
+      if (timeInMinutes < blockStart || timeInMinutes >= blockEnd) return false;
+
+      if (block.recurrence === 'weekly') return block.dayOfWeek === dayOfWeek;
+      if (block.recurrence === 'once' && block.specificDate) {
+        if (!block.endDate || block.endDate === block.specificDate) return block.specificDate === dateStr;
+        return dateStr >= block.specificDate && dateStr <= block.endDate;
+      }
+      return false;
+    });
+
+    if (matchingBlock) {
+      if (matchingBlock.notes) return matchingBlock.notes;
+      if (matchingBlock.reason) {
+        const reasonLabels: Record<string, string> = {
+          personal: 'Personal',
+          lunch: 'Lunch',
+          meeting: 'Meeting',
+          holiday: 'Holiday',
+          other: 'Blocked',
+        };
+        return reasonLabels[matchingBlock.reason] || matchingBlock.reason;
+      }
+    }
+    return 'BLOCKED';
+  };
+
+  // Get block ID for a given time slot (for removal)
+  const getBlockId = (datetime: Date): string | null => {
+    if (!trainerAvailability) return null;
+    const dateStr = datetime.toISOString().split('T')[0];
+    const dayOfWeek = datetime.getDay();
+    const timeInMinutes = datetime.getHours() * 60 + datetime.getMinutes();
+
+    const matchingBlock = trainerAvailability.blocks.find((block) => {
+      if (block.blockType !== 'blocked') return false;
+      const blockStart = block.startHour * 60 + block.startMinute;
+      const blockEnd = block.endHour * 60 + block.endMinute;
+      if (timeInMinutes < blockStart || timeInMinutes >= blockEnd) return false;
+
+      if (block.recurrence === 'weekly') return block.dayOfWeek === dayOfWeek;
+      if (block.recurrence === 'once' && block.specificDate) {
+        if (!block.endDate || block.endDate === block.specificDate) return block.specificDate === dateStr;
+        return dateStr >= block.specificDate && dateStr <= block.endDate;
+      }
+      return false;
+    });
+
+    return matchingBlock?.id || null;
+  };
+
+  // Remove blocked time
+  const handleRemoveBlock = (blockId: string) => {
+    deleteBlockMutation.mutate(blockId);
+    toast({ title: "Block Removed", description: "Time block has been removed" });
+    setRemovingBlockId(null);
+  };
+
+  // Check if time is in the past
+  const isTimePast = (datetime: Date): boolean => {
+    return datetime < new Date();
+  };
+
   // Pending requests count
   const pendingRequestsCount = bookingRequests.filter(
     (r) => r.status === "pending"
@@ -942,9 +1038,26 @@ export default function TrainerCalendar() {
                     <motion.div
                       key={session.id}
                       layout
-                      className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-xl cursor-pointer transition-all overflow-hidden"
+                      className={cn(
+                        "rounded-2xl shadow-md hover:shadow-xl cursor-pointer transition-all overflow-hidden",
+                        session.status === "soft-hold"
+                          ? "bg-amber-50 dark:bg-amber-900/10 border-2 border-dashed border-amber-400 dark:border-amber-600"
+                          : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                      )}
                       onClick={() => handleSessionClick(session.id)}
                     >
+                      {/* Soft Hold Banner */}
+                      {session.status === "soft-hold" && (
+                        <div className="bg-amber-100 dark:bg-amber-900/30 px-6 py-2 flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm font-semibold">
+                          <Clock size={14} />
+                          Soft Hold
+                          {session.holdExpiry && (
+                            <span className="text-xs font-normal ml-auto">
+                              {getTimeRemaining(session.holdExpiry)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {/* Session Card Header */}
                       <div className="p-6">
                         <div className="flex items-start gap-4 mb-4">
@@ -956,19 +1069,21 @@ export default function TrainerCalendar() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-bold text-lg text-wondrous-grey-dark dark:text-gray-100 mb-1">
-                              {session.clientName}
+                              {formatTime(session.datetime)} - {session.clientName}
                             </div>
                             <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                              <span className="flex items-center gap-1">
-                                <Clock size={14} />
-                                {formatTime(session.datetime)}
-                              </span>
-                              <span className="text-gray-400 dark:text-gray-500">•</span>
-                              <span>{serviceType?.duration} minutes</span>
+                              <span>{serviceType?.name}</span>
+                              <span className="text-gray-400 dark:text-gray-500">&middot;</span>
+                              <span>{serviceType?.duration} min</span>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-3xl font-bold text-wondrous-blue dark:text-blue-400 font-heading">
+                            <div className={cn(
+                              "text-3xl font-bold font-heading",
+                              session.status === "soft-hold"
+                                ? "text-amber-500 dark:text-amber-400"
+                                : "text-wondrous-blue dark:text-blue-400"
+                            )}>
                               {session.datetime.getHours()}:
                               {session.datetime.getMinutes().toString().padStart(2, "0")}
                             </div>
@@ -1332,22 +1447,25 @@ export default function TrainerCalendar() {
                   datetime.setHours(hour, 0, 0, 0);
                   const hasConflict = !isTimeAvailable(datetime, 30, sessions);
                   const isAvailable = isWithinAvailability(datetime, trainerAvailability);
+                  const isPast = isTimePast(datetime);
 
                   return (
                     <button
                       key={hour}
-                      onClick={() => !hasConflict && isAvailable && handleQuickSlotClick(datetime)}
-                      disabled={hasConflict || !isAvailable}
+                      onClick={() => !hasConflict && isAvailable && !isPast && handleQuickSlotClick(datetime)}
+                      disabled={hasConflict || !isAvailable || isPast}
                       className={cn(
                         "border-2 rounded-lg p-2 text-xs font-semibold transition-all relative",
-                        !isAvailable
+                        isPast
+                          ? "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-300 dark:text-gray-500 cursor-not-allowed opacity-40 line-through"
+                          : !isAvailable
                           ? "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50"
                           : hasConflict
                           ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-400 dark:text-red-400 cursor-not-allowed"
                           : "bg-white dark:bg-gray-800 border-wondrous-blue dark:border-blue-400 text-wondrous-blue dark:text-blue-400 hover:bg-wondrous-blue dark:hover:bg-blue-500 hover:text-white"
                       )}
                     >
-                      {hasConflict && isAvailable && (
+                      {hasConflict && isAvailable && !isPast && (
                         <AlertCircle size={12} className="absolute top-0.5 right-0.5 text-red-500" />
                       )}
                       {hour}:00
@@ -1398,7 +1516,7 @@ export default function TrainerCalendar() {
               <div className="relative">
                 {/* Background grid */}
                 {hours.map((hour) => (
-                  <div key={hour} className="grid grid-cols-8 gap-0.5 lg:gap-1 min-h-[48px] lg:min-h-[64px] border-t-2 border-wondrous-grey-light dark:border-gray-700">
+                  <div key={hour} className="grid grid-cols-8 gap-0.5 lg:gap-1 h-[48px] lg:h-[64px] border-t-2 border-wondrous-grey-light dark:border-gray-700">
                     <div className="text-[10px] lg:text-xs font-medium text-right pr-1 lg:pr-2 pt-1 text-wondrous-grey-dark dark:text-gray-300">
                       {hour}:00
                     </div>
@@ -1408,26 +1526,47 @@ export default function TrainerCalendar() {
                       slotTime.setHours(hour, 0, 0, 0);
                       const isBlocked = isTimeBlocked(slotTime, trainerAvailability);
                       const isAvailable = isWithinAvailability(slotTime, trainerAvailability);
+                      const isPast = isTimePast(slotTime);
+                      const blockLabel = isBlocked ? getBlockLabel(slotTime) : '';
+                      const blockId = isBlocked ? getBlockId(slotTime) : null;
 
                       return (
                         <div
                           key={dayIndex}
                           className={cn(
                             "rounded border transition-colors relative",
-                            isBlocked
-                              ? "bg-red-100 dark:bg-red-900/20 border-red-300 dark:border-red-800 cursor-not-allowed bg-[repeating-linear-gradient(45deg,_transparent,_transparent_10px,_rgba(239,68,68,0.1)_10px,_rgba(239,68,68,0.1)_20px)]"
+                            isPast && !isBlocked
+                              ? "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 cursor-not-allowed opacity-40"
+                              : isBlocked
+                              ? "bg-red-100 dark:bg-red-900/20 border-red-300 dark:border-red-800 cursor-pointer bg-[repeating-linear-gradient(45deg,_transparent,_transparent_10px,_rgba(239,68,68,0.1)_10px,_rgba(239,68,68,0.1)_20px)]"
                               : isAvailable
                               ? "bg-gray-50 dark:bg-gray-700 border-wondrous-grey-light dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-gray-600 cursor-pointer"
                               : "bg-gray-200 dark:bg-gray-600 border-gray-300 dark:border-gray-500 cursor-not-allowed opacity-40"
                           )}
-                          onClick={() => (isAvailable && !isBlocked) && handleQuickSlotClick(slotTime)}
-                          title={isBlocked ? "Time blocked" : !isAvailable ? "Trainer not available" : "Click to book"}
+                          onClick={() => {
+                            if (isBlocked && blockId) {
+                              setRemovingBlockId(removingBlockId === blockId ? null : blockId);
+                            } else if (isAvailable && !isPast) {
+                              handleQuickSlotClick(slotTime);
+                            }
+                          }}
+                          title={isBlocked ? `${blockLabel} - Click to remove` : isPast ? "Past time" : !isAvailable ? "Trainer not available" : "Click to book"}
                         >
                           {isBlocked && (
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-[8px] lg:text-[10px] font-semibold text-red-600 dark:text-red-400 bg-white/80 dark:bg-gray-900/80 px-1 rounded">
-                                BLOCKED
+                              <span className="text-[8px] lg:text-[10px] font-semibold text-red-600 dark:text-red-400 bg-white/80 dark:bg-gray-900/80 px-1 rounded truncate max-w-full">
+                                {blockLabel}
                               </span>
+                            </div>
+                          )}
+                          {removingBlockId === blockId && blockId && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 dark:bg-gray-900/90 rounded">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleRemoveBlock(blockId); }}
+                                className="text-[8px] lg:text-[10px] font-bold text-red-600 hover:text-red-700 px-1"
+                              >
+                                Remove
+                              </button>
                             </div>
                           )}
                         </div>
@@ -1454,19 +1593,12 @@ export default function TrainerCalendar() {
 
                     if (!serviceType) return null;
 
-                    // Calculate position (responsive for mobile/desktop)
+                    // Calculate position using fractional hour offset
                     const sessionHour = session.datetime.getHours();
                     const sessionMinute = session.datetime.getMinutes();
-
-                    // Use CSS variables for responsive height calculation
-                    // Mobile: 48px per hour, Desktop: 64px per hour
-                    const hourHeightMobile = 48;
-                    const hourHeightDesktop = 64;
-
-                    const topPositionMobile = (sessionHour - 6) * hourHeightMobile + (sessionMinute / 60) * hourHeightMobile;
-                    const topPositionDesktop = (sessionHour - 6) * hourHeightDesktop + (sessionMinute / 60) * hourHeightDesktop;
-                    const heightMobile = (serviceType.duration / 60) * hourHeightMobile;
-                    const heightDesktop = (serviceType.duration / 60) * hourHeightDesktop;
+                    const hourOffset = (sessionHour - 6) + sessionMinute / 60;
+                    const sessionDuration = serviceType.duration || (session as { duration?: number }).duration || 30;
+                    const durationHours = sessionDuration / 60;
 
                     // Calculate left position (column)
                     const columnWidth = 100 / 8; // 8 columns total
@@ -1475,15 +1607,24 @@ export default function TrainerCalendar() {
                     return (
                       <div
                         key={session.id}
-                        className="absolute rounded-md lg:rounded-lg shadow-sm border lg:border-2 p-1 lg:p-2 hover:shadow-md transition-all cursor-pointer overflow-hidden"
+                        className={cn(
+                          "absolute rounded-md lg:rounded-lg shadow-sm p-1 lg:p-2 hover:shadow-md transition-all cursor-pointer overflow-hidden",
+                          session.status === "soft-hold"
+                            ? "border-2 border-dashed border-amber-400"
+                            : "border lg:border-2"
+                        )}
                         style={{
-                          top: `${topPositionMobile}px`,
+                          top: `${hourOffset * hourHeight}px`,
                           left: `calc(${leftPosition}% + 2px)`,
                           width: `calc(${columnWidth}% - 4px)`,
-                          height: `${heightMobile}px`,
-                          minHeight: "32px",
-                          background: serviceType.color + "20",
-                          borderColor: serviceType.color,
+                          height: `${durationHours * hourHeight}px`,
+                          minHeight: "24px",
+                          background: session.status === "soft-hold"
+                            ? "rgba(245, 158, 11, 0.15)"
+                            : serviceType.color + "20",
+                          borderColor: session.status === "soft-hold"
+                            ? undefined
+                            : serviceType.color,
                         }}
                         onClick={() => handleSessionClick(session.id)}
                       >
@@ -1491,24 +1632,23 @@ export default function TrainerCalendar() {
                           <div>
                             <div
                               className="font-bold truncate text-[9px] lg:text-xs"
-                              style={{ color: serviceType.color }}
+                              style={{ color: session.status === "soft-hold" ? "#d97706" : serviceType.color }}
                             >
-                              <span className="hidden sm:inline">{client?.initials} </span>
-                              <span className="hidden md:inline">{session.clientName}</span>
+                              <span className="hidden md:inline">{formatTime(session.datetime)} - {session.clientName}</span>
                               <span className="md:hidden">{client?.initials}</span>
                             </div>
                             <div className="text-[8px] lg:text-[10px] text-gray-600 dark:text-gray-400 hidden sm:block">
-                              {formatTime(session.datetime)}
+                              {serviceType.name}
                             </div>
                           </div>
                           <div
                             className="text-[8px] lg:text-[10px] font-semibold px-1 lg:px-1.5 py-0.5 rounded self-start hidden sm:block"
                             style={{
-                              background: statusInfo.bg,
-                              color: statusInfo.text,
+                              background: session.status === "soft-hold" ? "#fef3c7" : statusInfo.bg,
+                              color: session.status === "soft-hold" ? "#92400e" : statusInfo.text,
                             }}
                           >
-                            {statusInfo.label}
+                            {session.status === "soft-hold" ? "Hold" : statusInfo.label}
                           </div>
                         </div>
                       </div>

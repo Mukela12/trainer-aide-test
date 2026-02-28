@@ -10,12 +10,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/lib/hooks/use-toast';
 import { usePatchClient } from '@/lib/hooks/use-clients';
-import { Gift, Plus, Minus } from 'lucide-react';
+import { Gift, AlertCircle } from 'lucide-react';
 import type { ClientSummary } from './EditClientDialog';
 
 interface RewardCreditsDialogProps {
@@ -28,24 +27,22 @@ interface RewardCreditsDialogProps {
 export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: RewardCreditsDialogProps) {
   const { toast } = useToast();
   const patchClient = usePatchClient();
-  const [creditsToAdd, setCreditsToAdd] = useState(1);
   const [reason, setReason] = useState('');
+  const [reasonError, setReasonError] = useState(false);
 
+  const creditsToAdd = 1; // Fixed at 1 per award
   const currentCredits = client.credits || 0;
   const newTotal = currentCredits + creditsToAdd;
-
-  const handleQuickAdd = (amount: number) => {
-    setCreditsToAdd(Math.max(1, creditsToAdd + amount));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (creditsToAdd < 1) {
+    if (!reason.trim()) {
+      setReasonError(true);
       toast({
         variant: 'destructive',
-        title: 'Invalid amount',
-        description: 'Please enter at least 1 credit to reward.',
+        title: 'Reason required',
+        description: 'Please provide a reason for the complimentary credit.',
       });
       return;
     }
@@ -54,13 +51,13 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
       await patchClient.mutateAsync({ clientId: client.id, updates: { credits: newTotal } });
 
       toast({
-        title: 'Credits rewarded!',
-        description: `${creditsToAdd} credit${creditsToAdd > 1 ? 's' : ''} added to ${client.first_name} ${client.last_name}. New balance: ${newTotal}`,
+        title: 'Credit rewarded!',
+        description: `1 complimentary credit added to ${client.first_name} ${client.last_name}. New balance: ${newTotal}`,
       });
 
       // Reset form
-      setCreditsToAdd(1);
       setReason('');
+      setReasonError(false);
 
       onOpenChange(false);
       onSuccess?.();
@@ -68,7 +65,7 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to reward credits',
+        description: error instanceof Error ? error.message : 'Failed to reward credit',
       });
     }
   };
@@ -79,10 +76,10 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gift className="h-5 w-5 text-purple-600" />
-            Reward Credits
+            Reward Complimentary Credit
           </DialogTitle>
           <DialogDescription>
-            Add complimentary credits to {client.first_name} {client.last_name}&apos;s account.
+            Add 1 complimentary credit to {client.first_name} {client.last_name}&apos;s account.
           </DialogDescription>
         </DialogHeader>
 
@@ -99,64 +96,33 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
             </div>
           </div>
 
-          {/* Credits input with quick buttons */}
-          <div className="space-y-2">
-            <Label htmlFor="creditsToAdd">Credits to Add</Label>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => handleQuickAdd(-1)}
-                disabled={creditsToAdd <= 1}
-              >
-                <Minus size={16} />
-              </Button>
-              <Input
-                id="creditsToAdd"
-                type="number"
-                min="1"
-                value={creditsToAdd}
-                onChange={(e) => setCreditsToAdd(Math.max(1, parseInt(e.target.value) || 1))}
-                className="text-center text-lg font-semibold"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => handleQuickAdd(1)}
-              >
-                <Plus size={16} />
-              </Button>
-            </div>
-
-            {/* Quick add buttons */}
-            <div className="flex gap-2 mt-2">
-              {[1, 5, 10].map((amount) => (
-                <Button
-                  key={amount}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCreditsToAdd(amount)}
-                  className={creditsToAdd === amount ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : ''}
-                >
-                  +{amount}
-                </Button>
-              ))}
-            </div>
+          {/* Fixed credit amount notice */}
+          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Maximum 1 complimentary credit per award. This action will be logged and visible to super admins.
+            </p>
           </div>
 
-          {/* Reason (optional) */}
+          {/* Reason (required) */}
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason (optional)</Label>
+            <Label htmlFor="reason" className="flex items-center gap-1">
+              Reason <span className="text-red-500">*</span>
+            </Label>
             <Textarea
               id="reason"
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(e) => {
+                setReason(e.target.value);
+                if (e.target.value.trim()) setReasonError(false);
+              }}
               placeholder="e.g., Referral bonus, Birthday gift, Loyalty reward..."
               rows={2}
+              className={reasonError ? 'border-red-500 focus:ring-red-500' : ''}
             />
+            {reasonError && (
+              <p className="text-xs text-red-500">A reason is required for complimentary credits</p>
+            )}
           </div>
 
           <DialogFooter>
@@ -166,9 +132,9 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
             <Button
               type="submit"
               disabled={patchClient.isPending}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              className="bg-gradient-to-r from-[#12229D] via-[#6B21A8] to-[#A71075] hover:opacity-90"
             >
-              {patchClient.isPending ? 'Rewarding...' : `Reward ${creditsToAdd} Credit${creditsToAdd > 1 ? 's' : ''}`}
+              {patchClient.isPending ? 'Rewarding...' : 'Reward 1 Credit'}
             </Button>
           </DialogFooter>
         </form>

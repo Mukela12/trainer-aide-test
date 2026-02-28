@@ -15,6 +15,7 @@ const PUBLIC_ROUTE_PREFIXES = [
   '/book/',
   '/invite/',
   '/client-invite/',
+  '/legal/',
 ]
 
 // Routes that are API routes (handle separately)

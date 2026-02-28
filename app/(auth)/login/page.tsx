@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, Suspense } from 'react'
+import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
@@ -17,8 +18,10 @@ function LoginPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // Form state - pre-fill email if provided
   const [email, setEmail] = useState(prefillEmail || '')
@@ -30,10 +33,45 @@ function LoginPageContent() {
     return returnTo ? `${base}?returnTo=${encodeURIComponent(returnTo)}` : base
   }
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Please enter your email address first')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const supabase = getSupabaseBrowserClient()
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      })
+
+      if (error) {
+        setError(error.message)
+      } else {
+        setSuccessMessage('Password reset link sent! Check your email.')
+      }
+    } catch {
+      setError('An unexpected error occurred. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
+    setSuccessMessage(null)
+
+    if (isSignUp && !agreedToTerms) {
+      setError('You must agree to the Terms of Service and Privacy Policy to create an account.')
+      setIsLoading(false)
+      return
+    }
 
     try {
       const supabase = getSupabaseBrowserClient()
@@ -57,7 +95,7 @@ function LoginPageContent() {
 
         if (data.user && !data.session) {
           // Email confirmation required
-          setError('Please check your email to confirm your account.')
+          setSuccessMessage('Please check your email to confirm your account.')
           setIsLoading(false)
           return
         }
@@ -82,7 +120,7 @@ function LoginPageContent() {
         // Redirect to callback with returnTo to handle profile loading
         router.push(getCallbackUrl())
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred. Please try again.')
       setIsLoading(false)
     }
@@ -91,6 +129,7 @@ function LoginPageContent() {
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
     setError(null)
+    setSuccessMessage(null)
 
     try {
       const supabase = getSupabaseBrowserClient()
@@ -111,41 +150,9 @@ function LoginPageContent() {
         setError(error.message)
         setIsGoogleLoading(false)
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred. Please try again.')
       setIsGoogleLoading(false)
-    }
-  }
-
-  const handleMagicLink = async () => {
-    if (!email) {
-      setError('Please enter your email address')
-      return
-    }
-
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const supabase = getSupabaseBrowserClient()
-      // Include returnTo in the callback URL for magic link
-      const callbackUrl = `${window.location.origin}${getCallbackUrl()}`
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: callbackUrl,
-        },
-      })
-
-      if (error) {
-        setError(error.message)
-      } else {
-        setError('Check your email for the login link!')
-      }
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again.')
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -154,12 +161,12 @@ function LoginPageContent() {
       <div className="w-full max-w-md">
         {/* Logo and Header */}
         <div className="text-center mb-8 mt-4">
-          <div className="relative w-64 h-24 mx-auto mb-6">
+          <div className="relative w-80 h-28 mx-auto mb-6">
             <Image
               src="/images/all-wondrous-logo.svg"
               alt="All Wondrous"
               fill
-              sizes="256px"
+              sizes="320px"
               className="object-contain"
               priority
             />
@@ -168,10 +175,17 @@ function LoginPageContent() {
 
         {/* Login Card */}
         <div className="backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 shadow-xl">
-          {/* Error/Success Message */}
+          {/* Error Message */}
           {error && (
-            <div className={`mb-6 p-4 rounded-lg ${error.includes('Check your email') ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'}`}>
-              <p className={`text-sm ${error.includes('Check your email') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{error}</p>
+            <div className="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-6 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <p className="text-sm text-green-600 dark:text-green-400">{successMessage}</p>
             </div>
           )}
 
@@ -266,12 +280,49 @@ function LoginPageContent() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+
+              {/* Forgot Password */}
+              {!isSignUp && (
+                <div className="mt-1 text-right">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={isLoading}
+                    className="text-sm text-purple-600 dark:text-purple-400 hover:text-pink-600 dark:hover:text-pink-400 transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </div>
+
+            {/* Terms Checkbox (sign up only) */}
+            {isSignUp && (
+              <div className="flex items-start gap-2">
+                <input
+                  id="terms"
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                />
+                <label htmlFor="terms" className="text-sm text-gray-600 dark:text-gray-400">
+                  I agree to the{' '}
+                  <Link href="/legal/terms" target="_blank" className="text-purple-600 dark:text-purple-400 hover:underline">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/legal/privacy" target="_blank" className="text-purple-600 dark:text-purple-400 hover:underline">
+                    Privacy Policy
+                  </Link>
+                </label>
+              </div>
+            )}
 
             <button
               type="submit"
-              disabled={isLoading || isGoogleLoading}
-              className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-md hover:shadow-lg"
+              disabled={isLoading || isGoogleLoading || (isSignUp && !agreedToTerms)}
+              className="w-full px-4 py-3 bg-gradient-to-r from-[#12229D] via-[#6B21A8] to-[#A71075] text-white rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-md hover:shadow-lg"
             >
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin mx-auto" />
@@ -283,17 +334,6 @@ function LoginPageContent() {
             </button>
           </form>
 
-          {/* Magic Link Option */}
-          {!isSignUp && (
-            <button
-              onClick={handleMagicLink}
-              disabled={isLoading || isGoogleLoading}
-              className="w-full mt-4 text-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
-            >
-              Send me a magic link instead
-            </button>
-          )}
-
           {/* Toggle Sign Up / Sign In */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -302,6 +342,7 @@ function LoginPageContent() {
                 onClick={() => {
                   setIsSignUp(!isSignUp)
                   setError(null)
+                  setSuccessMessage(null)
                 }}
                 className="ml-1 text-purple-600 dark:text-purple-400 hover:text-pink-600 dark:hover:text-pink-400 font-medium transition-colors"
               >
@@ -313,9 +354,11 @@ function LoginPageContent() {
 
         {/* Footer - Terms & Privacy */}
         <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
-          <a href="https://allwondrous.com/legal/terms" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 dark:hover:text-gray-300 underline">Terms</a>
+          <Link href="/legal/terms" className="hover:text-gray-600 dark:hover:text-gray-300 underline">Terms</Link>
           {' · '}
-          <a href="https://allwondrous.com/legal/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 dark:hover:text-gray-300 underline">Privacy Policy</a>
+          <Link href="/legal/privacy" className="hover:text-gray-600 dark:hover:text-gray-300 underline">Privacy Policy</Link>
+          {' · '}
+          <Link href="/legal/cookies" className="hover:text-gray-600 dark:hover:text-gray-300 underline">Cookies</Link>
         </p>
       </div>
     </div>

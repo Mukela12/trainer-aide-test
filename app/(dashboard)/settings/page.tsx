@@ -13,7 +13,7 @@ import {
   User, Bell, Shield, Palette, LogOut, Building2, Heart, CheckCircle2,
   AlertCircle, CalendarClock, Users, Lock, Loader2, Save,
   ListCheck, Plug, MessageSquare, Trash2, ChevronRight, AlertTriangle,
-  Scale,
+  Scale, CreditCard, ExternalLink, FileText,
 } from 'lucide-react';
 import ContentHeader from '@/components/shared/ContentHeader';
 import { LogoUpload } from '@/components/shared/LogoUpload';
@@ -99,20 +99,26 @@ interface SettingsTab {
   label: string;
   icon: React.ReactNode;
   roles: string[]; // empty = all roles
+  group?: number; // group index for dividers
 }
 
 const TABS: SettingsTab[] = [
-  { id: 'booking', label: 'Booking', icon: <CalendarClock size={18} />, roles: ['solo_practitioner', 'studio_owner'] },
-  { id: 'profile', label: 'Profile', icon: <User size={18} />, roles: [] },
-  { id: 'business', label: 'Business Details', icon: <Building2 size={18} />, roles: ['solo_practitioner', 'studio_owner'] },
-  { id: 'waitlist', label: 'Waitlist', icon: <ListCheck size={18} />, roles: ['solo_practitioner', 'studio_owner'] },
-  { id: 'legal', label: 'Legal & Compliance', icon: <Scale size={18} />, roles: ['solo_practitioner', 'studio_owner'] },
-  { id: 'staff', label: 'Staff Management', icon: <Users size={18} />, roles: ['studio_owner'] },
-  { id: 'health', label: 'Health & Safety', icon: <Heart size={18} />, roles: ['client'] },
-  { id: 'notifications', label: 'Notifications', icon: <Bell size={18} />, roles: [] },
-  { id: 'appearance', label: 'Appearance', icon: <Palette size={18} />, roles: [] },
-  { id: 'privacy', label: 'Privacy & Security', icon: <Shield size={18} />, roles: [] },
-  { id: 'danger', label: 'Danger Zone', icon: <Trash2 size={18} />, roles: [] },
+  // Group 1: Core
+  { id: 'booking', label: 'Booking', icon: <CalendarClock size={18} />, roles: ['solo_practitioner', 'studio_owner'], group: 1 },
+  { id: 'profile', label: 'Profile', icon: <User size={18} />, roles: [], group: 1 },
+  { id: 'business', label: 'Business Details', icon: <Building2 size={18} />, roles: ['solo_practitioner', 'studio_owner'], group: 1 },
+  { id: 'plan_billing', label: 'Plan & Billing', icon: <CreditCard size={18} />, roles: ['solo_practitioner', 'studio_owner'], group: 1 },
+  // Group 2: Communications
+  { id: 'waitlist', label: 'Waitlist', icon: <ListCheck size={18} />, roles: ['solo_practitioner', 'studio_owner'], group: 2 },
+  { id: 'notifications', label: 'Notifications', icon: <Bell size={18} />, roles: [], group: 2 },
+  { id: 'appearance', label: 'Appearance', icon: <Palette size={18} />, roles: [], group: 2 },
+  // Group 3: Legal & Management
+  { id: 'legal', label: 'Legal & Compliance', icon: <Scale size={18} />, roles: ['solo_practitioner', 'studio_owner'], group: 3 },
+  { id: 'privacy', label: 'Privacy & Security', icon: <Shield size={18} />, roles: [], group: 3 },
+  { id: 'staff', label: 'Staff Management', icon: <Users size={18} />, roles: ['studio_owner'], group: 3 },
+  { id: 'health', label: 'Health & Safety', icon: <Heart size={18} />, roles: ['client'], group: 3 },
+  // Group 4: Danger
+  { id: 'danger', label: 'Danger Zone', icon: <Trash2 size={18} />, roles: [], group: 4 },
 ];
 
 const COMING_SOON_TABS: SettingsTab[] = [
@@ -712,30 +718,107 @@ export default function SettingsPage() {
     </div>
   );
 
+  const renderPlanBilling = () => (
+    <div className="space-y-6">
+      <SectionHeader icon={<CreditCard size={20} />} title="Plan & Billing" subtitle="Your subscription, payment method, and fee schedule" color="bg-green-100 dark:bg-green-900/30" iconColor="text-green-600 dark:text-green-400" />
+      <div className="space-y-4">
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Current Plan</p>
+            <span className="text-xs font-semibold uppercase tracking-wider bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">Active</span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Your plan details and billing cycle will appear here once payment integration is enabled.</p>
+        </div>
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Payment Method</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">No payment method on file. Stripe Connect setup will be available here.</p>
+        </div>
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Fee Schedule</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Platform transaction fees and billing details will be displayed here. See allwondrous.com/pricing for current rates.</p>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderLegal = () => (
     <div className="space-y-6">
-      <SectionHeader icon={<Scale size={20} />} title="Legal & Compliance" subtitle="Policies, waivers, and compliance settings" color="bg-indigo-100 dark:bg-indigo-900/30" iconColor="text-indigo-600 dark:text-indigo-400" />
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Configure legal agreements and health requirements for your clients.
-      </p>
-      <div className="space-y-3">
-        {[
-          { label: 'PAR-Q Health Check Requirement', desc: 'Require clients to complete a health questionnaire before booking' },
-          { label: 'Terms of Service URL', desc: 'Link to your terms of service for client acknowledgement' },
-          { label: 'Privacy Policy URL', desc: 'Link to your privacy policy' },
-          { label: 'Photo / Media Consent', desc: 'Require media consent before sessions' },
-        ].map(({ label, desc }) => (
-          <div key={label} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-between">
-            <div className="flex-1 mr-4">
+      <SectionHeader icon={<Scale size={20} />} title="Legal & Compliance" subtitle="Your agreements with AllWondrous and your client-facing terms" color="bg-indigo-100 dark:bg-indigo-900/30" iconColor="text-indigo-600 dark:text-indigo-400" />
+
+      {/* Your Terms with AllWondrous */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 uppercase tracking-wider">Your Terms with AllWondrous</h3>
+        <div className="space-y-3">
+          <a href="/legal/terms" target="_blank" className="block p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Scale size={16} className="text-gray-400 shrink-0" />
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</p>
+                <FileText size={16} className="text-indigo-500" />
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Terms of Service</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Version 1.0 &middot; Effective 26 Feb 2026</p>
+                </div>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">{desc}</p>
+              <ExternalLink size={14} className="text-gray-400" />
+            </div>
+          </a>
+          <a href="/legal/privacy" target="_blank" className="block p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText size={16} className="text-indigo-500" />
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Privacy Policy</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Version 1.0 &middot; Effective 26 Feb 2026</p>
+                </div>
+              </div>
+              <ExternalLink size={14} className="text-gray-400" />
+            </div>
+          </a>
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText size={16} className="text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Data Processing Agreement</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Available upon request</p>
+              </div>
             </div>
             <span className="text-[10px] font-semibold uppercase tracking-wider bg-wondrous-blue-light text-wondrous-dark-blue px-2 py-0.5 rounded-full shrink-0">Coming Soon</span>
           </div>
-        ))}
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CreditCard size={16} className="text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Fee Schedule</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">See Plan &amp; Billing tab</p>
+              </div>
+            </div>
+            <ChevronRight size={14} className="text-gray-400" />
+          </div>
+        </div>
+      </div>
+
+      {/* Your Client Terms */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 uppercase tracking-wider">Your Client Terms</h3>
+        <div className="space-y-3">
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Client-facing Terms</p>
+                <span className="text-[10px] font-semibold uppercase bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">Inactive</span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Set up terms that your clients must agree to before booking. You can use our template or write your own.
+            </p>
+            <span className="text-[10px] font-semibold uppercase tracking-wider bg-wondrous-blue-light text-wondrous-dark-blue px-2 py-0.5 rounded-full">Coming Soon</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg">
+        <p className="text-xs text-amber-700 dark:text-amber-300">
+          <strong>Legal disclaimer:</strong> AllWondrous provides template terms as a convenience only. These do not constitute legal advice. You are responsible for ensuring your terms are legally compliant.
+        </p>
       </div>
     </div>
   );
@@ -946,6 +1029,7 @@ export default function SettingsPage() {
     booking: renderBooking,
     profile: renderProfile,
     business: renderBusiness,
+    plan_billing: renderPlanBilling,
     waitlist: renderWaitlist,
     legal: renderLegal,
     staff: renderStaff,
@@ -966,23 +1050,29 @@ export default function SettingsPage() {
         {/* Desktop: Left tab navigation */}
         <nav className="hidden lg:block w-56 shrink-0">
           <div className="sticky top-6 space-y-1">
-            {visibleTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left',
-                  activeTab === tab.id
-                    ? 'bg-slate-100 dark:bg-slate-800 text-gray-900 dark:text-gray-100'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-                )}
-              >
-                <span className={cn("transition-colors", activeTab === tab.id ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400")}>
-                  {tab.icon}
-                </span>
-                {tab.label}
-              </button>
-            ))}
+            {visibleTabs.map((tab, i) => {
+              const prevGroup = i > 0 ? visibleTabs[i - 1].group : tab.group;
+              const showDivider = i > 0 && tab.group !== prevGroup;
+              return (
+                <div key={tab.id}>
+                  {showDivider && <div className="my-2 border-t border-slate-200 dark:border-slate-700" />}
+                  <button
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left',
+                      activeTab === tab.id
+                        ? 'bg-slate-100 dark:bg-slate-800 text-gray-900 dark:text-gray-100'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+                    )}
+                  >
+                    <span className={cn("transition-colors", activeTab === tab.id ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400")}>
+                      {tab.icon}
+                    </span>
+                    {tab.label}
+                  </button>
+                </div>
+              );
+            })}
 
             {visibleComingSoon.length > 0 && (
               <>
