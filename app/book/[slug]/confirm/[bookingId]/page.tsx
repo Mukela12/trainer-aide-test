@@ -49,6 +49,15 @@ export default function BookingConfirmationPage() {
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [request, setRequest] = useState<RequestDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [brandColor, setBrandColor] = useState('#3B82F6');
+
+  // Load brand color from sessionStorage
+  useEffect(() => {
+    const storedColor = sessionStorage.getItem('booking_brand_color');
+    if (storedColor) {
+      setBrandColor(storedColor);
+    }
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -238,7 +247,8 @@ export default function BookingConfirmationPage() {
             {request.trainerEmail && (
               <a
                 href={`mailto:${request.trainerEmail}`}
-                className="inline-flex items-center gap-1 text-wondrous-blue hover:underline"
+                className="inline-flex items-center gap-1 hover:underline"
+                style={{ color: brandColor }}
               >
                 <Mail size={14} />
                 Contact {request.trainerName}
@@ -344,7 +354,7 @@ export default function BookingConfirmationPage() {
                     Create an account to manage your bookings, view session history, and track your credits.
                   </p>
                   <Link href={`/book/${slug}/confirm/${bookingId}/create-account`}>
-                    <Button className="gap-2">
+                    <Button className="gap-2 hover:opacity-90" style={{ backgroundColor: brandColor }}>
                       Create Account
                       <ArrowRight size={16} />
                     </Button>
@@ -370,7 +380,8 @@ export default function BookingConfirmationPage() {
           {booking!.trainerEmail && (
             <a
               href={`mailto:${booking!.trainerEmail}`}
-              className="inline-flex items-center gap-1 text-wondrous-blue hover:underline"
+              className="inline-flex items-center gap-1 hover:underline"
+              style={{ color: brandColor }}
             >
               <Mail size={14} />
               Contact {booking!.trainerName}

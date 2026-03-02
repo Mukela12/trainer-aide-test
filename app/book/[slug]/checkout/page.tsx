@@ -42,8 +42,9 @@ export default function CheckoutPage() {
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [brandColor, setBrandColor] = useState('#3B82F6');
 
-  // Load selection from sessionStorage
+  // Load selection and brand color from sessionStorage
   useEffect(() => {
     const stored = sessionStorage.getItem('booking_selection');
     if (stored) {
@@ -55,6 +56,11 @@ export default function CheckoutPage() {
       }
     } else {
       router.push(`/book/${slug}`);
+    }
+
+    const storedColor = sessionStorage.getItem('booking_brand_color');
+    if (storedColor) {
+      setBrandColor(storedColor);
     }
   }, [slug, router]);
 
@@ -288,7 +294,8 @@ export default function CheckoutPage() {
             size="lg"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full"
+            className="w-full hover:opacity-90"
+            style={{ backgroundColor: brandColor }}
           >
             {isSubmitting ? (
               'Processing...'

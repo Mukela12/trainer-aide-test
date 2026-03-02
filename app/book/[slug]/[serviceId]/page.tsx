@@ -70,6 +70,7 @@ export default function ServiceBookingPage() {
   );
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<Date | null>(null);
+  const [brandColor, setBrandColor] = useState('#3B82F6');
 
   // Load service and availability
   useEffect(() => {
@@ -77,16 +78,20 @@ export default function ServiceBookingPage() {
       setIsLoading(true);
       const supabase = getSupabaseBrowserClient();
 
-      // Get trainer ID from profile
+      // Get trainer ID and brand color from profile
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, brand_color')
         .eq('business_slug', slug)
         .single();
 
       if (!profile) {
         setIsLoading(false);
         return;
+      }
+
+      if (profile.brand_color) {
+        setBrandColor(profile.brand_color);
       }
 
       // Load service
@@ -354,11 +359,12 @@ export default function ServiceBookingPage() {
                       className={cn(
                         'p-3 rounded-lg text-center transition-all',
                         isSelected
-                          ? 'bg-wondrous-blue text-white'
+                          ? 'text-white'
                           : hasAvail && !isPast
                           ? 'bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
                           : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                       )}
+                      style={isSelected ? { backgroundColor: brandColor } : undefined}
                     >
                       <div className="text-xs font-medium mb-1">
                         {format(day, 'EEE')}
@@ -401,11 +407,16 @@ export default function ServiceBookingPage() {
                       className={cn(
                         'px-3 py-2 rounded-lg text-sm font-medium transition-all',
                         selectedTime && isSameDay(slot.time, selectedTime) && slot.time.getTime() === selectedTime.getTime()
-                          ? 'bg-wondrous-blue text-white'
+                          ? 'text-white'
                           : slot.available
                           ? 'bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
                           : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed line-through'
                       )}
+                      style={
+                        selectedTime && isSameDay(slot.time, selectedTime) && slot.time.getTime() === selectedTime.getTime()
+                          ? { backgroundColor: brandColor }
+                          : undefined
+                      }
                     >
                       {format(slot.time, 'HH:mm')}
                     </button>
@@ -418,7 +429,10 @@ export default function ServiceBookingPage() {
 
         {/* Selection Summary & Continue */}
         {selectedTime && (
-          <Card className="mt-6 border-wondrous-blue/50 bg-blue-50/50 dark:bg-blue-900/10">
+          <Card
+            className="mt-6 bg-blue-50/50 dark:bg-blue-900/10"
+            style={{ borderColor: `${brandColor}80` }}
+          >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -430,7 +444,12 @@ export default function ServiceBookingPage() {
                     {format(selectedTime, 'h:mm a')}
                   </p>
                 </div>
-                <Button onClick={handleContinue} size="lg">
+                <Button
+                  onClick={handleContinue}
+                  size="lg"
+                  style={{ backgroundColor: brandColor }}
+                  className="hover:opacity-90"
+                >
                   Continue
                   <ArrowRight className="ml-2" size={18} />
                 </Button>

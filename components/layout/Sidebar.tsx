@@ -214,7 +214,7 @@ export function Sidebar() {
           <div className="flex items-center justify-center">
             <div className="relative w-10 h-10">
               <Image
-                src="/images/w-icon-logo.png"
+                src="/images/w-icon-new.svg"
                 alt="W"
                 fill
                 sizes="40px"

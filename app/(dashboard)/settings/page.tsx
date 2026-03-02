@@ -38,9 +38,11 @@ interface ProfileData {
 
 interface CancellationPolicyData {
   booking_cutoff_hours?: number;
+  booking_cutoff_minutes?: number;
   buffer_minutes?: number;
   no_show_policy?: string;
   late_cancel_fee_percent?: number;
+  late_cancel_fee_amount?: number;
   grace_period_minutes?: number;
 }
 
@@ -205,6 +207,7 @@ export default function SettingsPage() {
     last_name: '',
     phone: '',
     bio: '',
+    email: '',
   });
 
   const [businessForm, setBusinessForm] = useState({
@@ -255,6 +258,7 @@ export default function SettingsPage() {
         last_name: profile.last_name || '',
         phone: profile.phone || '',
         bio: profile.bio || '',
+        email: currentUser.email || '',
       });
       setBusinessForm({
         business_name: profile.business_name || '',
@@ -455,7 +459,16 @@ export default function SettingsPage() {
       <SectionHeader icon={<CalendarClock size={20} />} title="Booking" subtitle="Configure how clients can book sessions" color="bg-orange-100 dark:bg-orange-900/30" iconColor="text-orange-600 dark:text-orange-400" />
 
       {!hasOpeningHours && !studioLoading && (
-        <WarningBanner message="You haven't set opening hours yet. Go to Business Details to configure your availability." />
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 flex items-center gap-2">
+          <AlertTriangle size={16} className="text-yellow-600 dark:text-yellow-400 shrink-0" />
+          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            You haven&apos;t set opening hours yet.{' '}
+            <button type="button" className="underline font-medium hover:text-yellow-900 dark:hover:text-yellow-100" onClick={() => setActiveTab('business')}>
+              Go to Business Details
+            </button>{' '}
+            to configure your availability.
+          </p>
+        </div>
       )}
 
       {studioLoading ? <LoadingSpinner /> : (
@@ -474,25 +487,19 @@ export default function SettingsPage() {
 
           {bookingForm.self_booking_enabled && (
             <div>
-              <Label>Booking Model</Label>
-              <div className="flex gap-2 mt-2">
-                {(['instant', 'soft-hold'] as const).map((model) => (
-                  <Button
-                    key={model}
-                    type="button"
-                    variant={bookingForm.booking_model === model ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setBookingForm((f) => ({ ...f, booking_model: model }))}
-                    className={cn(bookingForm.booking_model === model ? 'bg-wondrous-magenta hover:bg-wondrous-magenta-alt' : 'dark:border-gray-600 dark:text-gray-300')}
-                  >
-                    {model === 'instant' ? 'Instant Confirm' : 'Soft Hold'}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {bookingForm.booking_model === 'instant' && 'Bookings are confirmed immediately without approval'}
-                {bookingForm.booking_model === 'soft-hold' && 'Sessions are held temporarily until you confirm'}
+              <Label>Soft Hold</Label>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                When enabled, clients without credits can book sessions that are held temporarily for a set period. Bookings are always confirmed instantly for clients with credits.
               </p>
+              <div className="flex items-center gap-3 mt-2">
+                <ToggleSwitch
+                  checked={bookingForm.booking_model === 'soft-hold'}
+                  onChange={(v) => setBookingForm((f) => ({ ...f, booking_model: v ? 'soft-hold' : 'client-self-book' }))}
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  {bookingForm.booking_model === 'soft-hold' ? 'Soft hold enabled' : 'Soft hold disabled'}
+                </span>
+              </div>
             </div>
           )}
 
@@ -522,9 +529,20 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Min. hours notice to cancel without penalty</p>
             </div>
             <div>
-              <Label htmlFor="cutoff">Booking Cut-off (hours)</Label>
-              <Input id="cutoff" type="number" min={0} max={168} value={policyForm.booking_cutoff_hours ?? 2} onChange={(e) => setPolicyForm((f) => ({ ...f, booking_cutoff_hours: parseInt(e.target.value) || 0 }))} className="mt-1 w-full" />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Min. advance time to book a session</p>
+              <Label htmlFor="cutoff">Booking Cut-off (minutes)</Label>
+              <div className="flex items-center gap-3 mt-1">
+                <input
+                  id="cutoff"
+                  type="range"
+                  min={1}
+                  max={60}
+                  value={policyForm.booking_cutoff_minutes ?? 10}
+                  onChange={(e) => setPolicyForm((f) => ({ ...f, booking_cutoff_minutes: parseInt(e.target.value) || 10 }))}
+                  className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-wondrous-magenta"
+                />
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 w-16 text-right">{policyForm.booking_cutoff_minutes ?? 10} min</span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Min. advance time to book a session (default: 10 minutes)</p>
             </div>
           </div>
 
@@ -543,9 +561,12 @@ export default function SettingsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="lateCancelFee">Late Cancel Fee (%)</Label>
-              <Input id="lateCancelFee" type="number" min={0} max={100} value={policyForm.late_cancel_fee_percent ?? 0} onChange={(e) => setPolicyForm((f) => ({ ...f, late_cancel_fee_percent: parseInt(e.target.value) || 0 }))} className="mt-1 w-full" />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">% charged for late cancellations</p>
+              <Label htmlFor="lateCancelFee">Late Cancellation Fee (&pound;)</Label>
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">&pound;</span>
+                <Input id="lateCancelFee" type="number" min={0} max={500} step={1} value={policyForm.late_cancel_fee_amount ?? 0} onChange={(e) => setPolicyForm((f) => ({ ...f, late_cancel_fee_amount: parseInt(e.target.value) || 0 }))} className="w-full pl-7" />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Fixed amount charged for late cancellations (e.g. &pound;10)</p>
             </div>
           </div>
 
@@ -589,8 +610,8 @@ export default function SettingsPage() {
           </div>
           <div>
             <Label htmlFor="email">Email Address</Label>
-            <Input id="email" type="email" value={currentUser.email} disabled className="mt-1 opacity-60" />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Email cannot be changed</p>
+            <Input id="email" type="email" value={profileForm.email ?? currentUser.email} onChange={(e) => setProfileForm((p) => ({ ...p, email: e.target.value }))} className="mt-1" />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Changing your email will require re-verification</p>
           </div>
           <div>
             <Label htmlFor="phone">Phone Number</Label>
@@ -695,13 +716,16 @@ export default function SettingsPage() {
 
   const renderWaitlist = () => (
     <div className="space-y-6">
-      <SectionHeader icon={<ListCheck size={20} />} title="Waitlist" subtitle="Manage waitlist for fully-booked sessions" color="bg-cyan-100 dark:bg-cyan-900/30" iconColor="text-cyan-600 dark:text-cyan-400" />
+      <SectionHeader icon={<ListCheck size={20} />} title="Waitlist" subtitle="Manage waitlist for fully-booked group classes" color="bg-cyan-100 dark:bg-cyan-900/30" iconColor="text-cyan-600 dark:text-cyan-400" />
       {studioLoading ? <LoadingSpinner /> : (
         <div className="space-y-4">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm text-blue-700 dark:text-blue-300">
+            Waitlist is available for group classes only. When a group class reaches capacity, clients can join a waitlist and will be notified if a spot opens up.
+          </div>
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="font-medium text-gray-900 dark:text-gray-100">Enable Waitlist</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Allow clients to join a waitlist for full sessions</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Allow clients to join a waitlist for full group classes</p>
             </div>
             <ToggleSwitch checked={waitlistForm.enabled} onChange={(v) => setWaitlistForm((f) => ({ ...f, enabled: v }))} />
           </div>

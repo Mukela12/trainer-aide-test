@@ -16,12 +16,20 @@ import {
 } from 'lucide-react';
 import { format, isToday } from 'date-fns';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/lib/hooks/use-toast';
 import type { SoloDashboardStats, UpcomingSession, RecentClient } from '@/lib/types/dashboard';
 
 export default function SoloPractitionerDashboard() {
+  const { toast } = useToast();
   const { currentUser, businessSlug, businessName } = useUserStore();
   const { sessions: calendarSessions } = useBookings(currentUser.id);
   const [copied, setCopied] = useState(false);
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [addClientForm, setAddClientForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
+  const [addingClient, setAddingClient] = useState(false);
+  const [chasingPayment, setChasingPayment] = useState(false);
+  const queryClient = useQueryClient();
 
   // React Query hooks
   const { data: analyticsData, isLoading: analyticsLoading } = useAnalytics(currentUser?.id);
@@ -77,6 +85,21 @@ export default function SoloPractitionerDashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
+  // Motivational messages that rotate daily
+  const motivationalMessages = [
+    "You're going to have a great day — keep pushing!",
+    "Keep up the great work, your clients are lucky to have you!",
+    "You're ready to smash it today!",
+    "The early bird catches the worm — let's go!",
+    "Every session you run changes someone's life.",
+    "Stay focused, stay strong — you've got this!",
+    "Today is another chance to make a difference.",
+    "Your energy is contagious — bring it today!",
+    "Champions are made one session at a time.",
+    "Believe in the work you do — your clients already do!",
+  ];
+  const dailyMessage = motivationalMessages[new Date().getDate() % motivationalMessages.length];
+
   const bookingUrl = businessSlug ? `${typeof window !== 'undefined' ? window.location.origin : ''}/book/${businessSlug}` : '';
 
   const handleCopyLink = () => {
@@ -84,6 +107,57 @@ export default function SoloPractitionerDashboard() {
       navigator.clipboard.writeText(bookingUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleChasePayment = async () => {
+    if (!firstSoftHold || chasingPayment) return;
+    setChasingPayment(true);
+    try {
+      const res = await fetch('/api/notifications/chase-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: firstSoftHold.id, clientName: firstSoftHold.clientName }),
+      });
+      if (res.ok) {
+        toast({ title: 'Chase payment email sent!' });
+      } else {
+        toast({ title: 'Failed to send chase email', description: 'Please try again.' });
+      }
+    } catch {
+      toast({ title: 'Failed to send chase email', description: 'Please try again.' });
+    } finally {
+      setChasingPayment(false);
+    }
+  };
+
+  const handleAddClient = async () => {
+    if (!addClientForm.email || !addClientForm.firstName || addingClient) return;
+    setAddingClient(true);
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: addClientForm.firstName,
+          last_name: addClientForm.lastName,
+          email: addClientForm.email,
+          phone: addClientForm.phone,
+        }),
+      });
+      if (res.ok) {
+        toast({ title: 'Client added successfully!' });
+        setShowAddClient(false);
+        setAddClientForm({ firstName: '', lastName: '', email: '', phone: '' });
+        queryClient.invalidateQueries({ queryKey: ['clients'] });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ title: data.error || 'Failed to add client' });
+      }
+    } catch {
+      toast({ title: 'Failed to add client' });
+    } finally {
+      setAddingClient(false);
     }
   };
 
@@ -97,6 +171,9 @@ export default function SoloPractitionerDashboard() {
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">
           {greeting}{currentUser.firstName ? `, ${currentUser.firstName}` : ''} <span className="inline-block">👋</span>
         </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">
+          {dailyMessage}
+        </p>
       </div>
 
       {/* Soft Hold Action Banner */}
@@ -118,11 +195,15 @@ export default function SoloPractitionerDashboard() {
                 )}
               </div>
             </div>
-            <Link href="/solo/calendar">
-              <Button size="sm" variant="outline" className="border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40">
-                Chase Payment <ChevronRight size={14} />
-              </Button>
-            </Link>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleChasePayment}
+              disabled={chasingPayment}
+              className="border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800/60 hover:text-amber-900 dark:hover:text-amber-100"
+            >
+              {chasingPayment ? 'Sending...' : 'Chase Payment'} <ChevronRight size={14} />
+            </Button>
           </div>
         </div>
       )}
@@ -281,7 +362,7 @@ export default function SoloPractitionerDashboard() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/solo/clients" className="group">
+            <div className="group cursor-pointer" onClick={() => setShowAddClient(true)}>
               <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer h-full">
                 <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -290,7 +371,7 @@ export default function SoloPractitionerDashboard() {
                   <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Add Client</span>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
             <Link href="/solo/calendar" className="group">
               <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer h-full">
                 <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
@@ -432,7 +513,7 @@ export default function SoloPractitionerDashboard() {
                   className="gap-2 shrink-0"
                 >
                   {copied ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
-                  {copied ? 'Copied!' : 'Copy Link'}
+                  {copied ? 'Copied!' : 'Share Booking Link'}
                 </Button>
               </div>
             </CardContent>
@@ -459,6 +540,77 @@ export default function SoloPractitionerDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Client Modal */}
+      {showAddClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowAddClient(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Add New Client</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Add a client to your roster. They will receive an email to set up their account.</p>
+              </div>
+              <button onClick={() => setShowAddClient(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    placeholder="John"
+                    value={addClientForm.firstName}
+                    onChange={(e) => setAddClientForm(f => ({ ...f, firstName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    placeholder="Doe"
+                    value={addClientForm.lastName}
+                    onChange={(e) => setAddClientForm(f => ({ ...f, lastName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email *</label>
+                <input
+                  type="email"
+                  placeholder="john@example.com"
+                  value={addClientForm.email}
+                  onChange={(e) => setAddClientForm(f => ({ ...f, email: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  placeholder="+1 234 567 8900"
+                  value={addClientForm.phone}
+                  onChange={(e) => setAddClientForm(f => ({ ...f, phone: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">A welcome email will be sent so the client can set up their account.</p>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" size="sm" onClick={() => setShowAddClient(false)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  onClick={handleAddClient}
+                  disabled={!addClientForm.email || !addClientForm.firstName || addingClient}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  {addingClient ? 'Adding...' : 'Add Client'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -220,8 +220,30 @@ export async function loadExercises(): Promise<Exercise[]> {
     return cachedExercises;
   }
 
-  const supabaseExercises = await getAllExercisesClient();
-  const exercises = supabaseToFrontendExercises(supabaseExercises);
+  let exercises: Exercise[] = [];
+
+  try {
+    // Try direct client-side Supabase query first
+    const supabaseExercises = await getAllExercisesClient();
+    exercises = supabaseToFrontendExercises(supabaseExercises);
+  } catch (err) {
+    console.warn('Direct exercise fetch failed, trying API fallback:', err);
+  }
+
+  // If direct query returned nothing, try the server API route
+  if (exercises.length === 0) {
+    try {
+      const res = await fetch('/api/exercises');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.exercises && json.exercises.length > 0) {
+          exercises = supabaseToFrontendExercises(json.exercises);
+        }
+      }
+    } catch (err) {
+      console.warn('API exercise fallback also failed:', err);
+    }
+  }
 
   cachedExercises = exercises;
   lastCacheTime = now;

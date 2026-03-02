@@ -27,6 +27,7 @@ interface TrainerProfile {
   specializations: string[] | null;
   profileImageUrl: string | null;
   businessLogoUrl: string | null;
+  brandColor: string | null;
 }
 
 interface Service {
@@ -58,7 +59,7 @@ export default function TrainerBookingPage() {
       // Load trainer profile by slug
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, business_name, bio, location, years_experience, specializations, profile_image_url, business_logo_url')
+        .select('id, first_name, last_name, business_name, bio, location, years_experience, specializations, profile_image_url, business_logo_url, brand_color')
         .eq('business_slug', slug)
         .eq('is_onboarded', true)
         .single();
@@ -80,6 +81,7 @@ export default function TrainerBookingPage() {
         specializations: profile.specializations,
         profileImageUrl: profile.profile_image_url,
         businessLogoUrl: profile.business_logo_url,
+        brandColor: profile.brand_color,
       });
 
       // Load public services
@@ -124,6 +126,13 @@ export default function TrainerBookingPage() {
     }
   }, [slug]);
 
+  // Store brand color in sessionStorage for sub-pages
+  useEffect(() => {
+    if (trainer?.brandColor) {
+      sessionStorage.setItem('booking_brand_color', trainer.brandColor);
+    }
+  }, [trainer?.brandColor]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
@@ -156,6 +165,7 @@ export default function TrainerBookingPage() {
   }
 
   const displayName = trainer.businessName || `${trainer.firstName} ${trainer.lastName}`;
+  const brandColor = trainer.brandColor || '#3B82F6'; // fallback to default blue
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
@@ -164,7 +174,10 @@ export default function TrainerBookingPage() {
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="flex items-start gap-6">
             {/* Avatar / Business Logo */}
-            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-wondrous-blue to-purple-600 flex items-center justify-center text-white text-3xl font-bold flex-shrink-0 overflow-hidden">
+            <div
+              className="w-24 h-24 rounded-2xl flex items-center justify-center text-white text-3xl font-bold flex-shrink-0 overflow-hidden"
+              style={{ backgroundColor: brandColor }}
+            >
               {trainer.businessLogoUrl ? (
                 <img
                   src={trainer.businessLogoUrl}
@@ -288,7 +301,11 @@ export default function TrainerBookingPage() {
                           ? 'Free'
                           : `£${(service.priceCents / 100).toFixed(0)}`}
                       </div>
-                      <Button size="sm">
+                      <Button
+                        size="sm"
+                        style={{ backgroundColor: brandColor }}
+                        className="hover:opacity-90"
+                      >
                         Book Now
                         <ArrowRight className="ml-1" size={14} />
                       </Button>

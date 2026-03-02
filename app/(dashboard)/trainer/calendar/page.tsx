@@ -65,7 +65,14 @@ export default function TrainerCalendar() {
       duration: service.duration,
       color: service.color,
       creditsRequired: service.creditsRequired,
+      type: service.type, // '1-2-1' | 'duet' | 'group'
     };
+  };
+
+  // Helper: check if a session is a group class
+  const isGroupClass = (serviceTypeId: string | null) => {
+    const st = getServiceType(serviceTypeId);
+    return st?.type === 'group';
   };
 
   const getClient = (clientId: string | null) => {
@@ -486,19 +493,36 @@ export default function TrainerCalendar() {
     closeBookingPanel();
   };
 
+  // Check in client for group class
+  const handleCheckIn = (sessionId: string, status: 'checked-in' | 'late' | 'no-show') => {
+    updateSessionMutation.mutate(sessionId, { status });
+    const session = sessions.find((s) => s.id === sessionId);
+    const statusLabel = status === 'checked-in' ? 'Checked In' : status === 'late' ? 'Late' : 'No Show';
+    toast({
+      title: statusLabel,
+      description: `${session?.clientName} marked as ${statusLabel.toLowerCase()}`,
+    });
+  };
+
   // Start session
   const handleStartSession = (sessionId: string) => {
     const session = sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
-    // Check if session has template and sign-off mode
+    // Group classes don't use templates - just check in
+    if (isGroupClass(session.serviceTypeId ?? null)) {
+      handleCheckIn(sessionId, 'checked-in');
+      return;
+    }
+
+    // For 1:1 and duet sessions:
+    // If session has template and sign-off mode, navigate directly
     if (session.templateId && session.signOffMode) {
-      // Navigate directly to session start page with pre-filled params
       router.push(
         `/trainer/sessions/new?clientId=${session.clientId}&templateId=${session.templateId}&signOffMode=${session.signOffMode}`
       );
     } else {
-      // Show setup panel to select template and sign-off mode
+      // Show setup panel - but template is now optional
       setSetupSessionId(sessionId);
       setSetupTemplateId(null);
       setSetupSignOffMode(null);
@@ -1308,6 +1332,32 @@ export default function TrainerCalendar() {
                                           <Repeat size={14} />
                                           Quick Rebook
                                         </Button>
+                                      ) : isGroupClass(session.serviceTypeId ?? null) ? (
+                                        <div className="flex gap-1">
+                                          <Button
+                                            size="sm"
+                                            className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+                                            onClick={(e) => { e.stopPropagation(); handleCheckIn(session.id, 'checked-in'); }}
+                                          >
+                                            <Check size={14} /> Check In
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-amber-600 border-amber-300 hover:bg-amber-50 flex items-center gap-1"
+                                            onClick={(e) => { e.stopPropagation(); handleCheckIn(session.id, 'late'); }}
+                                          >
+                                            <Clock size={14} /> Late
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-red-600 border-red-300 hover:bg-red-50 flex items-center gap-1"
+                                            onClick={(e) => { e.stopPropagation(); handleCheckIn(session.id, 'no-show'); }}
+                                          >
+                                            <X size={14} /> No Show
+                                          </Button>
+                                        </div>
                                       ) : (
                                         <Button
                                           size="sm"
@@ -1628,21 +1678,18 @@ export default function TrainerCalendar() {
                         }}
                         onClick={() => handleSessionClick(session.id)}
                       >
-                        <div className="flex flex-col h-full justify-between text-[10px] lg:text-xs">
+                        <div className="flex flex-col h-full justify-between text-xs lg:text-sm">
                           <div>
-                            <div
-                              className="font-bold truncate text-[9px] lg:text-xs"
-                              style={{ color: session.status === "soft-hold" ? "#d97706" : serviceType.color }}
-                            >
+                            <div className="font-bold truncate text-[10px] lg:text-sm text-gray-900 dark:text-gray-100">
                               <span className="hidden md:inline">{formatTime(session.datetime)} - {session.clientName}</span>
                               <span className="md:hidden">{client?.initials}</span>
                             </div>
-                            <div className="text-[8px] lg:text-[10px] text-gray-600 dark:text-gray-400 hidden sm:block">
+                            <div className="text-[9px] lg:text-xs text-gray-700 dark:text-gray-300 hidden sm:block">
                               {serviceType.name}
                             </div>
                           </div>
                           <div
-                            className="text-[8px] lg:text-[10px] font-semibold px-1 lg:px-1.5 py-0.5 rounded self-start hidden sm:block"
+                            className="text-[9px] lg:text-xs font-semibold px-1 lg:px-1.5 py-0.5 rounded self-start hidden sm:block"
                             style={{
                               background: session.status === "soft-hold" ? "#fef3c7" : statusInfo.bg,
                               color: session.status === "soft-hold" ? "#92400e" : statusInfo.text,
@@ -2175,7 +2222,7 @@ export default function TrainerCalendar() {
                     Setup Session
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Select template and sign-off mode to start
+                    Select a template (optional) and sign-off mode
                   </p>
                 </div>
                 <button
@@ -2189,10 +2236,10 @@ export default function TrainerCalendar() {
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-5 pt-4">
-              {/* Workout Template Selection - REQUIRED */}
+              {/* Workout Template Selection - OPTIONAL */}
               <div className="mb-4">
                 <div className="text-xs font-semibold mb-2 text-wondrous-grey-dark dark:text-gray-200">
-                  Workout Template <span className="text-red-500">*</span>
+                  Workout Template <span className="text-gray-400">(optional)</span>
                 </div>
                 <div className="grid grid-cols-1 gap-2 max-h-[250px] overflow-y-auto">
                   {templates.map((template) => (
@@ -2296,13 +2343,30 @@ export default function TrainerCalendar() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  className="flex-1 bg-wondrous-primary hover:bg-wondrous-primary/90"
-                  onClick={confirmSessionSetup}
-                  disabled={!setupTemplateId || !setupSignOffMode}
-                >
-                  Start Session
-                </Button>
+                {setupTemplateId ? (
+                  <Button
+                    className="flex-1 bg-wondrous-primary hover:bg-wondrous-primary/90"
+                    onClick={confirmSessionSetup}
+                    disabled={!setupSignOffMode}
+                  >
+                    Start Session
+                  </Button>
+                ) : (
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      // Start session without template
+                      const session = sessions.find((s) => s.id === setupSessionId);
+                      if (session) {
+                        updateSessionMutation.mutate(setupSessionId!, { status: 'checked-in' });
+                        toast({ title: 'Session Started', description: `${session.clientName}'s session started without template` });
+                        closeSessionSetupPanel();
+                      }
+                    }}
+                  >
+                    Start Without Template
+                  </Button>
+                )}
               </div>
             </div>
           </motion.div>

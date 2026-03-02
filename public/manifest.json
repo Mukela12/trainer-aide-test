@@ -1,0 +1,23 @@
+{
+  "name": "AllWondrous",
+  "short_name": "AllWondrous",
+  "description": "Professional fitness training platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4e2780",
+  "icons": [
+    {
+      "src": "/images/w-icon-new.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/all-wondrous-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

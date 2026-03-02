@@ -362,7 +362,7 @@ export default function StudioOwnerDashboard() {
                   className="gap-2 shrink-0"
                 >
                   {copied ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
-                  {copied ? 'Copied!' : 'Copy Link'}
+                  {copied ? 'Copied!' : 'Share Booking Link'}
                 </Button>
               </div>
             </CardContent>

@@ -31,9 +31,10 @@ export const metadata: Metadata = {
   title: "allwondrous",
   description: "Professional fitness training platform",
   icons: {
-    icon: "/images/w-icon-logo.ico",
-    apple: "/images/w-icon-logo.png",
+    icon: "/images/w-icon-new.svg",
+    apple: "/images/all-wondrous-logo.png",
   },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
