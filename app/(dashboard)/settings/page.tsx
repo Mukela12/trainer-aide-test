@@ -73,7 +73,7 @@ async function fetchProfile(): Promise<ProfileData> {
   return res.json();
 }
 
-async function patchProfile(data: Partial<ProfileData>): Promise<ProfileData> {
+async function patchProfile(data: Partial<ProfileData & { email?: string }>): Promise<ProfileData & { emailChangeInitiated?: boolean }> {
   const res = await fetch('/api/settings/profile', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -207,6 +207,18 @@ export default function SettingsPage() {
     staleTime: 60 * 1000,
   });
 
+  const { data: smsStatus } = useQuery({
+    queryKey: ['settings', 'sms-status'],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/sms-status');
+      if (!res.ok) return { enabled: false };
+      return res.json() as Promise<{ enabled: boolean }>;
+    },
+    enabled: isOperator,
+    staleTime: 5 * 60 * 1000,
+  });
+  const smsEnabled = smsStatus?.enabled ?? false;
+
   // ---------- Form state ----------
 
   const [profileForm, setProfileForm] = useState({
@@ -216,6 +228,8 @@ export default function SettingsPage() {
     bio: '',
     email: '',
   });
+
+  const [emailConfirmationMessage, setEmailConfirmationMessage] = useState(false);
 
   const [businessForm, setBusinessForm] = useState({
     business_name: '',
@@ -325,9 +339,12 @@ export default function SettingsPage() {
 
   const profileMutation = useMutation({
     mutationFn: patchProfile,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['settings', 'profile'] });
       setProfileSaveCount((c) => c + 1);
+      if (data?.emailChangeInitiated) {
+        setEmailConfirmationMessage(true);
+      }
     },
   });
 
@@ -428,7 +445,10 @@ export default function SettingsPage() {
   );
 
   const visibleComingSoon = COMING_SOON_TABS.filter(
-    (tab) => tab.roles.length === 0 || tab.roles.includes(currentRole)
+    (tab) => {
+      if (tab.id === 'sms' && smsEnabled) return false; // promoted to active tab
+      return tab.roles.length === 0 || tab.roles.includes(currentRole);
+    }
   );
 
   // ---------- Opening hours helpers ----------
@@ -623,8 +643,14 @@ export default function SettingsPage() {
           </div>
           <div>
             <Label htmlFor="email">Email Address</Label>
-            <Input id="email" type="email" value={profileForm.email ?? currentUser.email} onChange={(e) => setProfileForm((p) => ({ ...p, email: e.target.value }))} className="mt-1" />
+            <Input id="email" type="email" value={profileForm.email ?? currentUser.email} onChange={(e) => { setProfileForm((p) => ({ ...p, email: e.target.value })); setEmailConfirmationMessage(false); }} className="mt-1" />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Changing your email will require re-verification</p>
+            {emailConfirmationMessage && (
+              <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <p className="text-sm text-blue-700 dark:text-blue-300">A confirmation email has been sent to your new address. Please check your inbox to verify the change.</p>
+              </div>
+            )}
           </div>
           <div>
             <Label htmlFor="phone">Phone Number</Label>
@@ -635,6 +661,20 @@ export default function SettingsPage() {
             <textarea id="bio" value={profileForm.bio} onChange={(e) => setProfileForm((p) => ({ ...p, bio: e.target.value }))} placeholder="Tell your clients a bit about yourself..." rows={3} className="mt-1 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-wondrous-primary dark:bg-gray-700 dark:text-gray-100" />
           </div>
           <SaveButton onClick={handleSaveProfile} loading={profileMutation.isPending} successCount={profileSaveCount} />
+
+          {isOperator && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('business')}
+              className="w-full flex items-center justify-between p-3 mt-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm"
+            >
+              <span className="flex items-center gap-2 text-gray-700 dark:text-gray-300 font-medium">
+                <Building2 size={16} />
+                Go to Business Details
+              </span>
+              <ChevronRight size={16} className="text-gray-400" />
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1113,6 +1153,50 @@ export default function SettingsPage() {
     </div>
   );
 
+  const [smsPrefs, setSmsPrefs] = useState({
+    confirmation: true,
+    reminder_24h: true,
+    reminder_2h: true,
+  });
+
+  const renderSMS = () => (
+    <div className="space-y-6">
+      <SectionHeader icon={<MessageSquare size={20} />} title="SMS Reminders" subtitle="Configure automated SMS notifications via Telnyx" color="bg-green-100 dark:bg-green-900/30" iconColor="text-green-600 dark:text-green-400" />
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Booking Confirmation</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Send SMS when a booking is confirmed</p>
+          </div>
+          <ToggleSwitch checked={smsPrefs.confirmation} onChange={(v) => setSmsPrefs((p) => ({ ...p, confirmation: v }))} />
+        </div>
+
+        <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">24-Hour Reminder</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Send reminder 24 hours before session</p>
+          </div>
+          <ToggleSwitch checked={smsPrefs.reminder_24h} onChange={(v) => setSmsPrefs((p) => ({ ...p, reminder_24h: v }))} />
+        </div>
+
+        <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">2-Hour Reminder</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Send reminder 2 hours before session</p>
+          </div>
+          <ToggleSwitch checked={smsPrefs.reminder_2h} onChange={(v) => setSmsPrefs((p) => ({ ...p, reminder_2h: v }))} />
+        </div>
+      </div>
+
+      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <p className="text-xs text-blue-700 dark:text-blue-300">
+          Clients can opt out by replying STOP to any SMS. They can re-enable by replying START.
+        </p>
+      </div>
+    </div>
+  );
+
   const renderComingSoon = (tab: SettingsTab) => (
     <div className="space-y-6">
       <SectionHeader icon={tab.icon} title={tab.label} subtitle="This feature is under development" color="bg-gray-100 dark:bg-gray-800" iconColor="text-gray-500 dark:text-gray-400" />
@@ -1144,9 +1228,15 @@ export default function SettingsPage() {
     appearance: renderAppearance,
     privacy: renderPrivacy,
     danger: renderDanger,
+    ...(smsEnabled ? { sms: renderSMS } : {}),
   };
 
-  const allTabs = [...visibleTabs, ...visibleComingSoon];
+  // When SMS is enabled, promote it from coming-soon to a real tab
+  const smsDynamicTab: SettingsTab[] = smsEnabled && isOperator
+    ? [{ id: 'sms', label: 'SMS Reminders', icon: <MessageSquare size={18} />, roles: ['solo_practitioner', 'studio_owner'], group: 2 }]
+    : [];
+
+  const allTabs = [...visibleTabs, ...smsDynamicTab, ...visibleComingSoon];
 
   return (
     <div className="pt-6 px-4 pb-4 lg:p-8 max-w-7xl mx-auto">

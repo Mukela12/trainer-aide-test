@@ -702,3 +702,69 @@ ${footerText}
     `.trim(),
   };
 }
+
+/**
+ * Reschedule notification email template
+ */
+export function getRescheduleEmail(data: {
+  clientName: string;
+  trainerName: string;
+  serviceName: string;
+  oldTime: string | Date;
+  newTime: string | Date;
+  branding?: EmailBranding;
+}): { subject: string; html: string; text: string } {
+  const oldFormatted = format(new Date(data.oldTime), 'EEEE d MMMM yyyy \'at\' HH:mm');
+  const newFormatted = format(new Date(data.newTime), 'EEEE d MMMM yyyy \'at\' HH:mm');
+  const footerText = data.branding?.businessName
+    ? `Powered by ${data.branding.businessName} &amp; AllWondrous`
+    : 'Powered by AllWondrous';
+
+  return {
+    subject: `Your session has been rescheduled — ${data.serviceName}`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>${baseStyles}</style>
+</head>
+<body>
+  <div class="container">
+    ${getEmailHeader('Session Rescheduled', data.branding)}
+    <div class="content">
+      <p>Hi ${data.clientName},</p>
+      <p>Your session has been rescheduled by <strong>${data.trainerName}</strong>.</p>
+
+      <div class="detail-card">
+        <div class="detail">
+          <div class="label">Service</div>
+          <div class="value">${data.serviceName}</div>
+        </div>
+        <div class="detail">
+          <div class="label">Previous Time</div>
+          <div class="value" style="text-decoration: line-through; color: #9CA3AF;">${oldFormatted}</div>
+        </div>
+        <div class="detail">
+          <div class="label">New Time</div>
+          <div class="value" style="color: #A71075;">${newFormatted}</div>
+        </div>
+        <div class="detail">
+          <div class="label">Trainer</div>
+          <div class="value">${data.trainerName}</div>
+        </div>
+      </div>
+
+      <p>If this time doesn't work for you, please contact your trainer to arrange an alternative.</p>
+    </div>
+    <div class="footer">
+      ${footerText}
+    </div>
+  </div>
+</body>
+</html>
+    `.trim(),
+    text: `Hi ${data.clientName},\n\nYour ${data.serviceName} session with ${data.trainerName} has been rescheduled.\n\nPrevious: ${oldFormatted}\nNew: ${newFormatted}\n\nIf this doesn't work for you, please contact your trainer.\n\n—\n${data.branding?.businessName || 'AllWondrous'}`,
+  };
+}

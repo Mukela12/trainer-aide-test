@@ -381,6 +381,21 @@ export async function createClientBooking(
     }
   }
 
+  // Enforce booking cutoff
+  if (clientStudioConfig?.cancellation_policy) {
+    const policy = clientStudioConfig.cancellation_policy as { booking_cutoff_minutes?: number };
+    if (policy.booking_cutoff_minutes && policy.booking_cutoff_minutes > 0) {
+      const minutesUntilBooking = (new Date(scheduledAt).getTime() - Date.now()) / 60000;
+      if (minutesUntilBooking < policy.booking_cutoff_minutes) {
+        return {
+          data: null,
+          error: new Error(`Bookings must be made at least ${policy.booking_cutoff_minutes} minutes in advance`),
+          status: 400,
+        };
+      }
+    }
+  }
+
   // Check conflicts
   const hasConflict = await checkBookingConflicts(supabase, trainerId, scheduledAt, service.duration as number);
   if (hasConflict) {
@@ -565,6 +580,22 @@ export async function cancelClientBooking(
 
   if (updateError) {
     return { data: null, error: new Error('Failed to cancel booking'), status: 500 };
+  }
+
+  // Record late cancellation fee if configured and within cancellation window
+  if (hoursUntilSession < cancellationWindowHours && refundPercent < 100) {
+    const lateCancelFee = cancelConfig?.cancellation_policy?.late_cancel_fee_amount;
+    if (lateCancelFee && lateCancelFee > 0) {
+      await supabase.from('ta_credit_usage').insert({
+        client_package_id: null,
+        booking_id: bookingId,
+        credits_used: 0,
+        balance_after: 0,
+        reason: 'late_cancel_fee',
+        notes: `Late cancellation fee: ${lateCancelFee / 100} (${hoursUntilSession.toFixed(1)}h before session)`,
+        metadata: { fee_amount_cents: lateCancelFee },
+      });
+    }
   }
 
   // Refund credits (proportional to refundPercent)

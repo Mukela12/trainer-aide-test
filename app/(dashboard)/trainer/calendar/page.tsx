@@ -21,6 +21,8 @@ import {
   calculateSessionHeight,
   getTimeRemaining,
   getStatusBadge,
+  getGroupColorOverride,
+  shouldShowStatusBadge,
   getWeekDates,
   formatDate,
   formatTime,
@@ -224,6 +226,102 @@ export default function TrainerCalendar() {
   const [blockReason, setBlockReason] = useState<BlockReasonType>('personal');
   const [blockNotes, setBlockNotes] = useState<string>('');
 
+  // Drag & drop reschedule state (week view)
+  const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
+  const [dragOverInfo, setDragOverInfo] = useState<{ dayIndex: number; hour: number; minute: number } | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, sessionId: string) => {
+    setDraggedSessionId(sessionId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', sessionId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, dayIndex: number, absoluteHour: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // Calculate minute from Y position within the hour cell
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    const minuteOffset = Math.floor((relativeY / rect.height) * 60);
+    const snappedMinute = Math.floor(minuteOffset / 15) * 15;
+    setDragOverInfo({ dayIndex, hour: absoluteHour, minute: Math.min(snappedMinute, 45) });
+  };
+
+  const handleDragLeave = () => {
+    setDragOverInfo(null);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!draggedSessionId || !dragOverInfo) {
+      setDraggedSessionId(null);
+      setDragOverInfo(null);
+      return;
+    }
+
+    const session = sessions.find((s) => s.id === draggedSessionId);
+    if (!session || !session.serviceTypeId) {
+      setDraggedSessionId(null);
+      setDragOverInfo(null);
+      return;
+    }
+
+    const targetDate = new Date(weekDates[dragOverInfo.dayIndex]);
+    targetDate.setHours(dragOverInfo.hour, dragOverInfo.minute, 0, 0);
+
+    const serviceType = getServiceType(session.serviceTypeId);
+    if (!serviceType) {
+      setDraggedSessionId(null);
+      setDragOverInfo(null);
+      return;
+    }
+
+    // Check conflicts (excluding dragged session)
+    const otherSessions = sessions.filter((s) => s.id !== draggedSessionId);
+    if (!isTimeAvailable(targetDate, serviceType.duration, otherSessions)) {
+      toast({
+        variant: "destructive",
+        title: "Time Conflict",
+        description: "This time slot is already booked",
+      });
+      setDraggedSessionId(null);
+      setDragOverInfo(null);
+      return;
+    }
+
+    const oldDatetime = new Date(session.datetime);
+
+    // Perform reschedule
+    updateSessionMutation.mutate(draggedSessionId, { datetime: targetDate });
+
+    toast({
+      title: "Session Rescheduled",
+      description: `${session.clientName} moved to ${formatDate(targetDate)} at ${formatTime(targetDate)}`,
+    });
+
+    // Send reschedule notification email (fire-and-forget)
+    const client = clients.find((c) => c.id === session.clientId);
+    if (client) {
+      fetch('/api/email/reschedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId: session.id,
+          oldTime: oldDatetime.toISOString(),
+          newTime: targetDate.toISOString(),
+        }),
+      }).catch(() => {});
+    }
+
+    setDraggedSessionId(null);
+    setDragOverInfo(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedSessionId(null);
+    setDragOverInfo(null);
+  };
+
   // Mark as mounted on client
   useEffect(() => {
     setIsMounted(true);
@@ -281,7 +379,10 @@ export default function TrainerCalendar() {
     setCurrentDate(newDate);
   };
 
-  const goToToday = () => setCurrentDate(new Date());
+  const goToToday = () => {
+    setCurrentDate(new Date());
+    setViewMode('day');
+  };
 
   // Get today's sessions
   const todaysSessions = useMemo(() => {
@@ -1125,12 +1226,14 @@ export default function TrainerCalendar() {
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            style={{ background: statusInfo.bg, color: statusInfo.text }}
-                            className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                          >
-                            {statusInfo.label}
-                          </span>
+                          {shouldShowStatusBadge(session.status) && (
+                            <span
+                              style={{ background: statusInfo.bg, color: statusInfo.text }}
+                              className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                            >
+                              {statusInfo.label}
+                            </span>
+                          )}
                           <span
                             style={{ background: serviceType?.color + "15", color: serviceType?.color, borderColor: serviceType?.color + "30" }}
                             className="px-3 py-1.5 rounded-full text-xs font-semibold border"
@@ -1589,12 +1692,14 @@ export default function TrainerCalendar() {
                       const isPast = isTimePast(slotTime);
                       const blockLabel = isBlocked ? getBlockLabel(slotTime) : '';
                       const blockId = isBlocked ? getBlockId(slotTime) : null;
+                      const isDragTarget = dragOverInfo?.dayIndex === dayIndex && dragOverInfo?.hour === hour;
 
                       return (
                         <div
                           key={dayIndex}
                           className={cn(
                             "rounded border transition-colors relative",
+                            isDragTarget && "ring-2 ring-wondrous-magenta bg-wondrous-magenta/10",
                             isPast && !isBlocked
                               ? "bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600 cursor-not-allowed opacity-40"
                               : isBlocked
@@ -1603,6 +1708,9 @@ export default function TrainerCalendar() {
                               ? "bg-gray-50 dark:bg-gray-700 border-wondrous-grey-light dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-gray-600 cursor-pointer"
                               : "bg-gray-200 dark:bg-gray-600 border-gray-300 dark:border-gray-500 cursor-not-allowed opacity-40"
                           )}
+                          onDragOver={(e) => handleDragOver(e, dayIndex, hour)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
                           onClick={() => {
                             if (isBlocked && blockId) {
                               setRemovingBlockId(removingBlockId === blockId ? null : blockId);
@@ -1663,15 +1771,30 @@ export default function TrainerCalendar() {
                     // Calculate left position (column)
                     const columnWidth = 100 / 8; // 8 columns total
                     const leftPosition = (dayIndex + 1) * columnWidth; // +1 to skip time label column
+                    const groupOverride = getGroupColorOverride(serviceType);
+                    const cardBg = session.status === "soft-hold"
+                      ? "rgba(245, 158, 11, 0.15)"
+                      : groupOverride
+                        ? groupOverride.bg + "30"
+                        : serviceType.color + "20";
+                    const cardBorder = session.status === "soft-hold"
+                      ? undefined
+                      : groupOverride
+                        ? groupOverride.border
+                        : serviceType.color;
 
                     return (
                       <div
                         key={session.id}
+                        draggable={session.status !== 'cancelled'}
+                        onDragStart={(e) => handleDragStart(e, session.id)}
+                        onDragEnd={handleDragEnd}
                         className={cn(
                           "absolute rounded-md lg:rounded-lg shadow-sm p-1 lg:p-2 hover:shadow-md transition-all cursor-pointer overflow-hidden",
                           session.status === "soft-hold"
                             ? "border-2 border-dashed border-amber-400"
-                            : "border lg:border-2"
+                            : "border lg:border-2",
+                          draggedSessionId === session.id && "opacity-50"
                         )}
                         style={{
                           top: `${hourOffset * hourHeight}px`,
@@ -1679,14 +1802,10 @@ export default function TrainerCalendar() {
                           width: `calc(${columnWidth}% - 4px)`,
                           height: `${durationHours * hourHeight}px`,
                           minHeight: "24px",
-                          background: session.status === "soft-hold"
-                            ? "rgba(245, 158, 11, 0.15)"
-                            : serviceType.color + "20",
-                          borderColor: session.status === "soft-hold"
-                            ? undefined
-                            : serviceType.color,
+                          background: cardBg,
+                          borderColor: cardBorder,
                         }}
-                        onClick={() => handleSessionClick(session.id)}
+                        onClick={() => { if (!draggedSessionId) handleSessionClick(session.id); }}
                       >
                         <div className="flex flex-col h-full justify-between text-xs lg:text-sm">
                           <div>
@@ -1698,15 +1817,17 @@ export default function TrainerCalendar() {
                               {serviceType.name}
                             </div>
                           </div>
-                          <div
-                            className="text-[9px] lg:text-xs font-semibold px-1 lg:px-1.5 py-0.5 rounded self-start hidden sm:block"
-                            style={{
-                              background: session.status === "soft-hold" ? "#fef3c7" : statusInfo.bg,
-                              color: session.status === "soft-hold" ? "#92400e" : statusInfo.text,
-                            }}
-                          >
-                            {session.status === "soft-hold" ? "Hold" : statusInfo.label}
-                          </div>
+                          {shouldShowStatusBadge(session.status) && (
+                            <div
+                              className="text-[9px] lg:text-xs font-semibold px-1 lg:px-1.5 py-0.5 rounded self-start hidden sm:block"
+                              style={{
+                                background: session.status === "soft-hold" ? "#fef3c7" : statusInfo.bg,
+                                color: session.status === "soft-hold" ? "#92400e" : statusInfo.text,
+                              }}
+                            >
+                              {session.status === "soft-hold" ? "Hold" : statusInfo.label}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -2207,7 +2328,7 @@ export default function TrainerCalendar() {
                 className="w-full"
                 onClick={closeBookingPanel}
               >
-                Cancel
+                Close
               </Button>
             </div>
           </motion.div>
@@ -2595,7 +2716,7 @@ export default function TrainerCalendar() {
                   variant="outline"
                   className="flex-1"
                 >
-                  Cancel
+                  Close
                 </Button>
                 <Button
                   onClick={handleCreateBlock}
@@ -2611,17 +2732,6 @@ export default function TrainerCalendar() {
 
       {/* Context-Aware Floating Action Button */}
       <div className="fixed bottom-24 right-6 lg:bottom-6 flex flex-col gap-3 z-30">
-        {/* Secondary Action - Protect Time (only show when there are sessions) */}
-        {todaysSessions.length > 0 && (
-          <button
-            onClick={openBlockTimePanel}
-            className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shadow-lg hover:shadow-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-all flex items-center justify-center"
-            aria-label="Protect time"
-            title="Protect time"
-          >
-            <CalendarX size={20} />
-          </button>
-        )}
         {/* Primary Action - Context aware based on day state */}
         <div className="relative">
           {todaysSessions.length === 0 ? (
@@ -2635,18 +2745,18 @@ export default function TrainerCalendar() {
               <Clock size={24} />
             </button>
           ) : (
-            // Busy day: Primary action is to book a session
+            // Busy day: Primary action is to block time
             <button
-              onClick={() => handleQuickSlotClick(new Date())}
-              className="w-14 h-14 rounded-full bg-wondrous-orange text-white shadow-lg hover:shadow-xl hover:brightness-110 transition-all flex items-center justify-center"
-              aria-label="Quick book"
-              title="Quick book"
+              onClick={openBlockTimePanel}
+              className="w-14 h-14 rounded-full bg-slate-600 dark:bg-slate-500 text-white shadow-lg hover:shadow-xl hover:bg-slate-700 dark:hover:bg-slate-400 transition-all flex items-center justify-center"
+              aria-label="Block Time"
+              title="Block Time"
             >
-              <Plus size={28} />
+              <CalendarX size={24} />
             </button>
           )}
           <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
-            {todaysSessions.length === 0 ? "Set availability" : "Tap to book"}
+            {todaysSessions.length === 0 ? "Set availability" : "Block Time"}
           </span>
         </div>
       </div>

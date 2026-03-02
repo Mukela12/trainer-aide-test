@@ -26,6 +26,7 @@ import {
   Trash2,
   Calendar,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils/cn';
@@ -46,6 +47,19 @@ export default function ServicesPage() {
   const { currentUser } = useUserStore();
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+
+  // Info banner dismiss state
+  const [infoBannerDismissed, setInfoBannerDismissed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('services-info-dismissed') === 'true';
+    }
+    return false;
+  });
+
+  const dismissInfoBanner = () => {
+    setInfoBannerDismissed(true);
+    localStorage.setItem('services-info-dismissed', 'true');
+  };
 
   // Session management
   const { sessions } = useSessionData(currentUser.id);
@@ -225,25 +239,34 @@ export default function ServicesPage() {
       {/* Services Tab Content */}
       {mainTab === 'services' && (
         <div className="space-y-6">
-          {/* Info Card */}
-          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-            <CardContent className="p-3 lg:p-4">
-              <div className="flex items-start gap-2 lg:gap-3">
-                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-100 dark:bg-blue-800 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Clock className="text-blue-600 dark:text-blue-400" size={18} />
+          {/* Info Card — dismissible, auto-hidden for experienced users */}
+          {!infoBannerDismissed && activeServices.length < 3 && (
+            <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+              <CardContent className="p-3 lg:p-4">
+                <div className="flex items-start gap-2 lg:gap-3">
+                  <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-100 dark:bg-blue-800 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Clock className="text-blue-600 dark:text-blue-400" size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm lg:text-base text-gray-900 dark:text-gray-100 mb-1">
+                      What are Services?
+                    </h3>
+                    <p className="text-xs lg:text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                      Services define session types (e.g., &quot;30min PT Session&quot;). They specify duration, type (1-on-1, duet, group), and credits.
+                      Different from <span className="font-medium">Templates</span>, which are workout programs with exercises.
+                    </p>
+                  </div>
+                  <button
+                    onClick={dismissInfoBanner}
+                    className="p-1 hover:bg-blue-100 dark:hover:bg-blue-800 rounded-full flex-shrink-0"
+                    aria-label="Dismiss"
+                  >
+                    <X size={16} className="text-blue-400 dark:text-blue-500" />
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm lg:text-base text-gray-900 dark:text-gray-100 mb-1">
-                    What are Services?
-                  </h3>
-                  <p className="text-xs lg:text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                    Services define session types (e.g., &quot;30min PT Session&quot;). They specify duration, type (1-on-1, duet, group), and credits.
-                    Different from <span className="font-medium">Templates</span>, which are workout programs with exercises.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Active Services */}
           <div>

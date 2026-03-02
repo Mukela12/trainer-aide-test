@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { useExerciseLookup } from '@/lib/hooks/use-exercise';
 import { Exercise, MuscleGroup } from '@/lib/types';
-import { Search, Dumbbell, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Dumbbell, ArrowLeft, ChevronDown, ChevronUp, Image as ImageIcon } from 'lucide-react';
+import { getExerciseImages } from '@/lib/supabase';
 
 export interface ExerciseCustomParams {
   resistanceValue?: number;
@@ -39,6 +40,48 @@ const MUSCLE_GROUPS: MuscleGroup[] = [
   'full_body',
   'stretch',
 ];
+
+function ExerciseImagePanel({ exerciseId, exerciseName }: { exerciseId: string; exerciseName: string }) {
+  const images = getExerciseImages(exerciseId, exerciseName);
+  const [hasStartError, setHasStartError] = useState(false);
+  const [hasEndError, setHasEndError] = useState(false);
+
+  if (!images.startUrl && !images.endUrl) return null;
+
+  const bothFailed = hasStartError && hasEndError;
+  if (bothFailed) return null;
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {!hasStartError && images.startUrl && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">Start Position</p>
+          <div className="aspect-[4/3] rounded-lg overflow-hidden bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-700">
+            <img
+              src={images.startUrl}
+              alt={`${exerciseName} - start`}
+              className="w-full h-full object-contain"
+              onError={() => setHasStartError(true)}
+            />
+          </div>
+        </div>
+      )}
+      {!hasEndError && images.endUrl && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 text-center">End Position</p>
+          <div className="aspect-[4/3] rounded-lg overflow-hidden bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-700">
+            <img
+              src={images.endUrl}
+              alt={`${exerciseName} - end`}
+              className="w-full h-full object-contain"
+              onError={() => setHasEndError(true)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ExerciseLibrary({
   open,
@@ -190,38 +233,52 @@ export function ExerciseLibrary({
 
             {/* Exercise List */}
             <div className="flex-1 overflow-y-auto space-y-2">
-              {filteredExercises.map((exercise) => (
-                <div
-                  key={exercise.id}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-wondrous-blue hover:bg-blue-50/50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
-                  onClick={() => handleSelectExercise(exercise)}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{exercise.name}</h3>
-                        <Badge variant="outline" className="capitalize">
-                          {exercise.category}
-                        </Badge>
-                        <Badge variant="outline" className="capitalize">
-                          {exercise.level}
-                        </Badge>
-                      </div>
-                      {exercise.equipment && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                          Equipment: {exercise.equipment}
-                        </p>
+              {filteredExercises.map((exercise) => {
+                const images = getExerciseImages(exercise.exerciseId, exercise.name);
+                return (
+                  <div
+                    key={exercise.id}
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-wondrous-blue hover:bg-blue-50/50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
+                    onClick={() => handleSelectExercise(exercise)}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Exercise thumbnail */}
+                      {images.startUrl && (
+                        <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 border border-gray-200 dark:border-gray-700">
+                          <img
+                            src={images.startUrl}
+                            alt={exercise.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        </div>
                       )}
-                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                        {exercise.instructions[0]}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <h3 className="font-semibold text-gray-900 dark:text-gray-100">{exercise.name}</h3>
+                          <Badge variant="outline" className="capitalize">
+                            {exercise.category}
+                          </Badge>
+                          <Badge variant="outline" className="capitalize">
+                            {exercise.level}
+                          </Badge>
+                        </div>
+                        {exercise.equipment && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            Equipment: {exercise.equipment}
+                          </p>
+                        )}
+                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                          {exercise.instructions[0]}
+                        </p>
+                      </div>
+                      <Button size="sm" onClick={() => handleSelectExercise(exercise)} className="flex-shrink-0">
+                        Customize
+                      </Button>
                     </div>
-                    <Button size="sm" onClick={() => handleSelectExercise(exercise)} className="flex-shrink-0">
-                      Customize
-                    </Button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {filteredExercises.length === 0 && (
                 <div className="text-center py-12">
@@ -249,6 +306,9 @@ export function ExerciseLibrary({
                 </p>
               )}
             </div>
+
+            {/* Exercise Images — Start/End positions */}
+            <ExerciseImagePanel exerciseId={selectedExercise.exerciseId} exerciseName={selectedExercise.name} />
 
             {/* Muscle Groups Display */}
             {(selectedExercise.primaryMuscles || selectedExercise.secondaryMuscles) && (

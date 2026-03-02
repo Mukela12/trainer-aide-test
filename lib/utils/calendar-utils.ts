@@ -124,6 +124,8 @@ export function getStatusBadge(status: string): {
       return { bg: '#E8F5E9', text: '#4CAF50', label: 'Confirmed' };
     case 'checked-in':
       return { bg: '#E3F2FD', text: '#2196F3', label: 'In Session' };
+    case 'cancelled':
+      return { bg: '#FCE4EC', text: '#E91E63', label: 'Cancelled' };
     case 'no-show':
       return { bg: '#FFEBEE', text: '#F44336', label: 'No Show' };
     case 'late':
@@ -133,6 +135,23 @@ export function getStatusBadge(status: string): {
     default:
       return { bg: '#F5F5F5', text: '#9E9E9E', label: status };
   }
+}
+
+/**
+ * Check if a service type is a group session and return group color overrides
+ */
+export function getGroupColorOverride(serviceType: { type?: string }): { bg: string; border: string } | null {
+  if (serviceType?.type === 'group') {
+    return { bg: '#E3F2FD', border: '#2196F3' };
+  }
+  return null;
+}
+
+/**
+ * Check if a status badge should be shown (hide "Confirmed" — only show non-obvious statuses)
+ */
+export function shouldShowStatusBadge(status: string): boolean {
+  return status !== 'confirmed';
 }
 
 /**

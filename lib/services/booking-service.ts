@@ -8,6 +8,8 @@
 import { createHash } from 'crypto';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendBookingConfirmationEmail, queueNotification } from '@/lib/notifications/email-service';
+import { isSMSEnabled, queueSMS } from '@/lib/notifications/sms-service';
+import { getBookingConfirmationSMS, getReminder24hSMS, getReminder2hSMS } from '@/lib/notifications/sms-templates';
 import { getStudioConfig, isWithinOpeningHours } from '@/lib/services/studio-service';
 import { createBookingRequest } from '@/lib/services/booking-request-service';
 
@@ -190,6 +192,17 @@ export async function createBooking(params: {
       }
     }
 
+    // Enforce booking cutoff (minimum advance booking time)
+    if (studioConfig?.cancellation_policy && bookingData.scheduled_at) {
+      const policy = studioConfig.cancellation_policy as { booking_cutoff_minutes?: number; buffer_minutes?: number };
+      if (policy.booking_cutoff_minutes && policy.booking_cutoff_minutes > 0) {
+        const minutesUntilBooking = (new Date(bookingData.scheduled_at).getTime() - Date.now()) / 60000;
+        if (minutesUntilBooking < policy.booking_cutoff_minutes) {
+          return { data: null, error: new Error(`Bookings must be made at least ${policy.booking_cutoff_minutes} minutes in advance`) };
+        }
+      }
+    }
+
     // Check for booking conflicts
     const { hasConflict } = await checkBookingConflicts(
       bookingData.trainer_id,
@@ -199,6 +212,33 @@ export async function createBooking(params: {
 
     if (hasConflict) {
       return { data: null, error: new Error('Time slot conflict with existing booking') };
+    }
+
+    // Enforce buffer_minutes between bookings
+    if (studioConfig?.cancellation_policy && bookingData.scheduled_at) {
+      const policy = studioConfig.cancellation_policy as { buffer_minutes?: number };
+      if (policy.buffer_minutes && policy.buffer_minutes > 0) {
+        const supabaseCheck = createServiceRoleClient();
+        const bookingStart = new Date(bookingData.scheduled_at);
+        const bookingEnd = new Date(bookingStart.getTime() + bookingData.duration * 60000);
+        const bufferMs = policy.buffer_minutes * 60000;
+
+        const windowStart = new Date(bookingStart.getTime() - bufferMs).toISOString();
+        const windowEnd = new Date(bookingEnd.getTime() + bufferMs).toISOString();
+
+        const { data: adjacentBookings } = await supabaseCheck
+          .from('ta_bookings')
+          .select('id, scheduled_at, duration')
+          .eq('trainer_id', bookingData.trainer_id)
+          .neq('status', 'cancelled')
+          .gte('scheduled_at', windowStart)
+          .lte('scheduled_at', windowEnd)
+          .limit(1);
+
+        if (adjacentBookings && adjacentBookings.length > 0) {
+          return { data: null, error: new Error(`A ${policy.buffer_minutes}-minute buffer is required between sessions`) };
+        }
+      }
     }
 
     const { data, error } = await supabase
@@ -278,9 +318,25 @@ export async function createBooking(params: {
             templateData,
           });
         }
+
+        // Queue SMS notifications if Telnyx is enabled and client has phone + opt-in
+        if (isSMSEnabled() && data.client.phone && data.client.sms_transactional_opt_in !== false) {
+          const smsDate = scheduledAt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+          const smsTime = scheduledAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+          const smsData = { clientName, trainerName, serviceName: data.service?.name || 'Session', date: smsDate, time: smsTime };
+
+          await queueSMS({ phone: data.client.phone, message: getBookingConfirmationSMS(smsData), bookingId: data.id, userId: data.client_id });
+
+          if (reminder24h > new Date()) {
+            await queueSMS({ phone: data.client.phone, message: getReminder24hSMS(smsData), bookingId: data.id, userId: data.client_id, sendAt: reminder24h });
+          }
+          if (reminder2h > new Date()) {
+            await queueSMS({ phone: data.client.phone, message: getReminder2hSMS(smsData), bookingId: data.id, userId: data.client_id, sendAt: reminder2h });
+          }
+        }
       } catch (emailError) {
         console.error('Error sending booking confirmation email:', emailError);
-        // Don't fail the booking creation if email fails
+        // Don't fail the booking creation if email/SMS fails
       }
     }
 
@@ -369,6 +425,17 @@ export async function createPublicBooking(params: {
       );
       if (!hoursCheck.valid) {
         return { data: null, error: new Error(hoursCheck.reason || 'Outside studio operating hours') };
+      }
+    }
+
+    // Enforce booking cutoff for public bookings
+    if (publicStudioConfig?.cancellation_policy) {
+      const policy = publicStudioConfig.cancellation_policy as { booking_cutoff_minutes?: number };
+      if (policy.booking_cutoff_minutes && policy.booking_cutoff_minutes > 0) {
+        const minutesUntilBooking = (new Date(params.scheduledAt).getTime() - Date.now()) / 60000;
+        if (minutesUntilBooking < policy.booking_cutoff_minutes) {
+          return { data: null, error: new Error(`Bookings must be made at least ${policy.booking_cutoff_minutes} minutes in advance`) };
+        }
       }
     }
 

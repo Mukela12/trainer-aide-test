@@ -11,6 +11,7 @@ import {
   getBookingRequestDeclinedEmail,
   getClientInvitationEmail,
   getCustomEmail,
+  getRescheduleEmail,
 } from './email-templates';
 
 const ELASTIC_EMAIL_API_URL = 'https://api.elasticemail.com/v4/emails/transactional';
@@ -613,6 +614,55 @@ export async function sendCustomEmail(params: {
     return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending custom email:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Send reschedule notification email to client
+ */
+export async function sendRescheduleEmail(params: {
+  clientEmail: string;
+  clientName: string;
+  trainerName: string;
+  serviceName: string;
+  oldTime: string | Date;
+  newTime: string | Date;
+  bookingId?: string;
+}): Promise<SendEmailResult> {
+  try {
+    const email = getRescheduleEmail({
+      clientName: params.clientName,
+      trainerName: params.trainerName,
+      serviceName: params.serviceName,
+      oldTime: params.oldTime,
+      newTime: params.newTime,
+    });
+
+    const result = await sendViaElasticEmail({
+      to: params.clientEmail,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+
+    if (result.error) {
+      return { success: false, error: result.error };
+    }
+
+    if (params.bookingId) {
+      await logNotification({
+        type: 'reschedule',
+        recipientEmail: params.clientEmail,
+        bookingId: params.bookingId,
+        status: 'sent',
+        messageId: result.messageId,
+      });
+    }
+
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error('Error sending reschedule email:', error);
     return { success: false, error: String(error) };
   }
 }

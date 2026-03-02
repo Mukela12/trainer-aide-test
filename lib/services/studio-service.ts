@@ -32,6 +32,11 @@ export interface CancellationRefundTier {
 export interface CancellationPolicy {
   no_show_action?: 'charge_full' | 'charge_partial' | 'no_charge';
   refund_tiers?: CancellationRefundTier[];
+  booking_cutoff_minutes?: number;
+  buffer_minutes?: number;
+  late_cancel_fee_percent?: number;
+  late_cancel_fee_amount?: number;
+  grace_period_minutes?: number;
 }
 
 export interface StudioConfig {

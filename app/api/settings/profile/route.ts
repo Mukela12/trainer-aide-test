@@ -46,6 +46,19 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
 
+    // Handle email change via auth admin API
+    let emailChangeInitiated = false;
+    if (body.email && body.email !== user.email) {
+      const serviceClient = createServiceRoleClient();
+      const { error: emailError } = await serviceClient.auth.admin.updateUserById(user.id, {
+        email: body.email,
+      });
+      if (emailError) {
+        return NextResponse.json({ error: `Email update failed: ${emailError.message}` }, { status: 500 });
+      }
+      emailChangeInitiated = true;
+    }
+
     // Filter to only allowed fields
     const updates: Record<string, unknown> = {};
     for (const key of ALLOWED_FIELDS) {
@@ -54,23 +67,27 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && !emailChangeInitiated) {
       return NextResponse.json({ error: 'No valid fields provided' }, { status: 400 });
     }
 
-    const serviceClient = createServiceRoleClient();
-    const { data: profile, error: profileError } = await serviceClient
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single();
+    let profile = null;
+    if (Object.keys(updates).length > 0) {
+      const serviceClient = createServiceRoleClient();
+      const { data, error: profileError } = await serviceClient
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
 
-    if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 500 });
+      if (profileError) {
+        return NextResponse.json({ error: profileError.message }, { status: 500 });
+      }
+      profile = data;
     }
 
-    return NextResponse.json(profile);
+    return NextResponse.json({ ...profile, emailChangeInitiated });
   } catch (error) {
     console.error('Error updating profile settings:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
