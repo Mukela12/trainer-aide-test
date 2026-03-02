@@ -25,6 +25,9 @@ export function AuthCallbackInner() {
       }
 
       try {
+        // Check if this is a password recovery flow
+        const type = searchParams.get('type')
+
         // Get the session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
@@ -43,11 +46,22 @@ export function AuthCallbackInner() {
               return
             }
             if (data.session) {
+              // If this is a recovery flow, redirect to reset password page
+              if (type === 'recovery') {
+                router.push('/reset-password')
+                return
+              }
               await processUser(supabase, data.session.user)
               return
             }
           }
           setError('No session found')
+          return
+        }
+
+        // If this is a recovery flow with existing session, redirect to reset password
+        if (type === 'recovery') {
+          router.push('/reset-password')
           return
         }
 
