@@ -715,11 +715,14 @@ export default function TrainerCalendar() {
 
   // Confirm session setup and start
   const confirmSessionSetup = () => {
-    if (!setupSessionId || !setupTemplateId || !setupSignOffMode) {
+    if (!setupSessionId) return;
+
+    // If a template is selected, require sign-off mode
+    if (setupTemplateId && !setupSignOffMode) {
       toast({
         variant: "destructive",
         title: "Incomplete Setup",
-        description: "Please select both template and sign-off mode",
+        description: "Please select a sign-off mode for the template",
       });
       return;
     }
@@ -727,16 +730,23 @@ export default function TrainerCalendar() {
     const session = sessions.find((s) => s.id === setupSessionId);
     if (!session) return;
 
-    // Update the calendar session with selected template and sign-off mode
-    updateSessionMutation.mutate(setupSessionId, {
-      templateId: setupTemplateId,
-      signOffMode: setupSignOffMode,
-    });
+    if (setupTemplateId) {
+      // Update the calendar session with selected template and sign-off mode
+      updateSessionMutation.mutate(setupSessionId, {
+        templateId: setupTemplateId,
+        signOffMode: setupSignOffMode || undefined,
+      });
 
-    // Navigate to session start page
-    router.push(
-      `/trainer/sessions/new?clientId=${session.clientId}&templateId=${setupTemplateId}&signOffMode=${setupSignOffMode}`
-    );
+      // Navigate to session start page with template
+      router.push(
+        `/trainer/sessions/new?clientId=${session.clientId}&templateId=${setupTemplateId}&signOffMode=${setupSignOffMode}`
+      );
+    } else {
+      // No template — navigate to session page without template params
+      router.push(
+        `/trainer/sessions/new?clientId=${session.clientId}`
+      );
+    }
 
     // Close setup panel
     closeSessionSetupPanel();

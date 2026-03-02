@@ -5,6 +5,7 @@
  * Extracted from api/bookings, api/public/book, and api/bookings/[id]/complete routes.
  */
 
+import { createHash } from 'crypto';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendBookingConfirmationEmail, queueNotification } from '@/lib/notifications/email-service';
 import { getStudioConfig, isWithinOpeningHours } from '@/lib/services/studio-service';
@@ -301,6 +302,8 @@ export async function createPublicBooking(params: {
   lastName: string;
   email: string;
   phone?: string;
+  termsContent?: string;
+  termsVersion?: number;
 }): Promise<{
   data: {
     type: 'booking' | 'request';
@@ -330,14 +333,23 @@ export async function createPublicBooking(params: {
       return { data: null, error: new Error('Service not found or not available') };
     }
 
-    // Get trainer's studio_id
+    // Get trainer's studio_id (check staff record first, then fall back to owner lookup for solo practitioners)
     const { data: trainerStaff } = await supabase
       .from('bs_staff')
       .select('studio_id')
       .eq('id', params.trainerId)
       .single();
 
-    const studioId = trainerStaff?.studio_id || null;
+    let studioId = trainerStaff?.studio_id || null;
+
+    if (!studioId) {
+      const { data: ownedStudio } = await supabase
+        .from('bs_studios')
+        .select('id')
+        .eq('owner_id', params.trainerId)
+        .maybeSingle();
+      studioId = ownedStudio?.id || null;
+    }
 
     // Fetch studio config for booking model, opening hours, and soft-hold length
     const publicStudioConfig = studioId ? (await getStudioConfig(studioId)).data : null;
@@ -469,6 +481,23 @@ export async function createPublicBooking(params: {
         return { data: null, error: requestError || new Error('Failed to create booking request') };
       }
 
+      // Create terms snapshot for the booking request
+      if (params.termsContent && studioId) {
+        try {
+          const termsHash = createHash('sha256').update(params.termsContent).digest('hex');
+          await supabase.from('ta_booking_terms_snapshots').insert({
+            booking_request_id: request.id,
+            studio_id: studioId,
+            terms_content: params.termsContent,
+            terms_version: params.termsVersion || 1,
+            terms_hash: termsHash,
+            client_email: params.email.toLowerCase(),
+          });
+        } catch (termsErr) {
+          console.error('Error creating terms snapshot:', termsErr);
+        }
+      }
+
       return {
         data: {
           type: 'request' as const,
@@ -521,6 +550,23 @@ export async function createPublicBooking(params: {
     if (bookingError || !booking) {
       console.error('Error creating booking:', bookingError);
       return { data: null, error: new Error('Failed to create booking') };
+    }
+
+    // Create terms snapshot for the booking
+    if (params.termsContent && studioId) {
+      try {
+        const termsHash = createHash('sha256').update(params.termsContent).digest('hex');
+        await supabase.from('ta_booking_terms_snapshots').insert({
+          booking_id: booking.id,
+          studio_id: studioId,
+          terms_content: params.termsContent,
+          terms_version: params.termsVersion || 1,
+          terms_hash: termsHash,
+          client_email: params.email.toLowerCase(),
+        });
+      } catch (termsErr) {
+        console.error('Error creating terms snapshot:', termsErr);
+      }
     }
 
     return {

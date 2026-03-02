@@ -9,6 +9,7 @@ const ALLOWED_FIELDS = [
   'waitlist_config',
   'opening_hours',
   'session_types',
+  'client_terms',
 ];
 
 export async function GET() {
@@ -34,7 +35,7 @@ export async function GET() {
     // Studio ID === user ID for solo/studio_owner
     const { data: studio, error: studioError } = await serviceClient
       .from('bs_studios')
-      .select('booking_model, soft_hold_length, cancellation_window_hours, cancellation_policy, waitlist_config, opening_hours, session_types')
+      .select('booking_model, soft_hold_length, cancellation_window_hours, cancellation_policy, waitlist_config, opening_hours, session_types, client_terms')
       .eq('owner_id', user.id)
       .maybeSingle();
 

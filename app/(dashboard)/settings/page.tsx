@@ -46,6 +46,12 @@ interface CancellationPolicyData {
   grace_period_minutes?: number;
 }
 
+interface ClientTermsData {
+  active: boolean;
+  content: string;
+  version: number;
+}
+
 interface StudioData {
   booking_model: string | null;
   soft_hold_length: number | null;
@@ -54,6 +60,7 @@ interface StudioData {
   waitlist_config: { enabled?: boolean; max_capacity?: number } | null;
   opening_hours: Record<string, { enabled: boolean; slots: { start: string; end: string }[] }>;
   session_types: string[] | null;
+  client_terms: ClientTermsData | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +222,9 @@ export default function SettingsPage() {
   });
 
   const [openingHours, setOpeningHours] = useState<StudioData['opening_hours']>({});
+  const [clientTerms, setClientTerms] = useState<ClientTermsData>({ active: false, content: '', version: 1 });
+  const [clientTermsDirty, setClientTermsDirty] = useState(false);
+  const [savingTerms, setSavingTerms] = useState(false);
 
   const [bookingForm, setBookingForm] = useState({
     self_booking_enabled: true,
@@ -294,6 +304,9 @@ export default function SettingsPage() {
         enabled: studio.waitlist_config?.enabled ?? false,
         max_capacity: studio.waitlist_config?.max_capacity ?? 10,
       });
+      if (studio.client_terms) {
+        setClientTerms(studio.client_terms);
+      }
     }
   }, [studio]);
 
@@ -824,17 +837,86 @@ export default function SettingsPage() {
       <div>
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 uppercase tracking-wider">Your Client Terms</h3>
         <div className="space-y-3">
-          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Client-facing Terms</p>
-                <span className="text-[10px] font-semibold uppercase bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">Inactive</span>
+                <span className={cn(
+                  "text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full",
+                  clientTerms.active
+                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                )}>
+                  {clientTerms.active ? 'Active' : 'Inactive'}
+                </span>
+                {clientTerms.version > 1 && (
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400">v{clientTerms.version}</span>
+                )}
               </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={clientTerms.active}
+                onClick={() => {
+                  setClientTerms(prev => ({ ...prev, active: !prev.active }));
+                  setClientTermsDirty(true);
+                }}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  clientTerms.active ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"
+                )}
+              >
+                <span className={cn(
+                  "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                  clientTerms.active ? "translate-x-6" : "translate-x-1"
+                )} />
+              </button>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              Set up terms that your clients must agree to before booking. You can use our template or write your own.
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Clients must agree to these terms before completing a booking. A snapshot is recorded with each booking.
             </p>
-            <span className="text-[10px] font-semibold uppercase tracking-wider bg-wondrous-blue-light text-wondrous-dark-blue px-2 py-0.5 rounded-full">Coming Soon</span>
+            <textarea
+              value={clientTerms.content}
+              onChange={(e) => {
+                setClientTerms(prev => ({ ...prev, content: e.target.value }));
+                setClientTermsDirty(true);
+              }}
+              rows={8}
+              placeholder="Enter your client-facing terms and conditions here..."
+              className="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                Version {clientTerms.version} {clientTermsDirty && '(unsaved changes)'}
+              </p>
+              <Button
+                size="sm"
+                disabled={!clientTermsDirty || savingTerms}
+                onClick={async () => {
+                  setSavingTerms(true);
+                  try {
+                    // Auto-increment version when content changes
+                    const currentStudioTerms = studio?.client_terms;
+                    const contentChanged = currentStudioTerms && currentStudioTerms.content !== clientTerms.content;
+                    const newVersion = contentChanged ? clientTerms.version + 1 : clientTerms.version;
+                    const termsToSave = { ...clientTerms, version: newVersion };
+                    await patchStudio({ client_terms: termsToSave });
+                    setClientTerms(termsToSave);
+                    setClientTermsDirty(false);
+                    queryClient.invalidateQueries({ queryKey: ['settings', 'studio'] });
+                    setStudioSaveCount((c: number) => c + 1);
+                  } catch {
+                    // error is shown by the mutation pattern
+                  } finally {
+                    setSavingTerms(false);
+                  }
+                }}
+                className="gap-2"
+              >
+                {savingTerms ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Save Terms
+              </Button>
+            </div>
           </div>
         </div>
       </div>

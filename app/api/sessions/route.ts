@@ -46,10 +46,6 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    if (!body.templateId) {
-      return NextResponse.json({ error: 'templateId is required' }, { status: 400 });
-    }
-
     const { data, error } = await createSession({
       trainerId: body.trainerId || user.id,
       clientId: body.clientId,

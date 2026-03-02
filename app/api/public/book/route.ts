@@ -12,6 +12,8 @@ export async function POST(request: NextRequest) {
       lastName,
       email,
       phone,
+      termsContent,
+      termsVersion,
     } = body;
 
     // Validate required fields
@@ -30,6 +32,8 @@ export async function POST(request: NextRequest) {
       lastName,
       email,
       phone,
+      termsContent,
+      termsVersion,
     });
 
     if (error) {

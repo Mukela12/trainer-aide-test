@@ -14,6 +14,9 @@ import {
   Clock,
   CreditCard,
   Lock,
+  FileText,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -25,6 +28,12 @@ interface BookingSelection {
   trainerId: string;
   scheduledAt: string;
   slug: string;
+}
+
+interface TrainerTerms {
+  active: boolean;
+  content?: string;
+  version?: number;
 }
 
 export default function CheckoutPage() {
@@ -43,6 +52,8 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [brandColor, setBrandColor] = useState('#3B82F6');
+  const [trainerTerms, setTrainerTerms] = useState<TrainerTerms | null>(null);
+  const [termsExpanded, setTermsExpanded] = useState(false);
 
   // Load selection and brand color from sessionStorage
   useEffect(() => {
@@ -63,6 +74,15 @@ export default function CheckoutPage() {
       setBrandColor(storedColor);
     }
   }, [slug, router]);
+
+  // Fetch trainer's terms when selection is available
+  useEffect(() => {
+    if (!selection?.trainerId) return;
+    fetch(`/api/public/terms/${selection.trainerId}`)
+      .then(res => res.json())
+      .then((data: TrainerTerms) => setTrainerTerms(data))
+      .catch(() => setTrainerTerms({ active: false }));
+  }, [selection?.trainerId]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -97,6 +117,10 @@ export default function CheckoutPage() {
           lastName: formData.lastName,
           email: formData.email,
           phone: formData.phone || null,
+          ...(trainerTerms?.active && trainerTerms.content ? {
+            termsContent: trainerTerms.content,
+            termsVersion: trainerTerms.version,
+          } : {}),
         }),
       });
 
@@ -264,6 +288,30 @@ export default function CheckoutPage() {
                 />
               </div>
 
+              {/* Trainer Terms & Conditions */}
+              {trainerTerms?.active && trainerTerms.content && (
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setTermsExpanded(!termsExpanded)}
+                    className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <FileText size={14} />
+                      Terms & Conditions
+                    </span>
+                    {termsExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                  </button>
+                  {termsExpanded && (
+                    <div className="p-3 max-h-48 overflow-y-auto border-t border-gray-200 dark:border-gray-700">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                        {trainerTerms.content}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-start gap-2 pt-2">
                 <Checkbox
                   id="terms"
@@ -274,7 +322,9 @@ export default function CheckoutPage() {
                   htmlFor="terms"
                   className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer"
                 >
-                  I agree to the booking terms and cancellation policy
+                  {trainerTerms?.active && trainerTerms.content
+                    ? "I agree to the trainer's terms & conditions and cancellation policy"
+                    : 'I agree to the booking terms and cancellation policy'}
                 </label>
               </div>
               {errors.terms && (
