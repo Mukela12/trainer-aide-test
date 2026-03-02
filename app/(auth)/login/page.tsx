@@ -33,32 +33,8 @@ function LoginPageContent() {
     return returnTo ? `${base}?returnTo=${encodeURIComponent(returnTo)}` : base
   }
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      setError('Please enter your email address first')
-      return
-    }
-
-    setIsLoading(true)
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      const supabase = getSupabaseBrowserClient()
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      })
-
-      if (error) {
-        setError(error.message)
-      } else {
-        setSuccessMessage('Password reset link sent! Check your email.')
-      }
-    } catch {
-      setError('An unexpected error occurred. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
+  const handleForgotPassword = () => {
+    router.push('/forgot-password')
   }
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
@@ -78,7 +54,7 @@ function LoginPageContent() {
 
       if (isSignUp) {
         // Sign up with email - include returnTo in callback URL
-        const callbackUrl = `${window.location.origin}${getCallbackUrl()}`
+        const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}${getCallbackUrl()}`
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -134,7 +110,7 @@ function LoginPageContent() {
     try {
       const supabase = getSupabaseBrowserClient()
       // Include returnTo in the callback URL for Google OAuth
-      const callbackUrl = `${window.location.origin}${getCallbackUrl()}`
+      const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}${getCallbackUrl()}`
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

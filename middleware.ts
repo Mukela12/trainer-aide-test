@@ -6,6 +6,8 @@ import { ROLE_DASHBOARDS, UserRole } from '@/lib/permissions'
 const PUBLIC_ROUTES = [
   '/',
   '/login',
+  '/forgot-password',
+  '/reset-password',
   '/auth/callback',
   '/book',
 ]
