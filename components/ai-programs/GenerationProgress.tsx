@@ -90,7 +90,7 @@ export function GenerationProgress({
                         <div className="h-2 w-2 rounded-full bg-wondrous-magenta flex-shrink-0 mt-1.5" />
                       )}
                       <span className="text-gray-700 dark:text-gray-300">
-                        {message}
+                        {message.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2705}\u{274C}]/gu, '').trim()}
                       </span>
                     </div>
                   ))}

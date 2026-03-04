@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { StatCard } from '@/components/shared/StatCard';
 import {
   Users,
+  User,
   Search,
   UserPlus,
   Mail,
@@ -42,6 +43,7 @@ import { SendEmailDialog } from '@/components/shared/SendEmailDialog';
 import BookingHistory from '@/components/studio-owner/BookingHistory';
 import { format } from 'date-fns';
 import ContentHeader from '@/components/shared/ContentHeader';
+import { cn } from '@/lib/utils/cn';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useClients, usePatchClient } from '@/lib/hooks/use-clients';
 
@@ -105,6 +107,7 @@ export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showDrawer, setShowDrawer] = useState(false);
   const [isDrawerAnimating, setIsDrawerAnimating] = useState(false);
+  const [clientDrawerTab, setClientDrawerTab] = useState<'overview' | 'sessions' | 'payments'>('overview');
 
   // Filter states
   const [creditFilter, setCreditFilter] = useState<CreditFilter>('all');
@@ -142,6 +145,7 @@ export default function ClientsPage() {
   const openClientDrawer = (client: Client) => {
     setSelectedClient(client);
     setShowDrawer(true);
+    setClientDrawerTab('overview');
     setTimeout(() => setIsDrawerAnimating(true), 10);
   };
 
@@ -666,76 +670,112 @@ export default function ClientsPage() {
                     </div>
                   </div>
 
-                  {/* Info Grid */}
-                  <div className="mb-6 space-y-3">
-                    <div className="p-3 rounded-lg bg-wondrous-blue/10 dark:bg-wondrous-blue/20">
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="w-5 h-5 text-wondrous-blue" />
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Credits</p>
-                          <p className="text-lg font-bold text-wondrous-blue">{selectedClient.credits || 0}</p>
-                        </div>
-                      </div>
-                    </div>
+                  {/* Tab Navigation */}
+                  <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+                    {([
+                      { key: 'overview' as const, label: 'Overview', icon: User },
+                      { key: 'sessions' as const, label: 'Sessions', icon: Calendar },
+                      { key: 'payments' as const, label: 'Payments', icon: CreditCard },
+                    ] as const).map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setClientDrawerTab(tab.key)}
+                        className={cn(
+                          'flex-1 py-2.5 text-xs font-medium text-center border-b-2 transition-colors flex items-center justify-center gap-1.5',
+                          clientDrawerTab === tab.key
+                            ? 'border-wondrous-magenta text-wondrous-magenta'
+                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        )}
+                      >
+                        <tab.icon size={14} />
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
 
-                    {selectedClient.phone && (
-                      <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                        <div className="flex items-center gap-3">
-                          <Phone className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Phone</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">{selectedClient.phone}</p>
+                  {clientDrawerTab === 'overview' && (
+                    <>
+                      {/* Info Grid */}
+                      <div className="mb-6 space-y-3">
+                        <div className="p-3 rounded-lg bg-wondrous-blue/10 dark:bg-wondrous-blue/20">
+                          <div className="flex items-center gap-3">
+                            <CreditCard className="w-5 h-5 text-wondrous-blue" />
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Credits</p>
+                              <p className="text-lg font-bold text-wondrous-blue">{selectedClient.credits || 0}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {selectedClient.phone && (
+                          <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                            <div className="flex items-center gap-3">
+                              <Phone className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Phone</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">{selectedClient.phone}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                          <div className="flex items-center gap-3">
+                            <UserCheck className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Status</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {selectedClient.is_archived ? 'Archived' : selectedClient.is_onboarded ? 'Active' : 'Pending Onboarding'}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    )}
 
-                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                      <div className="flex items-center gap-3">
-                        <UserCheck className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Status</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {selectedClient.is_archived ? 'Archived' : selectedClient.is_onboarded ? 'Active' : 'Pending Onboarding'}
-                          </p>
-                        </div>
+                      {/* Contact Actions */}
+                      <div className="mb-6 space-y-2">
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Contact</h4>
+
+                        <button
+                          onClick={() => {
+                            setEmailClient(selectedClient);
+                            setEmailDialogOpen(true);
+                          }}
+                          className="flex items-center w-full gap-3 p-3 transition-colors rounded-lg bg-wondrous-magenta/10 hover:bg-wondrous-magenta/20"
+                        >
+                          <Mail className="w-4 h-4 text-wondrous-magenta" />
+                          <span className="text-sm font-medium text-wondrous-magenta">Send Email</span>
+                        </button>
+
+                        {selectedClient.phone && (
+                          <button
+                            onClick={() => handleWhatsApp(selectedClient.phone || '')}
+                            className="flex items-center w-full gap-3 p-3 transition-colors rounded-lg bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30"
+                          >
+                            <MessageSquare className="w-4 h-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-600">WhatsApp</span>
+                          </button>
+                        )}
                       </div>
+                    </>
+                  )}
+
+                  {clientDrawerTab === 'sessions' && (
+                    <div className="mb-6">
+                      <BookingHistory
+                        clientId={selectedClient.id}
+                        clientName={`${selectedClient.first_name} ${selectedClient.last_name}`}
+                      />
                     </div>
-                  </div>
+                  )}
 
-                  {/* Contact Actions */}
-                  <div className="mb-6 space-y-2">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Contact</h4>
-
-                    <button
-                      onClick={() => {
-                        setEmailClient(selectedClient);
-                        setEmailDialogOpen(true);
-                      }}
-                      className="flex items-center w-full gap-3 p-3 transition-colors rounded-lg bg-wondrous-magenta/10 hover:bg-wondrous-magenta/20"
-                    >
-                      <Mail className="w-4 h-4 text-wondrous-magenta" />
-                      <span className="text-sm font-medium text-wondrous-magenta">Send Email</span>
-                    </button>
-
-                    {selectedClient.phone && (
-                      <button
-                        onClick={() => handleWhatsApp(selectedClient.phone || '')}
-                        className="flex items-center w-full gap-3 p-3 transition-colors rounded-lg bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30"
-                      >
-                        <MessageSquare className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-medium text-green-600">WhatsApp</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Booking History */}
-                  <div className="mb-6">
-                    <BookingHistory
-                      clientId={selectedClient.id}
-                      clientName={`${selectedClient.first_name} ${selectedClient.last_name}`}
-                    />
-                  </div>
+                  {clientDrawerTab === 'payments' && (
+                    <div className="text-center py-8">
+                      <CreditCard className="mx-auto mb-2 text-gray-300 dark:text-gray-600" size={32} />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Coming soon</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Payment history will appear here</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Fixed Bottom Actions */}

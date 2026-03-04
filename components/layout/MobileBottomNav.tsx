@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter, usePathname } from "next/navigation";
-import { Home, Calendar, Settings, FileText, Dumbbell, BookOpen, LayoutDashboard, Clock, Sparkles } from "lucide-react";
+import { Home, Calendar, Settings, FileText, Dumbbell, BookOpen, LayoutDashboard, Clock, Sparkles, Users, CreditCard, Zap } from "lucide-react";
 import { useUserStore } from "@/lib/stores/user-store";
 
 interface NavItem {
@@ -42,22 +42,34 @@ const studioOwnerNavItems: NavItem[] = [
 
 const trainerNavItems: NavItem[] = [
   {
-    id: "dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
+    id: "home",
+    label: "Home",
+    icon: Home,
     route: "/trainer",
   },
   {
-    id: "sessions",
-    label: "Sessions",
-    icon: Dumbbell,
-    route: "/trainer/sessions",
+    id: "schedule",
+    label: "Schedule",
+    icon: Calendar,
+    route: "/trainer/calendar",
   },
   {
-    id: "settings",
-    label: "Settings",
-    icon: Settings,
-    route: "/settings",
+    id: "clients",
+    label: "Clients",
+    icon: Users,
+    route: "/solo/clients",
+  },
+  {
+    id: "payments",
+    label: "Payments",
+    icon: CreditCard,
+    route: "/solo/revenue",
+  },
+  {
+    id: "ai",
+    label: "AI",
+    icon: Zap,
+    route: "/solo/programs",
   },
 ];
 
@@ -84,34 +96,34 @@ const clientNavItems: NavItem[] = [
 
 const soloPractitionerNavItems: NavItem[] = [
   {
-    id: "dashboard",
-    label: "Dashboard",
+    id: "home",
+    label: "Home",
     icon: Home,
     route: "/solo",
   },
   {
-    id: "programs",
-    label: "Programs",
-    icon: Sparkles,
-    route: "/solo/programs",
-  },
-  {
-    id: "sessions",
-    label: "Sessions",
-    icon: Dumbbell,
-    route: "/solo/sessions",
-  },
-  {
-    id: "calendar",
-    label: "Calendar",
+    id: "schedule",
+    label: "Schedule",
     icon: Calendar,
     route: "/solo/calendar",
   },
   {
-    id: "templates",
-    label: "Templates",
-    icon: FileText,
-    route: "/solo/templates",
+    id: "clients",
+    label: "Clients",
+    icon: Users,
+    route: "/solo/clients",
+  },
+  {
+    id: "payments",
+    label: "Payments",
+    icon: CreditCard,
+    route: "/solo/revenue",
+  },
+  {
+    id: "ai",
+    label: "AI",
+    icon: Zap,
+    route: "/solo/programs",
   },
 ];
 
@@ -141,10 +153,11 @@ export function MobileBottomNav() {
 
     // Trainer routes
     if (currentRole === 'trainer') {
-      if (pathname.startsWith("/trainer/programs")) return "programs";
-      if (pathname.startsWith("/trainer/calendar")) return "calendar";
-      if (pathname.startsWith("/trainer/sessions")) return "sessions";
-      if (pathname.startsWith("/trainer")) return "dashboard";
+      if (pathname.startsWith("/trainer/calendar")) return "schedule";
+      if (pathname.startsWith("/solo/clients")) return "clients";
+      if (pathname.startsWith("/solo/revenue")) return "payments";
+      if (pathname.startsWith("/solo/programs")) return "ai";
+      if (pathname.startsWith("/trainer")) return "home";
     }
 
     // Client routes
@@ -155,10 +168,11 @@ export function MobileBottomNav() {
 
     // Solo Practitioner routes
     if (currentRole === 'solo_practitioner') {
-      if (pathname.startsWith("/solo/templates")) return "templates";
-      if (pathname.startsWith("/solo/calendar")) return "calendar";
-      if (pathname.startsWith("/solo/sessions")) return "sessions";
-      if (pathname.startsWith("/solo")) return "dashboard";
+      if (pathname.startsWith("/solo/calendar")) return "schedule";
+      if (pathname.startsWith("/solo/clients")) return "clients";
+      if (pathname.startsWith("/solo/revenue")) return "payments";
+      if (pathname.startsWith("/solo/programs")) return "ai";
+      if (pathname.startsWith("/solo")) return "home";
     }
 
     return navItems[0]?.id || "home";

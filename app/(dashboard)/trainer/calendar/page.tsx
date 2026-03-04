@@ -22,6 +22,7 @@ import {
   getTimeRemaining,
   getStatusBadge,
   getGroupColorOverride,
+  getReadableTextColor,
   shouldShowStatusBadge,
   getWeekDates,
   formatDate,
@@ -188,6 +189,7 @@ export default function TrainerCalendar() {
   const [selectedServiceType, setSelectedServiceType] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedSignOffMode, setSelectedSignOffMode] = useState<string | null>(null);
+  const [selectedBookingClient, setSelectedBookingClient] = useState<string | null>(null);
   const [searchClient, setSearchClient] = useState("");
 
   // Inline session details state (NO MODALS)
@@ -214,13 +216,18 @@ export default function TrainerCalendar() {
 
   // Block removal confirmation
   const [removingBlockId, setRemovingBlockId] = useState<string | null>(null);
+  const [deleteBlockDialog, setDeleteBlockDialog] = useState<{
+    blockId: string;
+    isRecurring: boolean;
+    datetime: Date;
+  } | null>(null);
 
   // Legend collapsed state (collapsed by default for experienced users)
   const [showLegend, setShowLegend] = useState(false);
   const [blockRecurrence, setBlockRecurrence] = useState<RecurrenceType>('once');
   const [blockDate, setBlockDate] = useState<string>('');
   const [blockEndDate, setBlockEndDate] = useState<string>('');
-  const [blockDayOfWeek, setBlockDayOfWeek] = useState<number>(1);
+  const [blockDaysOfWeek, setBlockDaysOfWeek] = useState<number[]>([1]);
   const [blockStartTime, setBlockStartTime] = useState<string>('09:00');
   const [blockEndTime, setBlockEndTime] = useState<string>('17:00');
   const [blockReason, setBlockReason] = useState<BlockReasonType>('personal');
@@ -229,6 +236,12 @@ export default function TrainerCalendar() {
   // Drag & drop reschedule state (week view)
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<{ dayIndex: number; hour: number; minute: number } | null>(null);
+  const [pendingReschedule, setPendingReschedule] = useState<{
+    sessionId: string;
+    targetDate: Date;
+    session: typeof sessions[0];
+    oldDatetime: Date;
+  } | null>(null);
 
   const handleDragStart = (e: React.DragEvent, sessionId: string) => {
     setDraggedSessionId(sessionId);
@@ -291,8 +304,23 @@ export default function TrainerCalendar() {
 
     const oldDatetime = new Date(session.datetime);
 
-    // Perform reschedule
-    updateSessionMutation.mutate(draggedSessionId, { datetime: targetDate });
+    // Store pending reschedule — show confirmation dialog instead of executing immediately
+    setPendingReschedule({
+      sessionId: draggedSessionId,
+      targetDate,
+      session,
+      oldDatetime,
+    });
+
+    setDraggedSessionId(null);
+    setDragOverInfo(null);
+  };
+
+  const confirmReschedule = () => {
+    if (!pendingReschedule) return;
+    const { sessionId, targetDate, session, oldDatetime } = pendingReschedule;
+
+    updateSessionMutation.mutate(sessionId, { datetime: targetDate });
 
     toast({
       title: "Session Rescheduled",
@@ -313,8 +341,11 @@ export default function TrainerCalendar() {
       }).catch(() => {});
     }
 
-    setDraggedSessionId(null);
-    setDragOverInfo(null);
+    setPendingReschedule(null);
+  };
+
+  const cancelReschedule = () => {
+    setPendingReschedule(null);
   };
 
   const handleDragEnd = () => {
@@ -419,6 +450,7 @@ export default function TrainerCalendar() {
     }
     setSelectedSlot(datetime);
     setSelectedServiceType(services[0]?.id || null);
+    setSelectedBookingClient(null);
     setShowBookingPanel(true);
     setSearchClient("");
   };
@@ -455,7 +487,7 @@ export default function TrainerCalendar() {
     const dateStr = today.toISOString().split('T')[0];
     setBlockDate(dateStr);
     setBlockEndDate(dateStr);
-    setBlockDayOfWeek(today.getDay() || 1);
+    setBlockDaysOfWeek([today.getDay() || 1]);
     setBlockRecurrence('once');
     setBlockStartTime('09:00');
     setBlockEndTime('17:00');
@@ -484,37 +516,63 @@ export default function TrainerCalendar() {
       return;
     }
 
-    // Determine effective recurrence: if makeRecurring is enabled in one-time mode, treat as weekly
+    if (blockRecurrence === 'weekly' && blockDaysOfWeek.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No Days Selected",
+        description: "Please select at least one day of the week",
+      });
+      return;
+    }
+
     const effectiveRecurrence = blockRecurrence;
     const blockDayFromDate = blockDate ? new Date(blockDate).getDay() : 1;
 
-    const newBlock = {
-      id: `block_${Date.now()}`,
-      blockType: 'blocked' as const,
-      dayOfWeek: effectiveRecurrence === 'weekly' ?
-                 (blockRecurrence === 'weekly' ? blockDayOfWeek : blockDayFromDate) :
-                 blockDayFromDate,
-      startHour,
-      startMinute,
-      endHour,
-      endMinute,
-      recurrence: effectiveRecurrence,
-      specificDate: effectiveRecurrence === 'once' ? blockDate : undefined,
-      endDate: effectiveRecurrence === 'once' && blockEndDate && blockEndDate !== blockDate ? blockEndDate : undefined,
-      reason: blockReason,
-      notes: blockNotes || undefined,
-    };
+    if (effectiveRecurrence === 'weekly') {
+      // Create one block per selected day
+      blockDaysOfWeek.forEach((dayOfWeek, i) => {
+        const newBlock = {
+          id: `block_${Date.now()}_${i}`,
+          blockType: 'blocked' as const,
+          dayOfWeek,
+          startHour,
+          startMinute,
+          endHour,
+          endMinute,
+          recurrence: effectiveRecurrence,
+          reason: blockReason,
+          notes: blockNotes || undefined,
+        };
+        addBlockMutation.mutate(newBlock);
+      });
 
-    addBlockMutation.mutate(newBlock);
-
-    const description = effectiveRecurrence === 'weekly'
-      ? `Blocked weekly from ${blockStartTime} to ${blockEndTime}`
-      : `Blocked on ${blockDate} from ${blockStartTime} to ${blockEndTime}`;
-
-    toast({
-      title: "Time Blocked",
-      description,
-    });
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const selectedDayNames = blockDaysOfWeek.sort().map((d) => dayNames[d]).join(', ');
+      toast({
+        title: "Time Blocked",
+        description: `Blocked weekly on ${selectedDayNames} from ${blockStartTime} to ${blockEndTime}`,
+      });
+    } else {
+      const newBlock = {
+        id: `block_${Date.now()}`,
+        blockType: 'blocked' as const,
+        dayOfWeek: blockDayFromDate,
+        startHour,
+        startMinute,
+        endHour,
+        endMinute,
+        recurrence: effectiveRecurrence,
+        specificDate: blockDate,
+        endDate: blockEndDate && blockEndDate !== blockDate ? blockEndDate : undefined,
+        reason: blockReason,
+        notes: blockNotes || undefined,
+      };
+      addBlockMutation.mutate(newBlock);
+      toast({
+        title: "Time Blocked",
+        description: `Blocked on ${blockDate} from ${blockStartTime} to ${blockEndTime}`,
+      });
+    }
 
     closeBlockTimePanel();
   };
@@ -668,6 +726,7 @@ export default function TrainerCalendar() {
 
     setSelectedSlot(nextWeek);
     setSelectedServiceType(session.serviceTypeId ?? null);
+    setSelectedBookingClient(null);
     setShowBookingPanel(true);
     setSearchClient(session.clientName ?? "");
 
@@ -985,11 +1044,55 @@ export default function TrainerCalendar() {
     return matchingBlock?.id || null;
   };
 
-  // Remove blocked time
-  const handleRemoveBlock = (blockId: string) => {
+  // Check if a block is recurring
+  const isBlockRecurring = (blockId: string): boolean => {
+    if (!trainerAvailability) return false;
+    const block = trainerAvailability.blocks.find((b) => b.id === blockId);
+    return block?.recurrence === 'weekly';
+  };
+
+  // Remove blocked time — now with recurring block dialog
+  const handleRemoveBlock = (blockId: string, datetime?: Date) => {
+    if (isBlockRecurring(blockId) && datetime) {
+      setDeleteBlockDialog({ blockId, isRecurring: true, datetime });
+      setRemovingBlockId(null);
+      return;
+    }
     deleteBlockMutation.mutate(blockId);
     toast({ title: "Block Removed", description: "Time block has been removed" });
     setRemovingBlockId(null);
+  };
+
+  // Remove single occurrence of recurring block (create an override)
+  const handleRemoveSingleOccurrence = () => {
+    if (!deleteBlockDialog) return;
+    const { blockId, datetime } = deleteBlockDialog;
+    const block = trainerAvailability?.blocks.find((b) => b.id === blockId);
+    if (!block) return;
+
+    // Create a one-time "available" override for this specific date+time
+    const overrideBlock = {
+      id: `override_${Date.now()}`,
+      blockType: 'available' as const,
+      dayOfWeek: datetime.getDay(),
+      startHour: block.startHour,
+      startMinute: block.startMinute,
+      endHour: block.endHour,
+      endMinute: block.endMinute,
+      recurrence: 'once' as const,
+      specificDate: datetime.toISOString().split('T')[0],
+    };
+    addBlockMutation.mutate(overrideBlock);
+    toast({ title: "Occurrence Removed", description: "This single occurrence has been removed" });
+    setDeleteBlockDialog(null);
+  };
+
+  // Remove all occurrences of recurring block
+  const handleRemoveAllOccurrences = () => {
+    if (!deleteBlockDialog) return;
+    deleteBlockMutation.mutate(deleteBlockDialog.blockId);
+    toast({ title: "Block Removed", description: "All occurrences have been removed" });
+    setDeleteBlockDialog(null);
   };
 
   // Check if time is in the past
@@ -1136,7 +1239,7 @@ export default function TrainerCalendar() {
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center border border-slate-200 dark:border-slate-700">
                   <CalendarDays size={48} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
                   <div className="text-base font-medium text-gray-900 dark:text-gray-100 mb-1">No sessions today</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">Would you like to open availability or book a client?</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">Would you like to block time or book a client?</div>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button
                       onClick={openBlockTimePanel}
@@ -1144,7 +1247,7 @@ export default function TrainerCalendar() {
                       className="gap-2 border-slate-300 dark:border-slate-600"
                     >
                       <Clock size={16} />
-                      Open availability
+                      Block Time
                     </Button>
                     <Button
                       onClick={() => {
@@ -1235,13 +1338,17 @@ export default function TrainerCalendar() {
                             </span>
                           )}
                           <span
-                            style={{ background: serviceType?.color + "15", color: serviceType?.color, borderColor: serviceType?.color + "30" }}
+                            style={{
+                              background: serviceType?.type === 'group' ? '#E3F2FD' : serviceType?.color + "15",
+                              color: serviceType?.type === 'group' ? '#1a1a1a' : getReadableTextColor(serviceType?.color),
+                              borderColor: serviceType?.type === 'group' ? '#2196F330' : serviceType?.color + "30"
+                            }}
                             className="px-3 py-1.5 rounded-full text-xs font-semibold border"
                           >
                             {serviceType?.name}
                           </span>
                           {session.status === "soft-hold" && session.holdExpiry && (
-                            <span className="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 border border-orange-200">
+                            <span className="bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 border border-orange-200 dark:border-orange-800">
                               <Timer size={14} />
                               {getTimeRemaining(session.holdExpiry)}
                             </span>
@@ -1457,7 +1564,7 @@ export default function TrainerCalendar() {
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            className="text-amber-600 border-amber-300 hover:bg-amber-50 flex items-center gap-1"
+                                            className="text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 flex items-center gap-1"
                                             onClick={(e) => { e.stopPropagation(); handleCheckIn(session.id, 'late'); }}
                                           >
                                             <Clock size={14} /> Late
@@ -1730,7 +1837,7 @@ export default function TrainerCalendar() {
                           {removingBlockId === blockId && blockId && (
                             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 dark:bg-gray-900/90 rounded">
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleRemoveBlock(blockId); }}
+                                onClick={(e) => { e.stopPropagation(); handleRemoveBlock(blockId, slotTime); }}
                                 className="text-[8px] lg:text-[10px] font-bold text-red-600 hover:text-red-700 px-1"
                               >
                                 Remove
@@ -1792,7 +1899,7 @@ export default function TrainerCalendar() {
                         className={cn(
                           "absolute rounded-md lg:rounded-lg shadow-sm p-1 lg:p-2 hover:shadow-md transition-all cursor-pointer overflow-hidden",
                           session.status === "soft-hold"
-                            ? "border-2 border-dashed border-amber-400"
+                            ? "border-2 border-dashed border-amber-400 dark:border-amber-600"
                             : "border lg:border-2",
                           draggedSessionId === session.id && "opacity-50"
                         )}
@@ -1907,7 +2014,7 @@ export default function TrainerCalendar() {
                               <div>
                                 <div
                                   className="font-semibold text-sm"
-                                  style={{ color: serviceType.color }}
+                                  style={{ color: serviceType.type === 'group' ? '#1a1a1a' : getReadableTextColor(serviceType.color) }}
                                 >
                                   {serviceType.name}
                                 </div>
@@ -1971,7 +2078,27 @@ export default function TrainerCalendar() {
                           </div>
 
                           {/* Actions */}
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
+                            {(() => {
+                              const firstAvailableTime = request.preferredTimes
+                                .map((t: string) => new Date(t))
+                                .find((t: Date) => isTimeAvailable(t, serviceType.duration, sessions));
+                              return (
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                  disabled={!firstAvailableTime}
+                                  onClick={() => {
+                                    if (firstAvailableTime) {
+                                      handleAcceptRequest(request.id, firstAvailableTime);
+                                    }
+                                  }}
+                                >
+                                  <CheckCircle size={16} className="mr-1" />
+                                  Accept
+                                </Button>
+                              );
+                            })()}
                             <Button
                               size="sm"
                               variant="outline"
@@ -2024,7 +2151,14 @@ export default function TrainerCalendar() {
                     Book Session
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {selectedSlot && formatTime(selectedSlot)}
+                    {(() => {
+                      const st = services.find(s => s.id === selectedServiceType);
+                      const parts: string[] = [];
+                      if (st) parts.push(st.name);
+                      if (selectedSlot) parts.push(formatDate(selectedSlot));
+                      if (selectedSlot) parts.push(formatTime(selectedSlot));
+                      return parts.join(' · ') || 'Select a time';
+                    })()}
                   </p>
                 </div>
                 <button
@@ -2212,7 +2346,12 @@ export default function TrainerCalendar() {
                 />
               </div>
 
-              {/* Client List - INLINE */}
+              {/* Client Selection Label */}
+              <div className="text-xs font-semibold mb-2 text-wondrous-grey-dark dark:text-gray-200 uppercase tracking-wide">
+                Select Client
+              </div>
+
+              {/* Client List - Selectable Rows */}
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
                 {filteredClients.map((client) => {
                   const serviceType = services.find(
@@ -2220,115 +2359,104 @@ export default function TrainerCalendar() {
                   );
                   const hasEnoughCredits =
                     serviceType && client.credits >= serviceType.creditsRequired;
+                  const isSelected = selectedBookingClient === client.id;
 
                   return (
-                    <div
+                    <button
                       key={client.id}
-                      className="bg-gray-50 dark:bg-gray-700 border-2 border-wondrous-grey-light dark:border-gray-600 rounded-xl p-3"
+                      onClick={() => setSelectedBookingClient(client.id)}
+                      className={cn(
+                        "w-full bg-white dark:bg-gray-700 border-2 rounded-xl p-3 text-left transition-all",
+                        isSelected
+                          ? "border-wondrous-magenta bg-purple-50 dark:bg-purple-900/20"
+                          : "border-gray-200 dark:border-gray-600 hover:border-gray-300"
+                      )}
                     >
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center gap-3">
                         <div
                           style={{ background: client.color }}
-                          className="w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0 shadow-sm"
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0 shadow-sm"
                         >
                           {client.initials}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-wondrous-grey-dark dark:text-gray-100">
+                          <div className="font-semibold text-sm text-wondrous-grey-dark dark:text-gray-100">
                             {client.name}
                           </div>
-                          <div
-                            className={cn(
-                              "text-xs font-semibold",
-                              hasEnoughCredits
-                                ? "text-green-600"
-                                : "text-red-600"
-                            )}
-                          >
-                            {client.credits} credits
-                            {serviceType &&
-                              ` (need ${serviceType.creditsRequired})`}
+                          <div className="flex items-center gap-1 text-xs">
+                            <span className={hasEnoughCredits ? "text-green-600" : "text-red-600"}>
+                              {client.credits} credit{client.credits !== 1 ? 's' : ''}
+                              {serviceType && ` · needs ${serviceType.creditsRequired}`}
+                              {!hasEnoughCredits && serviceType && (
+                                <> · <span className="inline-flex items-center gap-0.5"><AlertTriangle size={11} className="inline" /> insufficient</span></>
+                              )}
+                            </span>
                           </div>
                         </div>
+                        {!hasEnoughCredits && serviceType && (
+                          <span className="text-xs text-red-500 font-medium whitespace-nowrap">Soft hold</span>
+                        )}
                       </div>
-
-                      {hasEnoughCredits ? (
-                        <Button
-                          size="sm"
-                          className="w-full bg-wondrous-magenta hover:bg-wondrous-magenta/90 flex items-center justify-center gap-1"
-                          onClick={() => {
-                            if (selectedSlot && selectedServiceType) {
-                              handleCreateBooking(client.id, selectedServiceType, selectedSlot);
-                            }
-                          }}
-                        >
-                          <CheckCircle size={16} />
-                          Confirm Booking
-                        </Button>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="bg-orange-50 text-wondrous-orange hover:bg-orange-100 flex items-center justify-center gap-1"
-                            onClick={() => {
-                              if (selectedSlot && selectedServiceType) {
-                                // Create soft hold booking
-                                const holdExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-                                const newSession: CalendarSession = {
-                                  id: `session_${Date.now()}`,
-                                  datetime: selectedSlot,
-                                  clientId: client.id,
-                                  clientName: client.name,
-                                  clientColor: client.color,
-                                  clientCredits: client.credits,
-                                  status: "soft-hold",
-                                  serviceTypeId: selectedServiceType,
-                                  workoutId: null,
-                                  holdExpiry: holdExpiry,
-                                };
-                                addSessionMutation.mutate(newSession);
-                                toast({
-                                  title: "Soft Hold Created",
-                                  description: `Hold expires in 24 hours • ${client.name}`,
-                                });
-                                closeBookingPanel();
-                              }
-                            }}
-                          >
-                            <Timer size={16} />
-                            Soft Hold
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 flex items-center justify-center gap-1"
-                            onClick={() => {
-                              toast({
-                                title: "Top Up Email Sent",
-                                description: "Credit top-up email sent to client",
-                              });
-                            }}
-                            title="Send credit top-up email to client"
-                          >
-                            <Mail size={16} />
-                            Top Up
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Fixed Footer with Button */}
+            {/* Fixed Footer with Book Button */}
             <div className="flex-shrink-0 p-5 pt-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
               <Button
-                variant="outline"
-                className="w-full"
-                onClick={closeBookingPanel}
+                className="w-full bg-gradient-to-r from-[#A71075] to-[#6B21A8] hover:from-[#8a0d60] hover:to-[#5a1b8a] text-white text-base py-5"
+                disabled={!selectedBookingClient || !selectedServiceType || !selectedSlot}
+                onClick={() => {
+                  if (!selectedSlot || !selectedServiceType || !selectedBookingClient) return;
+                  const client = filteredClients.find(c => c.id === selectedBookingClient);
+                  if (!client) return;
+                  const serviceType = services.find(s => s.id === selectedServiceType);
+                  const hasEnoughCredits = serviceType && client.credits >= serviceType.creditsRequired;
+
+                  if (hasEnoughCredits) {
+                    handleCreateBooking(client.id, selectedServiceType, selectedSlot);
+                  } else {
+                    // Auto soft-hold + auto send top-up email
+                    const holdExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                    const newSession: CalendarSession = {
+                      id: `session_${Date.now()}`,
+                      datetime: selectedSlot,
+                      clientId: client.id,
+                      clientName: client.name,
+                      clientColor: client.color,
+                      clientCredits: client.credits,
+                      status: "soft-hold",
+                      serviceTypeId: selectedServiceType,
+                      workoutId: null,
+                      holdExpiry: holdExpiry,
+                    };
+                    addSessionMutation.mutate(newSession);
+
+                    // Auto-send soft hold email
+                    fetch('/api/email/soft-hold', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        clientId: client.id,
+                        clientName: client.name,
+                        sessionDatetime: selectedSlot.toISOString(),
+                        serviceTypeName: serviceType?.name,
+                        creditsRequired: serviceType?.creditsRequired,
+                        holdExpiry: holdExpiry.toISOString(),
+                      }),
+                    }).catch(() => {});
+
+                    toast({
+                      title: "Soft Hold + Top-Up Email Sent",
+                      description: `Hold expires in 24h • Top-up email sent to ${client.name}`,
+                    });
+                    closeBookingPanel();
+                  }
+                }}
               >
-                Close
+                Book
               </Button>
             </div>
           </motion.div>
@@ -2602,11 +2730,11 @@ export default function TrainerCalendar() {
                 </>
               )}
 
-              {/* Weekly: Day of Week Selection */}
+              {/* Weekly: Day of Week Selection (Multi-Select) */}
               {blockRecurrence === 'weekly' && (
                 <div className="mb-4">
                   <div className="text-xs font-semibold mb-2 text-wondrous-grey-dark dark:text-gray-200">
-                    Day of Week
+                    Days of Week <span className="text-gray-400 font-normal">(select multiple)</span>
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     {[
@@ -2620,10 +2748,14 @@ export default function TrainerCalendar() {
                     ].map((day) => (
                       <button
                         key={day.value}
-                        onClick={() => setBlockDayOfWeek(day.value)}
+                        onClick={() => setBlockDaysOfWeek((prev) =>
+                          prev.includes(day.value)
+                            ? prev.filter((d) => d !== day.value)
+                            : [...prev, day.value]
+                        )}
                         className={cn(
                           "border-2 rounded-lg p-2 text-xs font-semibold hover:opacity-90 transition-all",
-                          blockDayOfWeek === day.value
+                          blockDaysOfWeek.includes(day.value)
                             ? "bg-wondrous-magenta border-wondrous-magenta text-white"
                             : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                         )}
@@ -2730,17 +2862,93 @@ export default function TrainerCalendar() {
         )}
       </AnimatePresence>
 
+      {/* Drag & Drop Reschedule Confirmation Dialog */}
+      {pendingReschedule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 mx-4 max-w-sm w-full border border-gray-200 dark:border-gray-700">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-wondrous-blue/10 flex items-center justify-center">
+                <CalendarIcon size={24} className="text-wondrous-blue" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Confirm Reschedule?</h3>
+            </div>
+            <div className="space-y-2 mb-6 text-sm text-gray-700 dark:text-gray-300">
+              <p><span className="font-semibold">{pendingReschedule.session.clientName}</span>&apos;s session</p>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500">From:</span>
+                <span>{formatDate(pendingReschedule.oldDatetime)} at {formatTime(pendingReschedule.oldDatetime)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500">To:</span>
+                <span className="font-semibold text-wondrous-blue">{formatDate(pendingReschedule.targetDate)} at {formatTime(pendingReschedule.targetDate)}</span>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={cancelReschedule}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-wondrous-blue hover:bg-wondrous-dark-blue text-white"
+                onClick={confirmReschedule}
+              >
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recurring Block Deletion Dialog */}
+      {deleteBlockDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 mx-4 max-w-sm w-full border border-gray-200 dark:border-gray-700">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-50 flex items-center justify-center">
+                <Repeat size={24} className="text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Remove Recurring Block</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">This is a weekly recurring block</p>
+            </div>
+            <div className="space-y-2">
+              <Button
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                onClick={handleRemoveSingleOccurrence}
+              >
+                Remove this occurrence only
+              </Button>
+              <Button
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleRemoveAllOccurrences}
+              >
+                Remove all occurrences
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setDeleteBlockDialog(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Context-Aware Floating Action Button */}
       <div className="fixed bottom-24 right-6 lg:bottom-6 flex flex-col gap-3 z-30">
         {/* Primary Action - Context aware based on day state */}
         <div className="relative">
           {todaysSessions.length === 0 ? (
-            // Empty day: Primary action is to open availability
+            // Empty day: Primary action is to block time
             <button
               onClick={openBlockTimePanel}
               className="w-14 h-14 rounded-full bg-gradient-to-r from-wondrous-blue to-wondrous-magenta text-white shadow-lg hover:shadow-xl hover:from-wondrous-dark-blue hover:to-wondrous-primary-hover transition-all flex items-center justify-center"
-              aria-label="Set availability"
-              title="Set availability"
+              aria-label="Block Time"
+              title="Block Time"
             >
               <Clock size={24} />
             </button>
@@ -2756,7 +2964,7 @@ export default function TrainerCalendar() {
             </button>
           )}
           <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
-            {todaysSessions.length === 0 ? "Set availability" : "Block Time"}
+            Block Time
           </span>
         </div>
       </div>

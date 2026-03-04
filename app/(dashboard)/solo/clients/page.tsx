@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { StatCard } from '@/components/shared/StatCard';
 import {
   Users,
+  User,
   Search,
   UserPlus,
   Mail,
@@ -30,6 +31,8 @@ import {
   Archive,
   ArchiveRestore,
   Gift,
+  Plus,
+  StickyNote,
 } from 'lucide-react';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useClients, usePatchClient, useDeleteClient } from '@/lib/hooks/use-clients';
@@ -94,6 +97,11 @@ export default function SoloClientsPage() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [isDrawerAnimating, setIsDrawerAnimating] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [clientDrawerTab, setClientDrawerTab] = useState<'overview' | 'sessions' | 'payments'>('overview');
+  const [clientNotes, setClientNotes] = useState<Array<{ id: string; category: 'injury' | 'preference' | 'general'; content: string; createdAt: Date }>>([]);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [newNoteCategory, setNewNoteCategory] = useState<'injury' | 'preference' | 'general'>('general');
+  const [showAddNote, setShowAddNote] = useState(false);
 
   // Sorting and filtering state
   const [sortField, setSortField] = useState<SortField>('name');
@@ -130,6 +138,8 @@ export default function SoloClientsPage() {
     setSelectedClient(client);
     setShowDrawer(true);
     setShowAllHistory(false);
+    setClientDrawerTab('overview');
+    setShowAddNote(false);
     setTimeout(() => setIsDrawerAnimating(true), 10);
   };
 
@@ -692,204 +702,314 @@ export default function SoloClientsPage() {
               </div>
             </div>
 
-            {/* Content */}
-            <div className="p-4 space-y-6">
-              {/* Profile Section */}
-              <div className="text-center">
-                <div className="w-20 h-20 rounded-full bg-wondrous-blue-light flex items-center justify-center mx-auto mb-3 overflow-hidden">
-                  <img
-                    src={getAvatarUrl(`${selectedClient.first_name} ${selectedClient.last_name}`)}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      e.currentTarget.parentElement!.innerHTML = `<span class="text-2xl font-semibold text-wondrous-dark-blue">${selectedClient.first_name?.[0]}${selectedClient.last_name?.[0]}</span>`;
-                    }}
-                  />
+            {/* Profile Header (always visible) */}
+            <div className="p-4 pb-0">
+              <div className="text-center mb-4">
+                <div className="w-16 h-16 rounded-full bg-wondrous-blue-light flex items-center justify-center mx-auto mb-2 overflow-hidden">
+                  <span className="text-xl font-semibold text-wondrous-dark-blue">
+                    {selectedClient.first_name?.[0]}{selectedClient.last_name?.[0]}
+                  </span>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {selectedClient.first_name} {selectedClient.last_name}
                 </h3>
-                <div className="mt-2">
+                <div className="mt-1 flex items-center justify-center gap-2">
                   {selectedClient.is_onboarded ? (
                     <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Active</Badge>
                   ) : (
                     <Badge variant="secondary">Pending</Badge>
                   )}
+                  <span className={cn(
+                    'text-xs font-semibold px-2 py-0.5 rounded-full',
+                    (selectedClient.credits || 0) === 0
+                      ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                      : (selectedClient.credits || 0) <= 3
+                        ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
+                        : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                  )}>
+                    {selectedClient.credits || 0} credits
+                  </span>
                 </div>
               </div>
 
-              {/* Contact Actions */}
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 gap-2" onClick={() => openEmailDialog(selectedClient)}>
-                  <Mail size={16} />
-                  Email
-                </Button>
-                {selectedClient.phone && (
-                  <Button variant="outline" className="flex-1 gap-2" onClick={() => handleWhatsApp(selectedClient.phone!)}>
-                    <MessageCircle size={16} />
-                    WhatsApp
-                  </Button>
-                )}
-              </div>
-
-              {/* Info Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Credits</div>
-                  <div
+              {/* Tab Navigation */}
+              <div className="flex border-b border-gray-200 dark:border-gray-700">
+                {([
+                  { key: 'overview' as const, label: 'Overview', icon: User },
+                  { key: 'sessions' as const, label: 'Sessions', icon: Calendar },
+                  { key: 'payments' as const, label: 'Payments', icon: CreditCard },
+                ] as const).map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setClientDrawerTab(tab.key)}
                     className={cn(
-                      'text-xl font-semibold',
-                      (selectedClient.credits || 0) === 0
-                        ? 'text-red-600 dark:text-red-400'
-                        : (selectedClient.credits || 0) <= 3
-                          ? 'text-yellow-600 dark:text-yellow-400'
-                          : 'text-gray-900 dark:text-gray-100'
+                      'flex-1 py-2.5 text-xs font-medium text-center border-b-2 transition-colors flex items-center justify-center gap-1.5',
+                      clientDrawerTab === tab.key
+                        ? 'border-wondrous-magenta text-wondrous-magenta'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     )}
                   >
-                    {selectedClient.credits || 0}
-                  </div>
-                </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Member Since</div>
-                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {format(new Date(selectedClient.created_at), 'MMM d, yyyy')}
-                  </div>
-                </div>
+                    <tab.icon size={14} />
+                    {tab.label}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              {/* Contact Info */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Contact Information</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 text-sm">
-                    <Mail size={16} className="text-gray-400" />
-                    <span className="text-gray-700 dark:text-gray-300">{selectedClient.email}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ml-auto h-6 w-6 p-0"
-                      onClick={() => openEmailDialog(selectedClient)}
-                    >
-                      <ExternalLink size={14} />
-                    </Button>
-                  </div>
-                  {selectedClient.phone && (
-                    <div className="flex items-center gap-3 text-sm">
-                      <Phone size={16} className="text-gray-400" />
-                      <span className="text-gray-700 dark:text-gray-300">{selectedClient.phone}</span>
+            {/* Tab Content */}
+            <div className="p-4 space-y-4">
+              {clientDrawerTab === 'overview' && (
+                <>
+                  {/* Client Notes */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                          <StickyNote size={14} />
+                          Client Notes
+                        </h4>
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">Always visible</span>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="ml-auto h-6 w-6 p-0"
-                        onClick={() => handleWhatsApp(selectedClient.phone!)}
+                        className="h-7 text-xs gap-1"
+                        onClick={() => setShowAddNote(!showAddNote)}
                       >
-                        <ExternalLink size={14} />
+                        <Plus size={14} />
+                        + Add
                       </Button>
+                    </div>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 -mt-1">Surfaced before every session — never miss a thing.</p>
+
+                    {/* Add Note Form */}
+                    {showAddNote && (
+                      <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 space-y-2">
+                        <div className="flex gap-2">
+                          {(['general', 'injury', 'preference'] as const).map((cat) => (
+                            <button
+                              key={cat}
+                              onClick={() => setNewNoteCategory(cat)}
+                              className={cn(
+                                'px-2 py-1 text-[10px] font-semibold rounded-full border transition-colors capitalize',
+                                newNoteCategory === cat
+                                  ? cat === 'injury' ? 'bg-amber-100 text-amber-700 border-amber-300'
+                                    : cat === 'preference' ? 'bg-pink-100 text-pink-700 border-pink-300'
+                                    : 'bg-blue-100 text-blue-700 border-blue-300'
+                                  : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-300 dark:border-gray-600'
+                              )}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+                        <Input
+                          placeholder="Add a note..."
+                          value={newNoteContent}
+                          onChange={(e) => setNewNoteContent(e.target.value)}
+                          className="text-sm"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setShowAddNote(false); setNewNoteContent(''); }}>
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs bg-wondrous-magenta hover:bg-wondrous-magenta/90"
+                            disabled={!newNoteContent.trim()}
+                            onClick={() => {
+                              setClientNotes((prev) => [...prev, {
+                                id: `note_${Date.now()}`,
+                                category: newNoteCategory,
+                                content: newNoteContent.trim(),
+                                createdAt: new Date(),
+                              }]);
+                              setNewNoteContent('');
+                              setShowAddNote(false);
+                            }}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Existing Notes */}
+                    {clientNotes.length > 0 ? (
+                      <div className="space-y-2">
+                        {clientNotes.map((note) => (
+                          <div
+                            key={note.id}
+                            className={cn(
+                              'p-3 rounded-lg border text-sm',
+                              note.category === 'injury' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+                                : note.category === 'preference' ? 'bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800 text-pink-800 dark:text-pink-200'
+                                : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
+                            )}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{note.category}</span>
+                              <button
+                                onClick={() => setClientNotes((prev) => prev.filter((n) => n.id !== note.id))}
+                                className="opacity-50 hover:opacity-100"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                            <p className="text-xs">{note.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-3">No notes yet</p>
+                    )}
+                  </div>
+
+                  {/* Contact Info */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Contact</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 text-sm">
+                        <Mail size={14} className="text-gray-400" />
+                        <span className="text-gray-700 dark:text-gray-300 text-xs">{selectedClient.email}</span>
+                        <Button variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0" onClick={() => openEmailDialog(selectedClient)}>
+                          <ExternalLink size={12} />
+                        </Button>
+                      </div>
+                      {selectedClient.phone && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Phone size={14} className="text-gray-400" />
+                          <span className="text-gray-700 dark:text-gray-300 text-xs">{selectedClient.phone}</span>
+                          <Button variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0" onClick={() => handleWhatsApp(selectedClient.phone!)}>
+                            <ExternalLink size={12} />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs" onClick={() => openEmailDialog(selectedClient)}>
+                        <Mail size={14} /> Email
+                      </Button>
+                      {selectedClient.phone && (
+                        <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs" onClick={() => handleWhatsApp(selectedClient.phone!)}>
+                          <MessageCircle size={14} /> WhatsApp
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Info Grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">Member Since</div>
+                      <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                        {format(new Date(selectedClient.created_at), 'MMM d, yyyy')}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1">Total Sessions</div>
+                      <div className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                        {bookingHistory.length}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                    <Button
+                      className="w-full gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-blue/90 hover:to-wondrous-magenta/90"
+                      size="sm"
+                      onClick={() => { setRewardCreditsClient(selectedClient); closeClientDrawer(); }}
+                    >
+                      <Gift size={14} /> Reward Credits
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs" onClick={() => { setEditClient(selectedClient); closeClientDrawer(); }}>
+                        <Edit size={14} /> Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "flex-1 gap-1 text-xs",
+                          selectedClient.is_archived
+                            ? "text-green-600 hover:bg-green-50 dark:text-green-400"
+                            : "text-orange-600 hover:bg-orange-50 dark:text-orange-400"
+                        )}
+                        onClick={() => handleArchiveClient(selectedClient)}
+                      >
+                        {selectedClient.is_archived ? <><ArchiveRestore size={14} /> Restore</> : <><Archive size={14} /> Archive</>}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {clientDrawerTab === 'sessions' && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Session History</h4>
+                  {loadingHistory ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-6 h-6 border-2 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : bookingHistory.length > 0 ? (
+                    <div className="space-y-2">
+                      {(showAllHistory ? bookingHistory : displayedHistory).map((booking) => (
+                        <div
+                          key={booking.id}
+                          className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                              {booking.session_name || 'Session'}
+                            </span>
+                            <span className={cn('px-2 py-0.5 text-xs rounded-full', STATUS_COLORS[booking.status] || STATUS_COLORS.pending)}>
+                              {booking.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <Calendar size={12} />
+                              {format(new Date(booking.scheduled_at), 'MMM d, yyyy')}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock size={12} />
+                              {format(new Date(booking.scheduled_at), 'h:mm a')}
+                            </span>
+                            {booking.credits_used > 0 && (
+                              <span className="flex items-center gap-1">
+                                <CreditCard size={12} />
+                                {booking.credits_used} credits
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {bookingHistory.length > 3 && !showAllHistory && (
+                        <Button variant="ghost" size="sm" onClick={() => setShowAllHistory(true)} className="w-full text-purple-600 dark:text-purple-400">
+                          View all {bookingHistory.length} sessions
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+                      <Calendar className="mx-auto mb-2 text-gray-300" size={32} />
+                      No session history yet
                     </div>
                   )}
                 </div>
-              </div>
+              )}
 
-              {/* Booking History */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Session History</h4>
-                {loadingHistory ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-6 h-6 border-2 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
+              {clientDrawerTab === 'payments' && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Payment History</h4>
+                  <div className="text-center py-8">
+                    <CreditCard className="mx-auto mb-2 text-gray-300 dark:text-gray-600" size={32} />
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Coming soon</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Payment history will appear here</p>
                   </div>
-                ) : bookingHistory.length > 0 ? (
-                  <div className="space-y-2">
-                    {displayedHistory.map((booking) => (
-                      <div
-                        key={booking.id}
-                        className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                            {booking.session_name || 'Session'}
-                          </span>
-                          <span className={cn('px-2 py-0.5 text-xs rounded-full', STATUS_COLORS[booking.status] || STATUS_COLORS.pending)}>
-                            {booking.status.replace('_', ' ')}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                          <span className="flex items-center gap-1">
-                            <Calendar size={12} />
-                            {format(new Date(booking.scheduled_at), 'MMM d, yyyy')}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock size={12} />
-                            {format(new Date(booking.scheduled_at), 'h:mm a')}
-                          </span>
-                          {booking.credits_used > 0 && (
-                            <span className="flex items-center gap-1">
-                              <CreditCard size={12} />
-                              {booking.credits_used} credits
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {bookingHistory.length > 3 && !showAllHistory && (
-                      <Button variant="ghost" size="sm" onClick={() => setShowAllHistory(true)} className="w-full text-purple-600 dark:text-purple-400">
-                        View all {bookingHistory.length} sessions
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-sm text-gray-500 dark:text-gray-400">
-                    No session history yet
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-                <Button
-                  className="w-full gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-blue/90 hover:to-wondrous-magenta/90"
-                  onClick={() => {
-                    setRewardCreditsClient(selectedClient);
-                    closeClientDrawer();
-                  }}
-                >
-                  <Gift size={16} />
-                  Reward Credits
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full gap-2"
-                  onClick={() => {
-                    setEditClient(selectedClient);
-                    closeClientDrawer();
-                  }}
-                >
-                  <Edit size={16} />
-                  Edit Client
-                </Button>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full gap-2",
-                    selectedClient.is_archived
-                      ? "text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
-                      : "text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-900/20"
-                  )}
-                  onClick={() => handleArchiveClient(selectedClient)}
-                >
-                  {selectedClient.is_archived ? (
-                    <>
-                      <ArchiveRestore size={16} />
-                      Restore Client
-                    </>
-                  ) : (
-                    <>
-                      <Archive size={16} />
-                      Archive Client
-                    </>
-                  )}
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

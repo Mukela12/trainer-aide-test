@@ -227,25 +227,25 @@ export function getPrimaryMuscleIntensity(exercise: Exercise): number {
 }
 
 /**
- * Get equipment icon/emoji
+ * Get equipment abbreviation label
  */
 export function getEquipmentIcon(equipment?: string): string {
-  if (!equipment) return '🏋️';
+  if (!equipment) return 'BB';
 
-  const equipmentIcons: Record<string, string> = {
-    'barbell': '🏋️',
-    'dumbbell': '💪',
-    'dumbbells': '💪',
-    'kettlebell': '⚫',
-    'body only': '🧘',
-    'bodyweight': '🧘',
-    'exercise ball': '⚽',
-    'resistance band': '🎗️',
-    'cable machine': '⚙️',
-    'machine': '⚙️',
-    'other': '🔧',
+  const equipmentLabels: Record<string, string> = {
+    'barbell': 'BB',
+    'dumbbell': 'DB',
+    'dumbbells': 'DB',
+    'kettlebell': 'KB',
+    'body only': 'BW',
+    'bodyweight': 'BW',
+    'exercise ball': 'SB',
+    'resistance band': 'RB',
+    'cable machine': 'CM',
+    'machine': 'MC',
+    'other': 'EQ',
   };
 
   const key = equipment.toLowerCase();
-  return equipmentIcons[key] || '🏋️';
+  return equipmentLabels[key] || 'BB';
 }

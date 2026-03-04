@@ -67,7 +67,7 @@ const soloPractitionerGroups: NavGroup[] = [
     title: 'GROW',
     links: [
       { href: '/solo/templates', label: 'Templates', icon: <FileText size={20} />, badge: 'AI' },
-      { href: '#', label: 'Campaigns', icon: <Megaphone size={20} />, badge: '🔒' },
+      { href: '#', label: 'Campaigns', icon: <Megaphone size={20} />, badge: 'Soon' },
     ],
   },
   {
@@ -99,14 +99,14 @@ const studioOwnerGroups: NavGroup[] = [
     title: 'BUSINESS',
     links: [
       { href: '/studio-owner/staff', label: 'Staff', icon: <UsersRound size={20} /> },
-      { href: '#', label: 'Payroll', icon: <Banknote size={20} />, badge: '🔒' },
+      { href: '#', label: 'Payroll', icon: <Banknote size={20} />, badge: 'Soon' },
     ],
   },
   {
     title: 'GROW',
     links: [
       { href: '/studio-owner/templates', label: 'Templates', icon: <FileText size={20} />, badge: 'AI' },
-      { href: '#', label: 'Campaigns', icon: <Megaphone size={20} />, badge: '🔒' },
+      { href: '#', label: 'Campaigns', icon: <Megaphone size={20} />, badge: 'Soon' },
     ],
   },
   {
@@ -276,14 +276,28 @@ export function Sidebar() {
                       <span className="flex-1">{link.label}</span>
                     )}
                     {!collapsed && link.badge && (
-                      <span className="text-xs">{link.badge}</span>
+                      <span className={cn(
+                        "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                        link.badge === 'Soon'
+                          ? "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                          : link.badge === 'AI'
+                            ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                      )}>{link.badge}</span>
                     )}
 
                     {/* Tooltip for collapsed state */}
                     {collapsed && (
                       <div className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 shadow-lg z-50">
                         {link.label}
-                        {link.badge && <span className="ml-1">{link.badge}</span>}
+                        {link.badge && <span className={cn(
+                          "ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                          link.badge === 'Soon'
+                            ? "bg-gray-600 text-gray-300"
+                            : link.badge === 'AI'
+                              ? "bg-purple-700 text-purple-200"
+                              : "bg-gray-700 text-gray-300"
+                        )}>{link.badge}</span>}
                       </div>
                     )}
                   </Link>

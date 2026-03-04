@@ -169,7 +169,7 @@ export default function SoloPractitionerDashboard() {
           {format(new Date(), 'EEEE, MMMM d, yyyy')}
         </p>
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">
-          {greeting}{currentUser.firstName ? `, ${currentUser.firstName}` : ''} <span className="inline-block">👋</span>
+          {greeting}{currentUser.firstName ? `, ${currentUser.firstName}` : ''}
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">
           {dailyMessage}
@@ -326,14 +326,100 @@ export default function SoloPractitionerDashboard() {
                 </div>
               ))}
             </Card>
-          ) : (
-            <Card className="p-6 dark:bg-gray-800 dark:border-gray-700">
-              <div className="text-center text-gray-500 dark:text-gray-400">
-                <Calendar className="mx-auto mb-3 text-gray-400 dark:text-gray-600" size={36} />
-                <p className="text-sm font-medium mb-1 text-gray-900 dark:text-gray-100">No sessions today</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Enjoy your free time or book new sessions</p>
+          ) : upcomingSessions.length > 0 ? (
+            /* No sessions today but have upcoming — show Next Up */
+            <div>
+              <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">No sessions today — here&apos;s what&apos;s next</p>
               </div>
-            </Card>
+              <Card className="dark:bg-gray-800 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+                {upcomingSessions.slice(0, 5).map((session) => (
+                  <div key={session.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-10 rounded-lg bg-gray-100 dark:bg-gray-700 flex flex-col items-center justify-center flex-shrink-0">
+                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 leading-none">{format(session.scheduledAt, 'EEE')}</span>
+                        <span className="text-sm font-bold text-gray-900 dark:text-gray-100 leading-tight">{format(session.scheduledAt, 'HH:mm')}</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                            {session.clientName}
+                          </h3>
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full">
+                            {session.serviceName}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {format(session.scheduledAt, 'MMM d')}
+                          </span>
+                          {session.status === 'soft-hold' ? (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">Pending</span>
+                          ) : (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">Confirmed</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <Link href="/solo/calendar">
+                      <Button size="sm" variant="ghost" className="text-xs">View</Button>
+                    </Link>
+                  </div>
+                ))}
+              </Card>
+            </div>
+          ) : (
+            /* No upcoming sessions at all — Growth Coach */
+            <div>
+              <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Zap size={14} className="text-purple-600 dark:text-purple-400" />
+                  <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">Growth Coach</span>
+                </div>
+                <p className="text-[11px] text-purple-600 dark:text-purple-400">Your calendar is clear — grow your business</p>
+              </div>
+              <div className="space-y-2">
+                <Link href="/solo/clients">
+                  <Card className="p-4 dark:bg-gray-800 dark:border-gray-700 hover:shadow-md transition-all cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                        <UserPlus size={18} className="text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Invite Past Clients</p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Re-engage clients who haven&apos;t booked recently</p>
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
+                {businessSlug && (
+                  <Card className="p-4 dark:bg-gray-800 dark:border-gray-700 hover:shadow-md transition-all cursor-pointer" onClick={handleCopyLink}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                        <ExternalLink size={18} className="text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Share Booking Link</p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Let new clients book you directly</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+                <Link href="/solo/calendar">
+                  <Card className="p-4 dark:bg-gray-800 dark:border-gray-700 hover:shadow-md transition-all cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                        <Users size={18} className="text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Create a Group Class</p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Maximize your time with group sessions</p>
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
+              </div>
+            </div>
           )}
         </div>
 

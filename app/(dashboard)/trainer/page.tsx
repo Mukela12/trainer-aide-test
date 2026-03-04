@@ -9,7 +9,7 @@ import { useUpcomingSessions } from '@/lib/hooks/use-upcoming-sessions';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { FileText, Dumbbell, Calendar, Users, DollarSign, Clock, Inbox, TrendingUp } from 'lucide-react';
+import { FileText, Dumbbell, Calendar, Users, DollarSign, Clock, Inbox, TrendingUp, Sparkles, Share2, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import type { TrainerDashboardStats, UpcomingSession } from '@/lib/types/dashboard';
 
@@ -179,49 +179,151 @@ export default function TrainerDashboard() {
             <div className="w-8 h-8 border-4 border-wondrous-blue border-t-transparent rounded-full animate-spin" />
           </div>
         ) : upcomingSessions.length > 0 ? (
-          <div className="space-y-4">
-            {upcomingSessions.map((session) => (
-              <Card key={session.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-5 lg:p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                          {session.clientName}
-                        </h3>
-                        {session.status === 'soft-hold' && (
-                          <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
-                            Soft Hold
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                        <span>
-                          {format(session.scheduledAt, 'EEE, MMM d')} at {format(session.scheduledAt, 'h:mm a')}
-                        </span>
-                        <span className="text-gray-400">•</span>
-                        <span>{session.serviceName}</span>
-                      </div>
-                    </div>
-                    <Link href="/trainer/calendar">
-                      <Button size="sm" variant="outline">Details</Button>
-                    </Link>
+          <>
+            {/* Check if any sessions are today */}
+            {(() => {
+              const todaySessions = upcomingSessions.filter(
+                (s) => format(s.scheduledAt, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+              );
+              const futureSessions = upcomingSessions.filter(
+                (s) => format(s.scheduledAt, 'yyyy-MM-dd') !== format(today, 'yyyy-MM-dd')
+              );
+
+              return todaySessions.length === 0 ? (
+                /* No sessions today — show "Next Up" */
+                <div>
+                  <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                    <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">No sessions today — here&apos;s what&apos;s coming up next</p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <div className="space-y-3">
+                    {upcomingSessions.slice(0, 5).map((session) => (
+                      <Card key={session.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4 lg:p-5">
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-10 rounded-lg bg-gray-100 dark:bg-gray-700 flex flex-col items-center justify-center flex-shrink-0">
+                                <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 leading-none">{format(session.scheduledAt, 'EEE')}</span>
+                                <span className="text-sm font-bold text-gray-900 dark:text-gray-100 leading-tight">{format(session.scheduledAt, 'HH:mm')}</span>
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                                    {session.clientName}
+                                  </h3>
+                                  <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full">
+                                    {session.serviceName}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {format(session.scheduledAt, 'MMM d')}
+                                  </span>
+                                  {session.status === 'soft-hold' ? (
+                                    <span className="text-[10px] font-medium px-1.5 py-0.5 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">Pending</span>
+                                  ) : (
+                                    <span className="text-[10px] font-medium px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">Confirmed</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <Link href="/trainer/calendar">
+                              <Button size="sm" variant="ghost" className="text-xs">View</Button>
+                            </Link>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* Has sessions today — show normal list */
+                <div className="space-y-4">
+                  {upcomingSessions.map((session) => (
+                    <Card key={session.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-5 lg:p-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                                {session.clientName}
+                              </h3>
+                              {session.status === 'soft-hold' && (
+                                <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
+                                  Soft Hold
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                              <span>
+                                {format(session.scheduledAt, 'EEE, MMM d')} at {format(session.scheduledAt, 'h:mm a')}
+                              </span>
+                              <span className="text-gray-400">·</span>
+                              <span>{session.serviceName}</span>
+                            </div>
+                          </div>
+                          <Link href="/trainer/calendar">
+                            <Button size="sm" variant="outline">Details</Button>
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              );
+            })()}
+          </>
         ) : (
-          <Card className="p-8">
-            <div className="text-center text-gray-500 dark:text-gray-400">
-              <Calendar className="mx-auto mb-4 text-gray-400 dark:text-gray-500" size={48} />
-              <p className="text-lg font-medium mb-2 dark:text-gray-300">No upcoming sessions</p>
-              <p className="text-sm mb-4 dark:text-gray-400">Schedule your next session to get started</p>
+          /* No upcoming sessions at all — Growth Coach */
+          <div>
+            <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-xl">
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles size={16} className="text-purple-600 dark:text-purple-400" />
+                <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">Growth Coach</span>
+              </div>
+              <p className="text-xs text-purple-600 dark:text-purple-400">Your calendar is clear — here are some ways to grow your business</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Link href="/solo/clients">
+                <Card className="p-5 hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-blue-200 dark:hover:border-blue-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                      <UserPlus size={20} className="text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Invite Past Clients</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Re-engage clients who haven&apos;t booked recently</p>
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+              <Link href="/settings">
+                <Card className="p-5 hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-green-200 dark:hover:border-green-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+                      <Share2 size={20} className="text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Share Booking Link</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Let new clients book you directly</p>
+                    </div>
+                  </div>
+                </Card>
+              </Link>
               <Link href="/trainer/calendar">
-                <Button>View Calendar</Button>
+                <Card className="p-5 hover:shadow-md transition-all cursor-pointer border-2 border-transparent hover:border-purple-200 dark:hover:border-purple-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
+                      <Users size={20} className="text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100">Create a Group Class</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Maximize your time with group sessions</p>
+                    </div>
+                  </div>
+                </Card>
               </Link>
             </div>
-          </Card>
+          </div>
         )}
       </div>
     </div>

@@ -12,6 +12,7 @@ import {
   getClientInvitationEmail,
   getCustomEmail,
   getRescheduleEmail,
+  generateSoftHoldEmail,
 } from './email-templates';
 
 const ELASTIC_EMAIL_API_URL = 'https://api.elasticemail.com/v4/emails/transactional';
@@ -726,5 +727,47 @@ export async function queueNotification(params: {
     });
   } catch (error) {
     console.error('Error queuing notification:', error);
+  }
+}
+
+/**
+ * Send soft hold notification email to client
+ */
+export async function sendSoftHoldEmail(params: {
+  clientEmail: string;
+  clientName: string;
+  trainerName: string;
+  serviceName: string;
+  sessionDatetime: string | Date;
+  creditsRequired: number;
+  holdExpiry: string | Date;
+  topUpLink?: string;
+}): Promise<SendEmailResult> {
+  try {
+    const email = generateSoftHoldEmail({
+      clientName: params.clientName,
+      trainerName: params.trainerName,
+      serviceName: params.serviceName,
+      sessionDatetime: params.sessionDatetime,
+      creditsRequired: params.creditsRequired,
+      holdExpiry: params.holdExpiry,
+      topUpLink: params.topUpLink,
+    });
+
+    const result = await sendViaElasticEmail({
+      to: params.clientEmail,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+
+    if (result.error) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error('Error sending soft hold email:', error);
+    return { success: false, error: String(error) };
   }
 }

@@ -98,7 +98,7 @@ export default function ClientDashboard() {
             {format(new Date(), 'EEEE, MMMM d')}
           </p>
           <h1 className="text-2xl md:text-3xl font-bold text-white mb-4">
-            {greeting}, {currentUser.firstName} <span className="inline-block">👋</span>
+            {greeting}, {currentUser.firstName}
           </h1>
 
           {/* Stats row */}

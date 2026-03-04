@@ -768,3 +768,128 @@ export function getRescheduleEmail(data: {
     text: `Hi ${data.clientName},\n\nYour ${data.serviceName} session with ${data.trainerName} has been rescheduled.\n\nPrevious: ${oldFormatted}\nNew: ${newFormatted}\n\nIf this doesn't work for you, please contact your trainer.\n\n—\n${data.branding?.businessName || 'AllWondrous'}`,
   };
 }
+
+/**
+ * Soft Hold Email - Sent when a trainer creates a soft hold for a client who lacks credits
+ */
+interface SoftHoldData {
+  clientName: string;
+  trainerName: string;
+  serviceName: string;
+  sessionDatetime: string | Date;
+  creditsRequired: number;
+  holdExpiry: string | Date;
+  topUpLink?: string;
+  branding?: EmailBranding;
+}
+
+export function generateSoftHoldEmail(data: SoftHoldData): { subject: string; html: string; text: string } {
+  const sessionDate = new Date(data.sessionDatetime);
+  const expiryDate = new Date(data.holdExpiry);
+  const sessionDateStr = format(sessionDate, 'EEEE, MMMM d, yyyy');
+  const sessionTimeStr = format(sessionDate, 'HH:mm');
+  const expiryTimeStr = format(expiryDate, "h:mm a 'tomorrow'");
+  const footerText = data.branding?.businessName
+    ? `Powered by ${data.branding.businessName}`
+    : 'Powered by allWondrous';
+
+  const topUpUrl = data.topUpLink || '#';
+  const businessName = data.branding?.businessName || '';
+  const logoUrl = data.branding?.logoUrl;
+
+  return {
+    subject: `Your spot is held — complete booking by ${format(expiryDate, "h a 'tomorrow'")}`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #272030; margin: 0; padding: 0; background-color: #f9fafb; }
+    .container { max-width: 560px; margin: 0 auto; padding: 24px 16px; }
+    .card { background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      ${logoUrl ? `
+      <div style="padding: 20px 24px; text-align: center; border-bottom: 1px solid #f0f0f0;">
+        <img src="${logoUrl}" alt="${businessName}" style="max-width: 140px; max-height: 50px; width: auto; height: auto;" />
+      </div>
+      ` : ''}
+
+      <!-- Hero Section -->
+      <div style="text-align: center; padding: 32px 24px 24px;">
+        <div style="display: inline-block; width: 56px; height: 56px; background: #FFF3E0; border-radius: 50%; line-height: 56px; text-align: center; margin-bottom: 16px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h1 style="font-size: 22px; font-weight: 700; color: #272030; margin: 0 0 6px;">Your spot is held!</h1>
+        <p style="font-size: 14px; color: #6b7280; margin: 0;">Complete your booking within <strong style="color: #272030;">24 hours</strong></p>
+      </div>
+
+      <!-- Body -->
+      <div style="padding: 0 24px 24px;">
+        <p style="margin: 0 0 20px; font-size: 15px;">Hi ${data.clientName},</p>
+        <p style="margin: 0 0 24px; font-size: 14px; color: #4b5563;">Your trainer has reserved a spot for you. You don't have enough credits to confirm it automatically, so we're holding it for <strong>24 hours</strong>.</p>
+
+        <!-- Session Details Card -->
+        <div style="background: #f9fafb; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+          <h2 style="font-size: 16px; font-weight: 700; color: #272030; margin: 0 0 14px;">${data.serviceName}</h2>
+          <table cellpadding="0" cellspacing="0" style="width: 100%; font-size: 14px;">
+            <tr>
+              <td style="padding: 5px 0; vertical-align: top; width: 28px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+              </td>
+              <td style="padding: 5px 0; color: #272030;">${sessionDateStr}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0; vertical-align: top; width: 28px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </td>
+              <td style="padding: 5px 0; color: #272030;">${sessionTimeStr}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0; vertical-align: top; width: 28px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </td>
+              <td style="padding: 5px 0; color: #272030;">with ${data.trainerName}</td>
+            </tr>
+            ${businessName ? `
+            <tr>
+              <td style="padding: 5px 0; vertical-align: top; width: 28px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              </td>
+              <td style="padding: 5px 0; color: #272030;">${businessName}</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+
+        <!-- Deadline Warning -->
+        <div style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 16px; margin-bottom: 24px; text-align: center;">
+          <span style="font-size: 13px; color: #DC2626; font-weight: 600;">Spot released at ${expiryTimeStr} if unpaid</span>
+        </div>
+
+        <!-- CTA Button -->
+        <div style="text-align: center; margin-bottom: 24px;">
+          <a href="${topUpUrl}" style="display: inline-block; background: #16A34A; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px;">
+            Top Up Credits &amp; Confirm →
+          </a>
+        </div>
+
+        <p style="font-size: 13px; color: #6b7280; text-align: center; margin: 0;">Questions? Reply to this email or contact ${data.trainerName} directly.</p>
+      </div>
+    </div>
+
+    <div style="text-align: center; padding: 20px; font-size: 12px; color: #9ca3af;">
+      ${footerText}
+    </div>
+  </div>
+</body>
+</html>
+    `.trim(),
+    text: `Hi ${data.clientName},\n\nYour spot is held! Complete your booking within 24 hours.\n\nYour trainer has reserved a spot for you. You don't have enough credits to confirm it automatically, so we're holding it for 24 hours.\n\n${data.serviceName}\nDate: ${sessionDateStr}\nTime: ${sessionTimeStr}\nTrainer: ${data.trainerName}\n\nSpot released at ${expiryTimeStr} if unpaid.\n\nTop up your credits to confirm your session.\n\nQuestions? Reply to this email or contact ${data.trainerName} directly.\n\n—\n${data.branding?.businessName || 'allWondrous'}`,
+  };
+}

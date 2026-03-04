@@ -80,7 +80,7 @@ export default function StudioOwnerDashboard() {
           {format(new Date(), 'EEEE, MMMM d, yyyy')}
         </p>
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">
-          {greeting}{businessName || currentUser.firstName ? `, ${businessName || currentUser.firstName}` : ''} <span className="inline-block">👋</span>
+          {greeting}{businessName || currentUser.firstName ? `, ${businessName || currentUser.firstName}` : ''}
         </h1>
       </div>
 

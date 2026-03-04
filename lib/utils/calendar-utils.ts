@@ -119,22 +119,42 @@ export function getStatusBadge(status: string): {
 } {
   switch (status) {
     case 'soft-hold':
-      return { bg: '#FFF3E0', text: '#F4B324', label: 'Soft Hold' };
+      return { bg: '#FFF3E0', text: '#B45309', label: 'Soft Hold' };
     case 'confirmed':
-      return { bg: '#E8F5E9', text: '#4CAF50', label: 'Confirmed' };
+      return { bg: '#E8F5E9', text: '#15803D', label: 'Confirmed' };
     case 'checked-in':
-      return { bg: '#E3F2FD', text: '#2196F3', label: 'In Session' };
+      return { bg: '#E3F2FD', text: '#1D4ED8', label: 'In Session' };
     case 'cancelled':
-      return { bg: '#FCE4EC', text: '#E91E63', label: 'Cancelled' };
+      return { bg: '#FCE4EC', text: '#BE185D', label: 'Cancelled' };
     case 'no-show':
-      return { bg: '#FFEBEE', text: '#F44336', label: 'No Show' };
+      return { bg: '#FFEBEE', text: '#DC2626', label: 'No Show' };
     case 'late':
-      return { bg: '#FFF9C4', text: '#F57C00', label: 'Late' };
+      return { bg: '#FFF9C4', text: '#B45309', label: 'Late' };
     case 'upcoming':
-      return { bg: '#F3E5F5', text: '#9C27B0', label: 'Upcoming' };
+      return { bg: '#F3E5F5', text: '#7E22CE', label: 'Upcoming' };
     default:
-      return { bg: '#F5F5F5', text: '#9E9E9E', label: status };
+      return { bg: '#F5F5F5', text: '#525252', label: status };
   }
+}
+
+/**
+ * Ensure a hex color has sufficient contrast for text on a light background.
+ * If the color is too light (luminance > 0.45), darken it for readability.
+ */
+export function getReadableTextColor(hexColor: string | undefined): string {
+  if (!hexColor || !hexColor.startsWith('#')) return '#272030';
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+  // Relative luminance (WCAG formula)
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  if (luminance > 0.45) {
+    // Color is too light for text — darken it
+    const darken = (v: number) => Math.round(v * 0.4 * 255).toString(16).padStart(2, '0');
+    return `#${darken(r)}${darken(g)}${darken(b)}`;
+  }
+  return hexColor;
 }
 
 /**
