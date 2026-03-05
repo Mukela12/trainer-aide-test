@@ -98,7 +98,7 @@ export function SlugInput({
         <Label>Your Booking Link</Label>
         <div className="flex items-center gap-2 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
           <Globe className="text-gray-400" size={20} />
-          <span className="text-gray-500">allwondrous.com/book/</span>
+          <span className="text-gray-500 dark:text-gray-400">allwondrous.com/book/</span>
           <span className="font-semibold text-wondrous-blue">
             {finalSlug || 'your-name'}
           </span>

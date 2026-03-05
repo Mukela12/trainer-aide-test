@@ -2170,9 +2170,9 @@ export default function TrainerCalendar() {
                 </div>
                 <button
                   onClick={closeBookingPanel}
-                  className="p-2 hover:bg-gray-100 rounded-full"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
                 >
-                  <X size={24} />
+                  <X size={24} className="dark:text-gray-300" />
                 </button>
               </div>
             </div>

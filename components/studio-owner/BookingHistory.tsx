@@ -144,7 +144,7 @@ export default function BookingHistory({ clientId, clientName }: BookingHistoryP
               <Clock className="w-3.5 h-3.5 text-wondrous-blue ml-1" />
               <span>{formatTime(booking.scheduled_at)}</span>
               {booking.duration && (
-                <span className="text-gray-500">
+                <span className="text-gray-500 dark:text-gray-400">
                   {formatDuration(booking.duration)}
                 </span>
               )}

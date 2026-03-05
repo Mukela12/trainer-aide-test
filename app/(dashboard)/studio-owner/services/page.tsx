@@ -270,10 +270,10 @@ export default function ServicesPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditService(service)} className="flex-1">
+                      <Button variant="outline" size="sm" onClick={() => handleEditService(service)} className="flex-1 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700">
                         <Edit size={14} className="mr-1" />Edit
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => toggleServiceStatus(service.id, service.isActive)} className="flex-1 text-orange-600">
+                      <Button variant="outline" size="sm" onClick={() => toggleServiceStatus(service.id, service.isActive)} className="flex-1 text-orange-600 dark:text-orange-400 dark:border-gray-600 dark:hover:bg-gray-700">
                         <PowerOff size={14} className="mr-1" />Disable
                       </Button>
                     </div>
@@ -290,16 +290,16 @@ export default function ServicesPage() {
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Inactive Services ({inactiveServices.length})</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {inactiveServices.map((service) => (
-                  <Card key={service.id} className="opacity-60 hover:opacity-100 transition-opacity">
+                  <Card key={service.id} className="opacity-60 hover:opacity-100 transition-opacity dark:bg-gray-800 dark:border-gray-700">
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-2 mb-1.5">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: service.color }} />
-                        <CardTitle className="text-base">{service.name}</CardTitle>
+                        <CardTitle className="text-base dark:text-gray-100">{service.name}</CardTitle>
                       </div>
                       <Badge variant="secondary">Inactive</Badge>
                     </CardHeader>
                     <CardContent className="py-3">
-                      <Button variant="outline" size="sm" onClick={() => toggleServiceStatus(service.id, service.isActive)} className="w-full text-green-600">
+                      <Button variant="outline" size="sm" onClick={() => toggleServiceStatus(service.id, service.isActive)} className="w-full text-green-600 dark:text-green-400 dark:border-gray-600 dark:hover:bg-gray-700">
                         <Power size={14} className="mr-1" />Enable
                       </Button>
                     </CardContent>
@@ -341,7 +341,7 @@ export default function ServicesPage() {
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Credits</span>
-                        <span className="font-semibold">{bundle.credit_count}</span>
+                        <span className="font-semibold dark:text-gray-100">{bundle.credit_count}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Price</span>
@@ -349,18 +349,18 @@ export default function ServicesPage() {
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Per Credit</span>
-                        <span className="text-gray-500">${bundle.price_per_credit.toFixed(2)}</span>
+                        <span className="text-gray-500 dark:text-gray-400">${bundle.price_per_credit.toFixed(2)}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Expires</span>
-                        <span className="text-gray-500">{bundle.expiry_days || 90} days</span>
+                        <span className="text-gray-500 dark:text-gray-400">{bundle.expiry_days || 90} days</span>
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openBundleModal(bundle)} className="flex-1">
+                      <Button variant="outline" size="sm" onClick={() => openBundleModal(bundle)} className="flex-1 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700">
                         <Edit size={14} className="mr-1" />Edit
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteBundle(bundle.id)} className="flex-1 text-red-600">
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteBundle(bundle.id)} className="flex-1 text-red-600 dark:text-red-400 dark:border-gray-600 dark:hover:bg-gray-700">
                         <Trash2 size={14} className="mr-1" />Delete
                       </Button>
                     </div>
@@ -399,23 +399,23 @@ export default function ServicesPage() {
                       <Gift className="w-5 h-5 text-wondrous-magenta" />
                       <CardTitle className="text-base dark:text-gray-100">{offer.title}</CardTitle>
                     </div>
-                    {offer.is_gift && <Badge className="bg-purple-100 text-purple-700">Gift</Badge>}
+                    {offer.is_gift && <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">Gift</Badge>}
                   </CardHeader>
                   <CardContent className="py-3">
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Credits</span>
-                        <span className="font-semibold">{offer.credits}</span>
+                        <span className="font-semibold dark:text-gray-100">{offer.credits}</span>
                       </div>
                       {offer.payment_amount > 0 && (
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600 dark:text-gray-400">Price</span>
-                          <span className="font-semibold">${offer.payment_amount.toFixed(2)}</span>
+                          <span className="font-semibold dark:text-gray-100">${offer.payment_amount.toFixed(2)}</span>
                         </div>
                       )}
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Redemptions</span>
-                        <span className="text-gray-500">{offer.current_referrals}/{offer.max_referrals || 'Unlimited'}</span>
+                        <span className="text-gray-500 dark:text-gray-400">{offer.current_referrals}/{offer.max_referrals || 'Unlimited'}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Status</span>
@@ -423,10 +423,10 @@ export default function ServicesPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openOfferModal(offer)} className="flex-1">
+                      <Button variant="outline" size="sm" onClick={() => openOfferModal(offer)} className="flex-1 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700">
                         <Edit size={14} className="mr-1" />Edit
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteOffer(offer.id)} className="flex-1 text-red-600">
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteOffer(offer.id)} className="flex-1 text-red-600 dark:text-red-400 dark:border-gray-600 dark:hover:bg-gray-700">
                         <Trash2 size={14} className="mr-1" />Delete
                       </Button>
                     </div>
@@ -456,10 +456,10 @@ export default function ServicesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowBundleModal(false)} />
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6">
-            <button onClick={() => setShowBundleModal(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+            <button onClick={() => setShowBundleModal(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
               <X size={20} />
             </button>
-            <h2 className="text-xl font-bold mb-4">{editingBundle ? 'Edit Package' : 'Create Package'}</h2>
+            <h2 className="text-xl font-bold mb-4 dark:text-gray-100">{editingBundle ? 'Edit Package' : 'Create Package'}</h2>
             <div className="space-y-4">
               <div>
                 <Label>Package Name</Label>
@@ -493,10 +493,10 @@ export default function ServicesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowOfferModal(false)} />
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6">
-            <button onClick={() => setShowOfferModal(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+            <button onClick={() => setShowOfferModal(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
               <X size={20} />
             </button>
-            <h2 className="text-xl font-bold mb-4">{editingOffer ? 'Edit Offer' : 'Create Offer'}</h2>
+            <h2 className="text-xl font-bold mb-4 dark:text-gray-100">{editingOffer ? 'Edit Offer' : 'Create Offer'}</h2>
             <div className="space-y-4">
               <div>
                 <Label>Offer Title</Label>

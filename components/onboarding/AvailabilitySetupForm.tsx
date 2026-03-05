@@ -232,7 +232,7 @@ export function AvailabilitySetupForm({
                               </option>
                             ))}
                           </select>
-                          <span className="text-gray-500">to</span>
+                          <span className="text-gray-500 dark:text-gray-400">to</span>
                           <select
                             value={slot.endHour * 60 + slot.endMinute}
                             onChange={(e) =>

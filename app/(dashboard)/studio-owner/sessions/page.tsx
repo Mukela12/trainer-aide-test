@@ -72,8 +72,8 @@ export default function AllSessionsPage() {
                 <Dumbbell className="text-wondrous-dark-blue" size={20} />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Total Sessions</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Sessions</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -81,12 +81,12 @@ export default function AllSessionsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="text-green-600" size={20} />
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                <TrendingUp className="text-green-600 dark:text-green-400" size={20} />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.completed}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Completed</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.completed}</p>
               </div>
             </div>
           </CardContent>
@@ -94,12 +94,12 @@ export default function AllSessionsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                <Clock className="text-orange-600" size={20} />
+              <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+                <Clock className="text-orange-600 dark:text-orange-400" size={20} />
               </div>
               <div>
-                <p className="text-sm text-gray-600">In Progress</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.inProgress}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">In Progress</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.inProgress}</p>
               </div>
             </div>
           </CardContent>
@@ -107,12 +107,12 @@ export default function AllSessionsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="text-purple-600" size={20} />
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                <TrendingUp className="text-purple-600 dark:text-purple-400" size={20} />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Avg RPE</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Avg RPE</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {stats.avgRpe > 0 ? `${stats.avgRpe}/10` : 'N/A'}
                 </p>
               </div>
@@ -135,7 +135,7 @@ export default function AllSessionsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Filter size={16} className="text-gray-600" />
+          <Filter size={16} className="text-gray-600 dark:text-gray-400" />
           <Button
             variant={filterType === 'all' ? 'default' : 'outline'}
             size="sm"
@@ -164,13 +164,13 @@ export default function AllSessionsPage() {
       {filteredSessions.length > 0 ? (
         <div className="space-y-4">
           {filteredSessions.map((session) => (
-            <Card key={session.id} className="hover:shadow-md transition-shadow">
+            <Card key={session.id} className="hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
               <CardContent className="p-4">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                   {/* Icon */}
                   <div className={cn(
                     'w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0',
-                    session.completed ? 'bg-green-100' : 'bg-wondrous-blue-light'
+                    session.completed ? 'bg-green-100 dark:bg-green-900/30' : 'bg-wondrous-blue-light dark:bg-blue-900/30'
                   )}>
                     <Dumbbell
                       className={session.completed ? 'text-green-600' : 'text-wondrous-dark-blue'}
@@ -182,10 +182,10 @@ export default function AllSessionsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 mb-1 truncate">
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1 truncate">
                           {session.sessionName}
                         </h3>
-                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                           {session.client && (
                             <span className="flex items-center gap-1">
                               <User size={14} />

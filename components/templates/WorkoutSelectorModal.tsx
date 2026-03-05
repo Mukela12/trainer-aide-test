@@ -124,7 +124,7 @@ export function WorkoutSelectorModal({ program, onClose, onSelectWorkout }: Work
                                     </span>
                                   ))}
                                   {workout.movement_patterns_covered.length > 3 && (
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
                                       +{workout.movement_patterns_covered.length - 3}
                                     </span>
                                   )}

@@ -98,7 +98,7 @@ export function OfferCard({
         </div>
 
         {expiresAt && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Offer expires: {format(new Date(expiresAt), 'MMM d, yyyy')}
           </p>
         )}
