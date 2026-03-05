@@ -236,7 +236,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className={cn("p-4 space-y-4 pb-36", collapsed ? "px-2" : "")}>
+      <nav className={cn("p-4 space-y-4 pb-40 overflow-y-auto", collapsed ? "px-2" : "")} style={{ maxHeight: 'calc(100vh - 200px)' }}>
         {navGroups.map((group) => (
           <div key={group.title}>
             {/* Section Header */}
