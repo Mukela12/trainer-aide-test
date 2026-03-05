@@ -30,6 +30,8 @@ export interface UpdateBookingRequestInput {
   acceptedTime?: string;
   accepted_time?: string;
   notes?: string;
+  bookingStatus?: 'confirmed' | 'soft-hold';
+  holdHours?: number;
 }
 
 interface BookingRequestRow {
