@@ -309,7 +309,7 @@ export function Sidebar() {
       </nav>
 
       {/* User Info (Bottom) */}
-      <div className={cn("absolute bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-700", collapsed ? "px-2 py-4" : "p-4")}>
+      <div className={cn("absolute bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800", collapsed ? "px-2 py-4" : "p-4")}>
         {!collapsed ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
