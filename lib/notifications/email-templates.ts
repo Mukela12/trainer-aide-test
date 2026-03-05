@@ -788,7 +788,9 @@ export function generateSoftHoldEmail(data: SoftHoldData): { subject: string; ht
   const expiryDate = new Date(data.holdExpiry);
   const sessionDateStr = format(sessionDate, 'EEEE, MMMM d, yyyy');
   const sessionTimeStr = format(sessionDate, 'HH:mm');
-  const expiryTimeStr = format(expiryDate, "h:mm a 'tomorrow'");
+  const expiryTimeStr = format(expiryDate, "h:mm a 'on' EEEE");
+  const holdHours = Math.max(1, Math.round((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60)));
+  const holdDurationText = holdHours === 1 ? '1 hour' : `${holdHours} hours`;
   const footerText = data.branding?.businessName
     ? `Powered by ${data.branding.businessName}`
     : 'Powered by allWondrous';
@@ -826,13 +828,13 @@ export function generateSoftHoldEmail(data: SoftHoldData): { subject: string; ht
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
         <h1 style="font-size: 22px; font-weight: 700; color: #272030; margin: 0 0 6px;">Your spot is held!</h1>
-        <p style="font-size: 14px; color: #6b7280; margin: 0;">Complete your booking within <strong style="color: #272030;">24 hours</strong></p>
+        <p style="font-size: 14px; color: #6b7280; margin: 0;">Complete your booking within <strong style="color: #272030;">${holdDurationText}</strong></p>
       </div>
 
       <!-- Body -->
       <div style="padding: 0 24px 24px;">
         <p style="margin: 0 0 20px; font-size: 15px;">Hi ${data.clientName},</p>
-        <p style="margin: 0 0 24px; font-size: 14px; color: #4b5563;">Your trainer has reserved a spot for you. You don't have enough credits to confirm it automatically, so we're holding it for <strong>24 hours</strong>.</p>
+        <p style="margin: 0 0 24px; font-size: 14px; color: #4b5563;">Your trainer has reserved a spot for you. You don't have enough credits to confirm it automatically, so we're holding it for <strong>${holdDurationText}</strong>.</p>
 
         <!-- Session Details Card -->
         <div style="background: #f9fafb; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
@@ -890,6 +892,6 @@ export function generateSoftHoldEmail(data: SoftHoldData): { subject: string; ht
 </body>
 </html>
     `.trim(),
-    text: `Hi ${data.clientName},\n\nYour spot is held! Complete your booking within 24 hours.\n\nYour trainer has reserved a spot for you. You don't have enough credits to confirm it automatically, so we're holding it for 24 hours.\n\n${data.serviceName}\nDate: ${sessionDateStr}\nTime: ${sessionTimeStr}\nTrainer: ${data.trainerName}\n\nSpot released at ${expiryTimeStr} if unpaid.\n\nTop up your credits to confirm your session.\n\nQuestions? Reply to this email or contact ${data.trainerName} directly.\n\n—\n${data.branding?.businessName || 'allWondrous'}`,
+    text: `Hi ${data.clientName},\n\nYour spot is held! Complete your booking within ${holdDurationText}.\n\nYour trainer has reserved a spot for you. You don't have enough credits to confirm it automatically, so we're holding it for ${holdDurationText}.\n\n${data.serviceName}\nDate: ${sessionDateStr}\nTime: ${sessionTimeStr}\nTrainer: ${data.trainerName}\n\nSpot released at ${expiryTimeStr} if unpaid.\n\nTop up your credits to confirm your session.\n\nQuestions? Reply to this email or contact ${data.trainerName} directly.\n\n—\n${data.branding?.businessName || 'allWondrous'}`,
   };
 }

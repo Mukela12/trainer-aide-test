@@ -236,7 +236,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className={cn("p-4 space-y-4", collapsed ? "px-2" : "")}>
+      <nav className={cn("p-4 space-y-4 pb-36", collapsed ? "px-2" : "")}>
         {navGroups.map((group) => (
           <div key={group.title}>
             {/* Section Header */}

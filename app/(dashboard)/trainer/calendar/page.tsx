@@ -316,9 +316,13 @@ export default function TrainerCalendar() {
     setDragOverInfo(null);
   };
 
+  const [isRescheduling, setIsRescheduling] = useState(false);
+
   const confirmReschedule = () => {
-    if (!pendingReschedule) return;
+    if (!pendingReschedule || isRescheduling) return;
+    setIsRescheduling(true);
     const { sessionId, targetDate, session, oldDatetime } = pendingReschedule;
+    setPendingReschedule(null);
 
     updateSessionMutation.mutate(sessionId, { datetime: targetDate });
 
@@ -338,10 +342,10 @@ export default function TrainerCalendar() {
           oldTime: oldDatetime.toISOString(),
           newTime: targetDate.toISOString(),
         }),
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => setIsRescheduling(false));
+    } else {
+      setIsRescheduling(false);
     }
-
-    setPendingReschedule(null);
   };
 
   const cancelReschedule = () => {
@@ -922,16 +926,6 @@ export default function TrainerCalendar() {
 
     if (!client || !serviceType) return;
 
-    // Check credits
-    if (client.credits < serviceType.creditsRequired) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Credits",
-        description: `${client.name} needs ${serviceType.creditsRequired} credits but only has ${client.credits}`,
-      });
-      return;
-    }
-
     // Check conflicts
     if (!isTimeAvailable(selectedTime, serviceType.duration, sessions)) {
       toast({
@@ -942,6 +936,8 @@ export default function TrainerCalendar() {
       return;
     }
 
+    const isSoftHold = client.credits < serviceType.creditsRequired;
+
     // Create session from request
     const newSession: CalendarSession = {
       id: `session_${Date.now()}`,
@@ -949,8 +945,8 @@ export default function TrainerCalendar() {
       clientId: request.clientId,
       clientName: request.clientName,
       clientColor: client.color,
-      clientCredits: client.credits - serviceType.creditsRequired,
-      status: "confirmed",
+      clientCredits: isSoftHold ? client.credits : client.credits - serviceType.creditsRequired,
+      status: isSoftHold ? "soft-hold" : "confirmed",
       serviceTypeId: request.serviceId,
       workoutId: null,
     };
@@ -960,13 +956,24 @@ export default function TrainerCalendar() {
     // Refresh clients to reflect updated credits
     queryClient.invalidateQueries({ queryKey: ['clients'] });
 
-    // Mark request as accepted via API
-    acceptRequestMutation.mutate({ requestId, acceptedTime: selectedTime.toISOString() });
-
-    toast({
-      title: "Request Accepted",
-      description: `${request.clientName ?? "Client"} booked for ${formatTime(selectedTime)}`,
+    // Mark request as accepted via API (with soft-hold status if insufficient credits)
+    acceptRequestMutation.mutate({
+      requestId,
+      acceptedTime: selectedTime.toISOString(),
+      ...(isSoftHold && { bookingStatus: 'soft-hold' as const }),
     });
+
+    if (isSoftHold) {
+      toast({
+        title: "Soft Hold — Top-Up Email Sent",
+        description: `${request.clientName ?? "Client"} needs ${serviceType.creditsRequired - client.credits} more credit${serviceType.creditsRequired - client.credits !== 1 ? 's' : ''}. Holding spot for 24h.`,
+      });
+    } else {
+      toast({
+        title: "Request Accepted",
+        description: `${request.clientName ?? "Client"} booked for ${formatTime(selectedTime)}`,
+      });
+    }
   };
 
   // Decline booking request
@@ -1212,7 +1219,7 @@ export default function TrainerCalendar() {
                 <Inbox size={16} className="lg:w-[18px] lg:h-[18px]" />
                 <span className="relative z-10">Requests</span>
                 {pendingRequestsCount > 0 && (
-                  <span className="bg-wondrous-orange text-white text-[10px] lg:text-xs font-bold px-1.5 lg:px-2 py-0.5 rounded-full min-w-[18px] lg:min-w-[20px] text-center">
+                  <span className="bg-wondrous-orange text-white text-[10px] lg:text-xs font-bold px-1.5 lg:px-2 py-0.5 rounded-full min-w-[18px] lg:min-w-[20px] text-center animate-pulse">
                     {pendingRequestsCount}
                   </span>
                 )}
@@ -2894,8 +2901,9 @@ export default function TrainerCalendar() {
               <Button
                 className="flex-1 bg-wondrous-blue hover:bg-wondrous-dark-blue text-white"
                 onClick={confirmReschedule}
+                disabled={isRescheduling}
               >
-                Confirm
+                {isRescheduling ? 'Rescheduling...' : 'Confirm'}
               </Button>
             </div>
           </div>

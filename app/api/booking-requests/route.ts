@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { isSMSEnabled, sendViaTelnyx } from '@/lib/notifications/sms-service';
 import { lookupUserProfile } from '@/lib/services/profile-service';
 import {
   getBookingRequests,
@@ -11,6 +12,7 @@ import {
   sendBookingRequestCreatedEmail,
   sendBookingRequestAcceptedEmail,
   sendBookingRequestDeclinedEmail,
+  sendSoftHoldEmail,
 } from '@/lib/notifications/email-service';
 
 async function authenticate() {
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
     const trainerId = data!.trainer_id;
     const { data: trainer } = await auth.serviceClient
       .from('fc_trainers')
-      .select('email, first_name, last_name')
+      .select('email, first_name, last_name, phone')
       .eq('id', trainerId)
       .single();
 
@@ -78,6 +80,23 @@ export async function POST(request: NextRequest) {
         notes: data.notes || undefined,
         requestId: data.id,
       }).catch((err) => console.error('Failed to send booking request email:', err));
+
+      // Send SMS notification to trainer if Telnyx is configured
+      if (isSMSEnabled() && trainer.phone) {
+        const pendingCount = await (async () => {
+          const { count } = await auth.serviceClient
+            .from('ta_booking_requests')
+            .select('*', { count: 'exact', head: true })
+            .eq('studio_id', auth.studioId)
+            .eq('status', 'pending');
+          return count || 1;
+        })();
+        const smsText = pendingCount > 1
+          ? `New booking request from ${clientName}. You have ${pendingCount} pending requests that need your attention.`
+          : `New booking request from ${clientName}. Tap to review and accept.`;
+        sendViaTelnyx({ to: trainer.phone, text: smsText })
+          .catch((err) => console.error('Failed to send booking request SMS:', err));
+      }
     }
 
     return NextResponse.json({ request: data }, { status: 201 });
@@ -117,7 +136,18 @@ export async function PUT(request: NextRequest) {
         ? `${trainer.first_name || ''} ${trainer.last_name || ''}`.trim() || 'Your trainer'
         : 'Your trainer';
 
-      if (body.status === 'accepted') {
+      if (body.status === 'accepted' && body.bookingStatus === 'soft-hold') {
+        const booking = data!.booking as Record<string, unknown> | null;
+        sendSoftHoldEmail({
+          clientEmail: updatedRequest.client.email,
+          clientName,
+          trainerName,
+          serviceName: updatedRequest.service?.name ?? 'Session',
+          sessionDatetime: body.acceptedTime || body.accepted_time,
+          creditsRequired: updatedRequest.service?.credits_required ?? 1,
+          holdExpiry: booking?.hold_expiry ? String(booking.hold_expiry) : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        }).catch((err) => console.error('Failed to send soft hold email:', err));
+      } else if (body.status === 'accepted') {
         sendBookingRequestAcceptedEmail({
           clientEmail: updatedRequest.client.email,
           clientName,

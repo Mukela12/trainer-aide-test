@@ -190,7 +190,8 @@ export async function createBookingRequestClient(
  */
 export async function acceptRequestClient(
   requestId: string,
-  acceptedTime: string
+  acceptedTime: string,
+  options?: { bookingStatus?: 'confirmed' | 'soft-hold'; holdHours?: number }
 ): Promise<{ request: BookingRequest | null; booking: unknown | null }> {
   try {
     const response = await fetch('/api/booking-requests', {
@@ -202,6 +203,8 @@ export async function acceptRequestClient(
         id: requestId,
         status: 'accepted',
         acceptedTime,
+        ...(options?.bookingStatus && { bookingStatus: options.bookingStatus }),
+        ...(options?.holdHours && { holdHours: options.holdHours }),
       }),
     });
 

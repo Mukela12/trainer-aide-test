@@ -19,6 +19,7 @@ export interface ClientBooking {
   serviceName: string;
   trainerName: string;
   duration: number;
+  holdExpiry?: string;
 }
 
 export interface ClientPackage {

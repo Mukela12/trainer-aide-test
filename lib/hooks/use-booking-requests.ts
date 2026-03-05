@@ -54,10 +54,14 @@ export function useAcceptBookingRequest() {
     mutationFn: ({
       requestId,
       acceptedTime,
+      bookingStatus,
+      holdHours,
     }: {
       requestId: string;
       acceptedTime: string;
-    }) => acceptRequestClient(requestId, acceptedTime),
+      bookingStatus?: 'confirmed' | 'soft-hold';
+      holdHours?: number;
+    }) => acceptRequestClient(requestId, acceptedTime, { bookingStatus, holdHours }),
     onMutate: async ({ requestId, acceptedTime }) => {
       await queryClient.cancelQueries({ queryKey: bookingRequestKeys.all });
       const previousQueries = queryClient.getQueriesData<BookingRequest[]>({

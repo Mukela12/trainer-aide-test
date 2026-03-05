@@ -9,10 +9,47 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Dumbbell, TrendingUp, Calendar, Clock, CreditCard, CalendarPlus,
-  ChevronRight, ShoppingBag, Flame,
+  ChevronRight, ShoppingBag, Flame, AlertCircle,
 } from 'lucide-react';
-import { format, isThisMonth } from 'date-fns';
+import { format, isThisMonth, differenceInSeconds } from 'date-fns';
 import { formatDuration } from '@/lib/utils/generators';
+import { useState, useEffect } from 'react';
+
+// Countdown component for soft-hold expiry
+function SoftHoldCountdown({ expiry }: { expiry: string }) {
+  const [remaining, setRemaining] = useState(() => {
+    const diff = differenceInSeconds(new Date(expiry), new Date());
+    return Math.max(0, diff);
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const diff = differenceInSeconds(new Date(expiry), new Date());
+      setRemaining(Math.max(0, diff));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [expiry]);
+
+  const hours = Math.floor(remaining / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+
+  if (remaining <= 0) {
+    return (
+      <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+        Hold expired
+      </span>
+    );
+  }
+
+  return (
+    <div className="inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-full px-3 py-1">
+      <Clock size={12} className="text-amber-600 dark:text-amber-400" />
+      <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+        Reserved for {hours}h {minutes}m
+      </span>
+    </div>
+  );
+}
 
 // Helper function to get time-based greeting
 function getTimeBasedGreeting(): string {
@@ -166,6 +203,49 @@ export default function ClientDashboard() {
               Your Next Session
             </p>
             {nextBooking ? (
+              nextBooking.status === 'soft-hold' ? (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                      <AlertCircle size={16} className="text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Your spot is held!</h3>
+                  </div>
+                  {nextBooking.holdExpiry && (
+                    <div className="mb-3">
+                      <SoftHoldCountdown expiry={nextBooking.holdExpiry} />
+                    </div>
+                  )}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 mb-3 space-y-1">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      {nextBooking.serviceName || 'Session'}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {format(new Date(nextBooking.scheduledAt), 'EEEE, MMM d')} · {format(new Date(nextBooking.scheduledAt), 'h:mm a')}
+                    </p>
+                    {nextBooking.trainerName && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        with {nextBooking.trainerName}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    Your spot will be released if payment isn&apos;t received in time.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <Link href="/client/shop">
+                      <Button size="sm" className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold">
+                        Top Up Credits Now
+                      </Button>
+                    </Link>
+                    <Link href="/client/bookings" className="text-center">
+                      <span className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer">
+                        I&apos;ll do it later
+                      </span>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div>
@@ -176,11 +256,6 @@ export default function ClientDashboard() {
                       {nextBooking.serviceName || 'Session'} · {format(new Date(nextBooking.scheduledAt), 'h:mm a')}
                     </p>
                   </div>
-                  {nextBooking.status === 'soft-hold' && (
-                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      Pending
-                    </Badge>
-                  )}
                 </div>
                 <div className="flex gap-2">
                   <Link href="/client/bookings" className="flex-1">
@@ -190,6 +265,7 @@ export default function ClientDashboard() {
                   </Link>
                 </div>
               </div>
+              )
             ) : (
               <div className="text-center py-4">
                 <Calendar className="mx-auto mb-2 text-gray-400" size={32} />

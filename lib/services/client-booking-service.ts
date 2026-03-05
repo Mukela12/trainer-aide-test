@@ -14,6 +14,7 @@ interface ClientBooking {
   status: string;
   serviceName: string;
   trainerName: string;
+  holdExpiry?: string;
 }
 
 interface CreateClientBookingInput {
@@ -195,6 +196,7 @@ export async function getClientBookings(userEmail: string) {
       scheduled_at,
       duration,
       status,
+      hold_expiry,
       ta_services(name),
       trainer_id
     `)
@@ -225,6 +227,7 @@ export async function getClientBookings(userEmail: string) {
     status: b.status as string,
     serviceName: (b.ta_services as { name?: string } | null)?.name || 'Session',
     trainerName: trainerMap.get(b.trainer_id as string) || 'Trainer',
+    ...(b.hold_expiry ? { holdExpiry: b.hold_expiry as string } : {}),
   }));
 
   return { data: result, error: null };

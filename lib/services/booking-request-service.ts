@@ -201,16 +201,22 @@ export async function updateBookingRequest(
         };
       }
 
-      const bookingData = {
+      const bookingStatus = input.bookingStatus || 'confirmed';
+      const bookingData: Record<string, unknown> = {
         studio_id: studioId,
         trainer_id: existing.trainer_id || userId,
         client_id: existing.client_id,
         service_id: existing.service_id,
         scheduled_at: acceptedTime,
         duration: existing.service?.duration || 60,
-        status: 'confirmed',
+        status: bookingStatus,
         notes: existing.notes,
       };
+
+      if (bookingStatus === 'soft-hold') {
+        const holdHours = input.holdHours || 24;
+        bookingData.hold_expiry = new Date(Date.now() + holdHours * 60 * 60 * 1000).toISOString();
+      }
 
       const { data: booking, error: bookingError } = await supabase
         .from('ta_bookings')
