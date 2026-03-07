@@ -578,9 +578,14 @@ function TemplateBuilderContent() {
 
                 {/* Add Exercise Button */}
                 <Button
+                  type="button"
                   variant="outline"
-                  className="w-full gap-2 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                  onClick={() => handleOpenExerciseLibrary(block.id)}
+                  className="w-full gap-2 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 relative z-10"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleOpenExerciseLibrary(block.id);
+                  }}
                 >
                   <Plus size={18} />
                   <span>Add Exercise</span>

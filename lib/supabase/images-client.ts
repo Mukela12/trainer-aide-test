@@ -12,9 +12,16 @@ const imagesSupabaseUrl = process.env.NEXT_PUBLIC_IMAGES_SUPABASE_URL || ''
 const imagesSupabaseKey = process.env.NEXT_PUBLIC_IMAGES_SUPABASE_KEY || ''
 
 // Create client with fallback values for build time
+// Disable auth session persistence to avoid "Multiple GoTrueClient instances" warning
 export const imagesSupabase = createClient(
   imagesSupabaseUrl || 'https://placeholder.supabase.co',
-  imagesSupabaseKey || 'placeholder-key'
+  imagesSupabaseKey || 'placeholder-key',
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
 )
 
 /**

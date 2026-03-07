@@ -73,9 +73,14 @@ export default function SoloPractitionerDashboard() {
       createdAt: new Date(c.created_at),
     }));
 
-  // Soft holds from calendar data
-  const softHoldsFromStore = calendarSessions.filter(s => s.status === 'soft-hold');
-  const displaySoftHolds = stats.softHoldsCount || softHoldsFromStore.length;
+  // Soft holds from calendar data — filter out expired ones
+  const softHoldsFromStore = calendarSessions.filter(s => {
+    if (s.status !== 'soft-hold') return false;
+    // If there's a holdExpiry, only show if not yet expired
+    if (s.holdExpiry && s.holdExpiry <= new Date()) return false;
+    return true;
+  });
+  const displaySoftHolds = softHoldsFromStore.length || stats.softHoldsCount;
   const firstSoftHold = softHoldsFromStore[0];
 
   // Low credit clients (credits <= 1)
@@ -190,7 +195,7 @@ export default function SoloPractitionerDashboard() {
                 </p>
                 {firstSoftHold && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    {firstSoftHold.clientName} · {format(firstSoftHold.datetime, 'h:mm a')}
+                    {firstSoftHold.clientName} · {format(firstSoftHold.datetime, "h:mm a EEEE do MMMM")}
                   </p>
                 )}
               </div>
@@ -258,17 +263,17 @@ export default function SoloPractitionerDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="dark:bg-gray-800 dark:border-gray-700">
+        <Card className={`dark:bg-gray-800 dark:border-gray-700 ${stats.pendingRequests > 0 ? 'border-red-400 dark:border-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : ''}`}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-                <Clock className="text-orange-600 dark:text-orange-400" size={20} />
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${stats.pendingRequests > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
+                <Clock className={stats.pendingRequests > 0 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'} size={20} />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                <p className={`text-2xl font-bold ${stats.pendingRequests > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
                   {isLoading ? '...' : stats.pendingRequests}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Pending</p>
+                <p className={`text-xs ${stats.pendingRequests > 0 ? 'text-red-500 dark:text-red-400 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>Pending</p>
               </div>
             </div>
           </CardContent>
@@ -675,7 +680,7 @@ export default function SoloPractitionerDashboard() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
                 <input
                   type="tel"
-                  placeholder="+1 234 567 8900"
+                  placeholder="+44 7777 000000"
                   value={addClientForm.phone}
                   onChange={(e) => setAddClientForm(f => ({ ...f, phone: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"

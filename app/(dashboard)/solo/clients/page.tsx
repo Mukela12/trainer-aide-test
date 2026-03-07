@@ -600,7 +600,7 @@ export default function SoloClientsPage() {
                           }}
                         >
                           <Gift size={14} className="mr-2 text-purple-600" />
-                          Reward Credits
+                          Reward Credit
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={(e) => {
@@ -706,9 +706,7 @@ export default function SoloClientsPage() {
             <div className="p-4 pb-0">
               <div className="text-center mb-4">
                 <div className="w-16 h-16 rounded-full bg-wondrous-blue-light flex items-center justify-center mx-auto mb-2 overflow-hidden">
-                  <span className="text-xl font-semibold text-wondrous-dark-blue">
-                    {selectedClient.first_name?.[0]}{selectedClient.last_name?.[0]}
-                  </span>
+                  <User size={28} className="text-wondrous-dark-blue" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {selectedClient.first_name} {selectedClient.last_name}
@@ -789,7 +787,19 @@ export default function SoloClientsPage() {
                           {(['general', 'injury', 'preference'] as const).map((cat) => (
                             <button
                               key={cat}
-                              onClick={() => setNewNoteCategory(cat)}
+                              onClick={() => {
+                                // Auto-save current note before switching category
+                                if (newNoteContent.trim() && cat !== newNoteCategory) {
+                                  setClientNotes((prev) => [...prev, {
+                                    id: `note_${Date.now()}`,
+                                    category: newNoteCategory,
+                                    content: newNoteContent.trim(),
+                                    createdAt: new Date(),
+                                  }]);
+                                  setNewNoteContent('');
+                                }
+                                setNewNoteCategory(cat);
+                              }}
                               className={cn(
                                 'px-2 py-1 text-[10px] font-semibold rounded-full border transition-colors capitalize',
                                 newNoteCategory === cat
@@ -921,7 +931,7 @@ export default function SoloClientsPage() {
                       size="sm"
                       onClick={() => { setRewardCreditsClient(selectedClient); closeClientDrawer(); }}
                     >
-                      <Gift size={14} /> Reward Credits
+                      <Gift size={14} /> Reward Credit
                     </Button>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs" onClick={() => { setEditClient(selectedClient); closeClientDrawer(); }}>

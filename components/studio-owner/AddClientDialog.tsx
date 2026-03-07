@@ -129,7 +129,7 @@ export function AddClientDialog({ open, onOpenChange, onSuccess }: AddClientDial
               type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="+1 234 567 8900"
+              placeholder="+44 7777 000000"
             />
           </div>
 

@@ -569,7 +569,7 @@ export default function ClientsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRewardCreditsClient(client); }}>
                           <Gift size={14} className="mr-2 text-purple-600" />
-                          Reward Credits
+                          Reward Credit
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditClient(client); }}>
                           <Edit size={14} className="mr-2" />
@@ -788,7 +788,7 @@ export default function ClientsPage() {
                     className="flex items-center justify-center w-full gap-2 px-4 py-3 font-semibold text-white transition-colors bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg hover:from-purple-700 hover:to-pink-700"
                   >
                     <Gift className="w-5 h-5" />
-                    Reward Credits
+                    Reward Credit
                   </button>
                   {selectedClient.is_archived ? (
                     <button

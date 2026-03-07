@@ -100,7 +100,7 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
           <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
             <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              Maximum 1 complimentary credit per award. This action will be logged and visible to super admins.
+              Max 1 free reward credit per customer per 30 days period.
             </p>
           </div>
 
