@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   description: "Professional fitness training platform",
   icons: {
     icon: "/images/w-icon-new.svg",
-    apple: "/images/all-wondrous-logo.png",
+    apple: "/images/w-icon-192.png",
   },
   manifest: "/manifest.json",
 };
