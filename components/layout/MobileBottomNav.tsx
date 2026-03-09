@@ -154,9 +154,11 @@ export function MobileBottomNav() {
     // Trainer routes
     if (currentRole === 'trainer') {
       if (pathname.startsWith("/trainer/calendar")) return "schedule";
-      if (pathname.startsWith("/solo/clients")) return "clients";
-      if (pathname.startsWith("/solo/revenue")) return "payments";
-      if (pathname.startsWith("/solo/programs")) return "ai";
+      if (pathname.startsWith("/trainer/requests")) return "schedule";
+      if (pathname.startsWith("/solo/clients") || pathname.startsWith("/trainer/clients")) return "clients";
+      if (pathname.startsWith("/solo/revenue") || pathname.startsWith("/trainer/revenue")) return "payments";
+      if (pathname.startsWith("/solo/programs") || pathname.startsWith("/trainer/templates")) return "ai";
+      if (pathname.startsWith("/trainer/sessions/new")) return "schedule";
       if (pathname.startsWith("/trainer")) return "home";
     }
 

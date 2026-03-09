@@ -104,12 +104,15 @@ export default function TrainerDashboard() {
           icon={Users}
           color="magenta"
         />
-        <StatCard
-          title="Soft Holds (Pending)"
-          value={isLoading ? '...' : displaySoftHolds}
-          icon={Clock}
-          color="orange"
-        />
+        <Link href="/trainer/calendar?tab=requests">
+          <StatCard
+            title="Pending"
+            value={isLoading ? '...' : (pendingRequests.length || displaySoftHolds)}
+            icon={Clock}
+            color="orange"
+            className="cursor-pointer"
+          />
+        </Link>
       </div>
 
       {/* Quick Actions */}
@@ -226,7 +229,7 @@ export default function TrainerDashboard() {
                                 </div>
                               </div>
                             </div>
-                            <Link href="/trainer/calendar">
+                            <Link href={`/trainer/calendar?date=${format(session.scheduledAt, 'yyyy-MM-dd')}`}>
                               <Button size="sm" variant="ghost" className="text-xs">View</Button>
                             </Link>
                           </div>
@@ -261,7 +264,7 @@ export default function TrainerDashboard() {
                               <span>{session.serviceName}</span>
                             </div>
                           </div>
-                          <Link href="/trainer/calendar">
+                          <Link href={`/trainer/calendar?date=${format(session.scheduledAt, 'yyyy-MM-dd')}`}>
                             <Button size="sm" variant="outline">Details</Button>
                           </Link>
                         </div>

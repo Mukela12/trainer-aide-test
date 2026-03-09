@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Plus, Clock, User, X, Search, Calendar as CalendarIcon, Inbox, CheckCircle, XCircle, MessageSquare, AlertCircle, Play, AlertTriangle, UserX, CalendarX, Check, TrendingUp, Repeat, StickyNote, Dumbbell, Bell, CalendarDays, Timer, CreditCard, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ type CalendarTab = "schedule" | "requests";
 
 export default function TrainerCalendar() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Store hooks
   const currentUser = useUserStore((state) => state.currentUser);
@@ -221,6 +222,17 @@ export default function TrainerCalendar() {
     isRecurring: boolean;
     datetime: Date;
   } | null>(null);
+
+  // Read URL params for deep linking (date, tab)
+  useEffect(() => {
+    const dateParam = searchParams.get('date');
+    const tabParam = searchParams.get('tab');
+    if (dateParam) {
+      const parsed = new Date(dateParam + 'T12:00:00');
+      if (!isNaN(parsed.getTime())) setCurrentDate(parsed);
+    }
+    if (tabParam === 'requests') setCalendarTab('requests');
+  }, [searchParams]);
 
   // Legend collapsed state (collapsed by default for experienced users)
   const [showLegend, setShowLegend] = useState(false);
@@ -1240,34 +1252,37 @@ export default function TrainerCalendar() {
             {/* DAY VIEW */}
             {viewMode === "day" && (
           <div className="space-y-4">
+            {/* Compact Action Bar - Always visible at top */}
+            <div className="flex gap-2">
+              <Button
+                onClick={openBlockTimePanel}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-slate-300 dark:border-slate-600 text-sm"
+              >
+                <Clock size={14} />
+                Block
+              </Button>
+              <Button
+                onClick={() => {
+                  const now = new Date();
+                  now.setHours(now.getHours() + 1, 0, 0, 0);
+                  handleQuickSlotClick(now);
+                }}
+                size="sm"
+                className="gap-1.5 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-dark-blue hover:to-wondrous-primary-hover text-sm"
+              >
+                <Plus size={14} />
+                Session
+              </Button>
+            </div>
+
             {/* Session List */}
             <div className="space-y-4">
               {todaysSessions.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center border border-slate-200 dark:border-slate-700">
-                  <CalendarDays size={48} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
-                  <div className="text-base font-medium text-gray-900 dark:text-gray-100 mb-1">No sessions today</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">Would you like to block time or book a client?</div>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button
-                      onClick={openBlockTimePanel}
-                      variant="outline"
-                      className="gap-2 border-slate-300 dark:border-slate-600"
-                    >
-                      <Clock size={16} />
-                      Block Time
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        const now = new Date();
-                        now.setMinutes(0, 0, 0);
-                        handleQuickSlotClick(now);
-                      }}
-                      className="gap-2 bg-gradient-to-r from-wondrous-blue to-wondrous-magenta hover:from-wondrous-dark-blue hover:to-wondrous-primary-hover"
-                    >
-                      <Plus size={16} />
-                      Book a session
-                    </Button>
-                  </div>
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center border border-slate-200 dark:border-slate-700">
+                  <CalendarDays size={36} className="mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">No sessions scheduled</div>
                 </div>
               ) : (
                 todaysSessions.map((session) => {
@@ -1560,29 +1575,29 @@ export default function TrainerCalendar() {
                                           Quick Rebook
                                         </Button>
                                       ) : isGroupClass(session.serviceTypeId ?? null) ? (
-                                        <div className="flex gap-1">
+                                        <div className="col-span-2 grid grid-cols-3 gap-1.5">
                                           <Button
                                             size="sm"
-                                            className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+                                            className="bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-1 text-xs px-2"
                                             onClick={(e) => { e.stopPropagation(); handleCheckIn(session.id, 'checked-in'); }}
                                           >
-                                            <Check size={14} /> Check In
+                                            <Check size={12} /> In
                                           </Button>
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            className="text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 flex items-center gap-1"
+                                            className="text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 flex items-center justify-center gap-1 text-xs px-2"
                                             onClick={(e) => { e.stopPropagation(); handleCheckIn(session.id, 'late'); }}
                                           >
-                                            <Clock size={14} /> Late
+                                            <Clock size={12} /> Late
                                           </Button>
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            className="text-red-600 border-red-300 hover:bg-red-50 flex items-center gap-1"
+                                            className="text-red-600 border-red-300 hover:bg-red-50 flex items-center justify-center gap-1 text-xs px-2"
                                             onClick={(e) => { e.stopPropagation(); handleCheckIn(session.id, 'no-show'); }}
                                           >
-                                            <X size={14} /> No Show
+                                            <X size={12} /> No Show
                                           </Button>
                                         </div>
                                       ) : (
@@ -1683,36 +1698,6 @@ export default function TrainerCalendar() {
               )}
             </div>
 
-            {/* Availability Legend - Collapsible */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border-2 border-wondrous-grey-light dark:border-gray-700 overflow-hidden">
-              <button
-                onClick={() => setShowLegend(!showLegend)}
-                className="w-full p-3 text-xs font-semibold text-wondrous-grey-dark dark:text-gray-100 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <AlertCircle size={14} className="text-wondrous-blue dark:text-blue-400" />
-                  Availability Legend
-                </div>
-                <ChevronRight size={14} className={cn("transition-transform", showLegend && "rotate-90")} />
-              </button>
-              {showLegend && (
-                <div className="px-3 pb-3 flex flex-wrap gap-4 text-xs border-t border-gray-100 dark:border-gray-700 pt-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded bg-white dark:bg-gray-700 border-2 border-wondrous-blue dark:border-blue-400 shadow-sm"></div>
-                    <span className="text-wondrous-grey-dark dark:text-gray-200 font-medium">Available</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded bg-red-50 border-2 border-red-300 shadow-sm"></div>
-                    <span className="text-wondrous-grey-dark dark:text-gray-200 font-medium">Conflict</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded bg-gray-100 border-2 border-gray-300 opacity-50 shadow-sm"></div>
-                    <span className="text-wondrous-grey-dark dark:text-gray-200 font-medium">Not Available</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Quick Time Selector - INLINE (NO MODAL) */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-2 border-wondrous-grey-light dark:border-gray-700">
               <div className="text-xs font-semibold mb-2 text-wondrous-grey-dark dark:text-gray-100">
@@ -1751,12 +1736,46 @@ export default function TrainerCalendar() {
                 })}
               </div>
               <button
-                onClick={() => handleQuickSlotClick(new Date())}
+                onClick={() => {
+                  const now = new Date();
+                  now.setHours(now.getHours() + 1, 0, 0, 0);
+                  handleQuickSlotClick(now);
+                }}
                 className="w-full p-2 rounded-lg text-xs font-semibold hover:opacity-90 bg-wondrous-orange text-white flex items-center justify-center gap-2"
               >
                 <Clock size={14} />
                 Custom Time
               </button>
+            </div>
+
+            {/* Availability Legend - Collapsible, starts collapsed */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-slate-200 dark:border-gray-700 overflow-hidden">
+              <button
+                onClick={() => setShowLegend(!showLegend)}
+                className="w-full p-2.5 text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={12} className="text-gray-400 dark:text-gray-500" />
+                  Availability Legend
+                </div>
+                <ChevronRight size={12} className={cn("transition-transform", showLegend && "rotate-90")} />
+              </button>
+              {showLegend && (
+                <div className="px-3 pb-2.5 flex flex-wrap gap-4 text-xs border-t border-gray-100 dark:border-gray-700 pt-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-white dark:bg-gray-700 border-2 border-wondrous-blue dark:border-blue-400 shadow-sm"></div>
+                    <span className="text-gray-500 dark:text-gray-400 font-medium">Available</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-red-50 border-2 border-red-300 shadow-sm"></div>
+                    <span className="text-gray-500 dark:text-gray-400 font-medium">Conflict</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-gray-100 border-2 border-gray-300 opacity-50 shadow-sm"></div>
+                    <span className="text-gray-500 dark:text-gray-400 font-medium">Not Available</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2148,7 +2167,7 @@ export default function TrainerCalendar() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl border-t-4 border-wondrous-magenta lg:left-1/2 lg:-translate-x-1/2 lg:w-[600px] lg:max-w-[90vw] lg:bottom-4 lg:rounded-3xl max-h-[90vh] lg:max-h-[85vh] overflow-hidden flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-[60] bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl border-t-4 border-wondrous-magenta lg:left-1/2 lg:-translate-x-1/2 lg:w-[600px] lg:max-w-[90vw] lg:bottom-4 lg:rounded-3xl max-h-[90vh] lg:max-h-[85vh] overflow-hidden flex flex-col"
           >
             {/* Header - Fixed */}
             <div className="flex-shrink-0 p-5 pb-3 border-b border-gray-200 dark:border-gray-700">
@@ -2411,7 +2430,7 @@ export default function TrainerCalendar() {
             </div>
 
             {/* Fixed Footer with Book Button */}
-            <div className="flex-shrink-0 p-5 pt-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+            <div className="flex-shrink-0 p-5 pt-4 pb-24 lg:pb-5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
               <Button
                 className="w-full bg-gradient-to-r from-[#A71075] to-[#6B21A8] hover:from-[#8a0d60] hover:to-[#5a1b8a] text-white text-base py-5"
                 disabled={!selectedBookingClient || !selectedServiceType || !selectedSlot}
@@ -2946,34 +2965,21 @@ export default function TrainerCalendar() {
         </div>
       )}
 
-      {/* Context-Aware Floating Action Button */}
+      {/* Floating Action Button - Book Session */}
       <div className="fixed bottom-24 right-6 lg:bottom-6 flex flex-col gap-3 z-30">
-        {/* Primary Action - Context aware based on day state */}
         <div className="relative">
-          {todaysSessions.length === 0 ? (
-            // Empty day: Primary action is to block time
-            <button
-              onClick={openBlockTimePanel}
-              className="w-14 h-14 rounded-full bg-gradient-to-r from-wondrous-blue to-wondrous-magenta text-white shadow-lg hover:shadow-xl hover:from-wondrous-dark-blue hover:to-wondrous-primary-hover transition-all flex items-center justify-center"
-              aria-label="Block Time"
-              title="Block Time"
-            >
-              <Clock size={24} />
-            </button>
-          ) : (
-            // Busy day: Primary action is to block time
-            <button
-              onClick={openBlockTimePanel}
-              className="w-14 h-14 rounded-full bg-slate-600 dark:bg-slate-500 text-white shadow-lg hover:shadow-xl hover:bg-slate-700 dark:hover:bg-slate-400 transition-all flex items-center justify-center"
-              aria-label="Block Time"
-              title="Block Time"
-            >
-              <CalendarX size={24} />
-            </button>
-          )}
-          <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
-            Block Time
-          </span>
+          <button
+            onClick={() => {
+              const now = new Date();
+              now.setHours(now.getHours() + 1, 0, 0, 0);
+              handleQuickSlotClick(now);
+            }}
+            className="w-14 h-14 rounded-full bg-gradient-to-r from-wondrous-blue to-wondrous-magenta text-white shadow-lg hover:shadow-xl hover:from-wondrous-dark-blue hover:to-wondrous-primary-hover transition-all flex items-center justify-center"
+            aria-label="Book Session"
+            title="Book Session"
+          >
+            <Plus size={24} />
+          </button>
         </div>
       </div>
     </div>

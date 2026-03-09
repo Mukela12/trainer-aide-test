@@ -195,8 +195,15 @@ export function Sidebar() {
       {/* Logo and Branding */}
       <div className={cn("py-5 border-b border-gray-100 dark:border-gray-700 relative", collapsed ? "px-2" : "px-6")}>
         {!collapsed && (
-          <>
-            <div className="flex items-center justify-center mb-3">
+          <Link
+            href={
+              currentRole === 'studio_owner' ? '/studio-owner' :
+              currentRole === 'trainer' ? '/trainer' :
+              currentRole === 'solo_practitioner' ? '/solo' :
+              '/client'
+            }
+          >
+            <div className="flex items-center justify-center mb-3 cursor-pointer">
               <div className="relative w-full h-16">
                 <Image
                   src="/images/all-wondrous-logo.svg"
@@ -208,21 +215,30 @@ export function Sidebar() {
                 />
               </div>
             </div>
-          </>
+          </Link>
         )}
         {collapsed && (
-          <div className="flex items-center justify-center">
-            <div className="relative w-10 h-10">
-              <Image
-                src="/images/w-icon-new.svg"
-                alt="W"
-                fill
-                sizes="40px"
-                className="object-contain"
-                priority
-              />
+          <Link
+            href={
+              currentRole === 'studio_owner' ? '/studio-owner' :
+              currentRole === 'trainer' ? '/trainer' :
+              currentRole === 'solo_practitioner' ? '/solo' :
+              '/client'
+            }
+          >
+            <div className="flex items-center justify-center cursor-pointer">
+              <div className="relative w-10 h-10">
+                <Image
+                  src="/images/w-icon-new.svg"
+                  alt="W"
+                  fill
+                  sizes="40px"
+                  className="object-contain"
+                  priority
+                />
+              </div>
             </div>
-          </div>
+          </Link>
         )}
 
         {/* Toggle Button */}

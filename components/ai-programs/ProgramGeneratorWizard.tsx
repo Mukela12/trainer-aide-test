@@ -71,7 +71,7 @@ export function ProgramGeneratorWizard() {
     setMethod(selectedMethod);
     if (selectedMethod === 'manual') {
       // Redirect to manual template builder
-      router.push('/trainer/sessions/new');
+      router.push('/solo/templates/builder');
     } else {
       // Continue to client selection
       setCurrentStep('client');

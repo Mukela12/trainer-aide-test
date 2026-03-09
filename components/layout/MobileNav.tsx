@@ -76,7 +76,15 @@ export function MobileNav() {
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 shadow-sm z-30">
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
+          <Link
+            href={
+              currentRole === 'studio_owner' ? '/studio-owner' :
+              currentRole === 'trainer' ? '/trainer' :
+              currentRole === 'solo_practitioner' ? '/solo' :
+              '/client'
+            }
+            className="flex items-center gap-2"
+          >
             <div className="relative w-56 h-12">
               <Image
                 src="/images/all-wondrous-logo.svg"
@@ -87,7 +95,7 @@ export function MobileNav() {
                 priority
               />
             </div>
-          </div>
+          </Link>
           <button
             onClick={toggleMenu}
             className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
