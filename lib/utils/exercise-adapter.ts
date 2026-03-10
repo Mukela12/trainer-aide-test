@@ -63,7 +63,11 @@ export function supabaseToFrontendExercise(supabaseExercise: SupabaseExercise): 
     id: supabaseExercise.id,
     exerciseId: supabaseExercise.slug || supabaseExercise.id,
     name: supabaseExercise.name || 'Unknown Exercise',
-    category: mapAnatomicalCategoryToMuscleGroup(supabaseExercise.anatomical_category || supabaseExercise.legacy_category || 'Core'),
+    category: supabaseExercise.exercise_type === 'cardio'
+      ? 'cardio'
+      : supabaseExercise.exercise_type === 'mobility-stretch'
+        ? 'stretch'
+        : mapAnatomicalCategoryToMuscleGroup(supabaseExercise.anatomical_category || supabaseExercise.legacy_category || 'Core'),
     equipment: supabaseExercise.equipment || undefined,
     level: supabaseExercise.level || 'beginner',
     instructions: supabaseExercise.instructions || [],

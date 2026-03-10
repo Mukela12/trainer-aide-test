@@ -106,7 +106,7 @@ export function ExerciseLibrary({
   const [cardioDuration, setCardioDuration] = useState(180); // 3 minutes in seconds
   const [cardioIntensity, setCardioIntensity] = useState(7);
 
-  const { exercises: allExercises } = useExerciseLookup();
+  const { exercises: allExercises, isLoading } = useExerciseLookup();
 
   const filteredExercises = allExercises.filter((exercise) => {
     const matchesSearch = exercise.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -280,7 +280,14 @@ export function ExerciseLibrary({
                 );
               })}
 
-              {filteredExercises.length === 0 && (
+              {filteredExercises.length === 0 && isLoading && (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mx-auto mb-4"></div>
+                  <p className="text-gray-500 dark:text-gray-400">Loading exercises...</p>
+                </div>
+              )}
+
+              {filteredExercises.length === 0 && !isLoading && (
                 <div className="text-center py-12">
                   <Dumbbell className="mx-auto mb-4 text-gray-400" size={48} />
                   <p className="text-gray-500 dark:text-gray-400">No exercises found</p>
