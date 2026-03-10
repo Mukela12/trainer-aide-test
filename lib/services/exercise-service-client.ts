@@ -238,7 +238,11 @@ export async function loadExercises(): Promise<Exercise[]> {
         const json = await res.json();
         if (json.exercises && json.exercises.length > 0) {
           exercises = supabaseToFrontendExercises(json.exercises);
+        } else {
+          console.warn('API returned empty exercises. Source:', json.source, 'Error:', json.error);
         }
+      } else {
+        console.warn('Exercise API returned status:', res.status);
       }
     } catch (err) {
       console.warn('API exercise fallback also failed:', err);

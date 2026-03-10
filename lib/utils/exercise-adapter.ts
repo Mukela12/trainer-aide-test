@@ -61,12 +61,12 @@ export function supabaseToFrontendExercise(supabaseExercise: SupabaseExercise): 
 
   return {
     id: supabaseExercise.id,
-    exerciseId: supabaseExercise.slug,
-    name: supabaseExercise.name,
+    exerciseId: supabaseExercise.slug || supabaseExercise.id,
+    name: supabaseExercise.name || 'Unknown Exercise',
     category: mapAnatomicalCategoryToMuscleGroup(supabaseExercise.anatomical_category || supabaseExercise.legacy_category || 'Core'),
     equipment: supabaseExercise.equipment || undefined,
-    level: supabaseExercise.level,
-    instructions: supabaseExercise.instructions,
+    level: supabaseExercise.level || 'beginner',
+    instructions: supabaseExercise.instructions || [],
     modifications,
     commonMistakes,
     primaryMuscles,
@@ -93,7 +93,16 @@ export function supabaseToFrontendExercise(supabaseExercise: SupabaseExercise): 
  * Convert array of Supabase exercises to frontend format
  */
 export function supabaseToFrontendExercises(supabaseExercises: SupabaseExercise[]): Exercise[] {
-  return supabaseExercises.map(supabaseToFrontendExercise);
+  const results: Exercise[] = [];
+  for (const ex of supabaseExercises) {
+    try {
+      results.push(supabaseToFrontendExercise(ex));
+    } catch (err) {
+      // Skip exercises that fail to convert rather than failing the entire batch
+      console.warn(`Failed to convert exercise ${ex.id} (${ex.name}):`, err);
+    }
+  }
+  return results;
 }
 
 /**
