@@ -222,30 +222,26 @@ export async function loadExercises(): Promise<Exercise[]> {
 
   let exercises: Exercise[] = [];
 
+  // Use server API route first (bypasses RLS, uses service role key)
   try {
-    // Try direct client-side Supabase query first
-    const supabaseExercises = await getAllExercisesClient();
-    exercises = supabaseToFrontendExercises(supabaseExercises);
+    const res = await fetch('/api/exercises');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.exercises && json.exercises.length > 0) {
+        exercises = supabaseToFrontendExercises(json.exercises);
+      }
+    }
   } catch (err) {
-    console.warn('Direct exercise fetch failed, trying API fallback:', err);
+    console.warn('API exercise fetch failed, trying direct Supabase:', err);
   }
 
-  // If direct query returned nothing, try the server API route
+  // Fallback: try direct client-side Supabase query
   if (exercises.length === 0) {
     try {
-      const res = await fetch('/api/exercises');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.exercises && json.exercises.length > 0) {
-          exercises = supabaseToFrontendExercises(json.exercises);
-        } else {
-          console.warn('API returned empty exercises. Source:', json.source, 'Error:', json.error);
-        }
-      } else {
-        console.warn('Exercise API returned status:', res.status);
-      }
+      const supabaseExercises = await getAllExercisesClient();
+      exercises = supabaseToFrontendExercises(supabaseExercises);
     } catch (err) {
-      console.warn('API exercise fallback also failed:', err);
+      console.warn('Direct Supabase exercise fetch also failed:', err);
     }
   }
 
