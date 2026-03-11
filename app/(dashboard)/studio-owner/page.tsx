@@ -160,21 +160,23 @@ export default function StudioOwnerDashboard() {
           </CardContent>
         </Card>
 
-        <Card className={`dark:bg-gray-800 dark:border-gray-700 ${(stats?.pendingActions || pendingRequests.length) > 0 ? 'border-red-400 dark:border-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : ''}`}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${(stats?.pendingActions || pendingRequests.length) > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
-                <Clock className={(stats?.pendingActions || pendingRequests.length) > 0 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'} size={20} />
+        <Link href="/studio-owner/requests">
+          <Card className={`dark:bg-gray-800 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow ${(stats?.pendingActions || pendingRequests.length) > 0 ? 'border-red-400 dark:border-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : ''}`}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${(stats?.pendingActions || pendingRequests.length) > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
+                  <Clock className={(stats?.pendingActions || pendingRequests.length) > 0 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'} size={20} />
+                </div>
+                <div>
+                  <p className={`text-2xl font-bold ${(stats?.pendingActions || pendingRequests.length) > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                    {isLoading ? '...' : (stats?.pendingActions || pendingRequests.length)}
+                  </p>
+                  <p className={`text-xs ${(stats?.pendingActions || pendingRequests.length) > 0 ? 'text-red-500 dark:text-red-400 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>Pending Actions</p>
+                </div>
               </div>
-              <div>
-                <p className={`text-2xl font-bold ${(stats?.pendingActions || pendingRequests.length) > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                  {isLoading ? '...' : (stats?.pendingActions || pendingRequests.length)}
-                </p>
-                <p className={`text-xs ${(stats?.pendingActions || pendingRequests.length) > 0 ? 'text-red-500 dark:text-red-400 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>Pending Actions</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Quick Actions */}

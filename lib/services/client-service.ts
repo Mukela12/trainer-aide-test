@@ -9,6 +9,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendClientInvitationEmail } from '@/lib/notifications/email-service';
 import { getOrCreateStudio } from '@/lib/services/studio-service';
 import crypto from 'crypto';
+import { generateAvatarUrl } from '@/lib/utils/avatar';
 
 interface DbClient {
   id: string;
@@ -25,6 +26,7 @@ interface DbClient {
   credits: number | null;
   notification_preferences: unknown;
   created_at: string;
+  avatar_url: string | null;
 }
 
 export interface TransformedClient {
@@ -39,6 +41,7 @@ export interface TransformedClient {
   is_archived: boolean;
   credits: number | null;
   created_at: string;
+  avatar_url: string | null;
   experience_level: 'intermediate';
   primary_goal: 'general_fitness';
   available_equipment: string[];
@@ -101,6 +104,7 @@ export async function getClientsForUser(
       is_archived: client.is_archived || false,
       credits: client.credits,
       created_at: client.created_at,
+      avatar_url: client.avatar_url || null,
       experience_level: 'intermediate' as const,
       primary_goal: 'general_fitness' as const,
       available_equipment: [] as string[],
@@ -150,6 +154,7 @@ export async function getClientsForUser(
           primary_goal: 'general_fitness' as const,
           available_equipment: [] as string[],
           injuries: [] as Array<{ body_part: string; description: string; restrictions: string[] }>,
+          avatar_url: null,
           is_active: true,
           invitation_status: inv.status,
           invitation_expires_at: inv.expires_at,
@@ -229,6 +234,7 @@ export async function createClient(params: {
       self_booking_allowed: params.body.selfBookingAllowed || false,
       credits: params.body.credits || 0,
       source: 'manual',
+      avatar_url: generateAvatarUrl(`${firstName || ''} ${lastName || ''}`.trim() || params.body.email),
     };
 
     // Only include id if it's a valid UUID

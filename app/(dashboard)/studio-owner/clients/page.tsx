@@ -58,6 +58,7 @@ interface Client {
   is_archived: boolean;
   created_at: string;
   last_session_date?: string | null;
+  avatar_url?: string | null;
 }
 
 // Helper function to generate DiceBear avatar URL
@@ -498,7 +499,7 @@ export default function ClientsPage() {
                     {/* Avatar */}
                     <div className="relative w-12 h-12 flex-shrink-0">
                       <img
-                        src={getAvatarUrl(`${client.first_name} ${client.last_name}`)}
+                        src={client.avatar_url || getAvatarUrl(`${client.first_name} ${client.last_name}`)}
                         alt={`${client.first_name} ${client.last_name}`}
                         className="w-12 h-12 rounded-full object-cover border-2 border-white shadow"
                         onError={(e) => {
@@ -641,7 +642,7 @@ export default function ClientsPage() {
                   <div className="mb-6 text-center">
                     <div className="relative inline-block mb-3">
                       <img
-                        src={getAvatarUrl(`${selectedClient.first_name} ${selectedClient.last_name}`)}
+                        src={selectedClient.avatar_url || getAvatarUrl(`${selectedClient.first_name} ${selectedClient.last_name}`)}
                         alt={`${selectedClient.first_name} ${selectedClient.last_name}`}
                         className="w-20 h-20 border-4 border-white rounded-full shadow-lg object-cover"
                         onError={(e) => {

@@ -19,6 +19,7 @@ interface ClientRecord {
   is_archived: boolean;
   credits: number | null;
   created_at: string;
+  avatar_url: string | null;
   experience_level: string;
   primary_goal: string;
   available_equipment: string[];

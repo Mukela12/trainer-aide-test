@@ -102,6 +102,9 @@ export default function ClientInvitePage() {
       const { getSupabaseBrowserClient } = await import('@/lib/supabase/client');
       const supabase = getSupabaseBrowserClient();
 
+      // Small delay to allow auth propagation
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: invitation?.email || '',
         password: formData.password,
@@ -109,7 +112,11 @@ export default function ClientInvitePage() {
 
       if (signInError) {
         console.error('Error signing in after invitation:', signInError);
-        // Still redirect - they can sign in manually
+        // Redirect to login so they can sign in manually
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
+        return;
       }
 
       // Redirect to client dashboard after a short delay

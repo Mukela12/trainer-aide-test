@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -106,14 +106,34 @@ export function ExerciseLibrary({
   const [cardioDuration, setCardioDuration] = useState(180); // 3 minutes in seconds
   const [cardioIntensity, setCardioIntensity] = useState(7);
 
+  // Debounced search for performance with 873+ exercises
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchTimeoutRef = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (searchTimeoutRef[0]) clearTimeout(searchTimeoutRef[0]);
+    searchTimeoutRef[0] = setTimeout(() => {
+      setDebouncedSearch(value);
+    }, 200);
+  }, [searchTimeoutRef]);
+
   const { exercises: allExercises, isLoading } = useExerciseLookup();
 
-  const filteredExercises = allExercises.filter((exercise) => {
-    const matchesSearch = exercise.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || exercise.category === selectedCategory;
-    const matchesCardioFilter = !filterCardioOnly || exercise.category === 'cardio';
-    return matchesSearch && matchesCategory && matchesCardioFilter;
-  });
+  // Memoize filtered exercises to prevent re-filtering on every parent render
+  const filteredExercises = useMemo(() => {
+    const search = debouncedSearch.toLowerCase();
+    return allExercises.filter((exercise) => {
+      const matchesSearch = !search || exercise.name.toLowerCase().includes(search);
+      const matchesCategory = selectedCategory === 'all' || exercise.category === selectedCategory;
+      const matchesCardioFilter = !filterCardioOnly || exercise.category === 'cardio';
+      return matchesSearch && matchesCategory && matchesCardioFilter;
+    });
+  }, [allExercises, debouncedSearch, selectedCategory, filterCardioOnly]);
+
+  // Limit rendered items for performance
+  const MAX_VISIBLE = 50;
+  const visibleExercises = filteredExercises.slice(0, MAX_VISIBLE);
 
   const handleSelectExercise = (exercise: Exercise) => {
     setSelectedExercise(exercise);
@@ -149,6 +169,7 @@ export function ExerciseLibrary({
     onSelect(selectedExercise, params);
     setSelectedExercise(null);
     setSearchQuery('');
+    setDebouncedSearch('');
     setSelectedCategory('all');
   };
 
@@ -202,7 +223,7 @@ export function ExerciseLibrary({
                 type="text"
                 placeholder="Search exercises..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -233,7 +254,12 @@ export function ExerciseLibrary({
 
             {/* Exercise List */}
             <div className="flex-1 overflow-y-auto space-y-2">
-              {filteredExercises.map((exercise) => {
+              {filteredExercises.length > MAX_VISIBLE && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
+                  Showing {MAX_VISIBLE} of {filteredExercises.length} exercises — type to narrow results
+                </p>
+              )}
+              {visibleExercises.map((exercise) => {
                 const images = getExerciseImages(exercise.exerciseId, exercise.name);
                 return (
                   <div

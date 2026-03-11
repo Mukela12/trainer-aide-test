@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -63,6 +63,7 @@ interface Client {
   is_archived?: boolean;
   created_at: string;
   last_session_date?: string | null;
+  avatar_url?: string | null;
 }
 
 type SortField = 'name' | 'credits' | 'created_at' | 'last_session';
@@ -133,9 +134,29 @@ export default function SoloClientsPage() {
   // Booking history via React Query (auto-fetches when selectedClient is set)
   const { data: bookingHistory = [], isLoading: loadingHistory } = useBookingHistory(selectedClient?.id);
 
+  // Load notes when a client is selected
+  const loadClientNotes = useCallback(async (clientId: string) => {
+    try {
+      const res = await fetch(`/api/clients/notes?clientId=${clientId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setClientNotes((data.notes || []).map((n: { id: string; category: string; content: string; created_at: string }) => ({
+          id: n.id,
+          category: n.category as 'injury' | 'preference' | 'general',
+          content: n.content,
+          createdAt: new Date(n.created_at),
+        })));
+      }
+    } catch (err) {
+      console.error('Error loading notes:', err);
+    }
+  }, []);
+
   // Open client drawer with animation
   const openClientDrawer = (client: Client) => {
     setSelectedClient(client);
+    setClientNotes([]); // Reset notes while loading
+    loadClientNotes(client.id);
     setShowDrawer(true);
     setShowAllHistory(false);
     setClientDrawerTab('overview');
@@ -519,7 +540,7 @@ export default function SoloClientsPage() {
                     {/* Avatar */}
                     <div className="w-12 h-12 rounded-full bg-wondrous-blue-light flex items-center justify-center flex-shrink-0 overflow-hidden">
                       <img
-                        src={getAvatarUrl(`${client.first_name} ${client.last_name}`)}
+                        src={client.avatar_url || getAvatarUrl(`${client.first_name} ${client.last_name}`)}
                         alt=""
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -787,16 +808,32 @@ export default function SoloClientsPage() {
                           {(['general', 'injury', 'preference'] as const).map((cat) => (
                             <button
                               key={cat}
-                              onClick={() => {
+                              onClick={async () => {
                                 // Auto-save current note before switching category
-                                if (newNoteContent.trim() && cat !== newNoteCategory) {
-                                  setClientNotes((prev) => [...prev, {
-                                    id: `note_${Date.now()}`,
-                                    category: newNoteCategory,
-                                    content: newNoteContent.trim(),
-                                    createdAt: new Date(),
-                                  }]);
-                                  setNewNoteContent('');
+                                if (newNoteContent.trim() && cat !== newNoteCategory && selectedClient) {
+                                  try {
+                                    const res = await fetch('/api/clients/notes', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        clientId: selectedClient.id,
+                                        category: newNoteCategory,
+                                        content: newNoteContent.trim(),
+                                      }),
+                                    });
+                                    if (res.ok) {
+                                      const { note } = await res.json();
+                                      setClientNotes((prev) => [{
+                                        id: note.id,
+                                        category: note.category,
+                                        content: note.content,
+                                        createdAt: new Date(note.created_at),
+                                      }, ...prev]);
+                                      setNewNoteContent('');
+                                    }
+                                  } catch (err) {
+                                    console.error('Error saving note:', err);
+                                  }
                                 }
                                 setNewNoteCategory(cat);
                               }}
@@ -827,15 +864,32 @@ export default function SoloClientsPage() {
                             size="sm"
                             className="h-7 text-xs bg-wondrous-magenta hover:bg-wondrous-magenta/90"
                             disabled={!newNoteContent.trim()}
-                            onClick={() => {
-                              setClientNotes((prev) => [...prev, {
-                                id: `note_${Date.now()}`,
-                                category: newNoteCategory,
-                                content: newNoteContent.trim(),
-                                createdAt: new Date(),
-                              }]);
-                              setNewNoteContent('');
-                              setShowAddNote(false);
+                            onClick={async () => {
+                              if (!selectedClient) return;
+                              try {
+                                const res = await fetch('/api/clients/notes', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    clientId: selectedClient.id,
+                                    category: newNoteCategory,
+                                    content: newNoteContent.trim(),
+                                  }),
+                                });
+                                if (res.ok) {
+                                  const { note } = await res.json();
+                                  setClientNotes((prev) => [{
+                                    id: note.id,
+                                    category: note.category,
+                                    content: note.content,
+                                    createdAt: new Date(note.created_at),
+                                  }, ...prev]);
+                                  setNewNoteContent('');
+                                  setShowAddNote(false);
+                                }
+                              } catch (err) {
+                                console.error('Error saving note:', err);
+                              }
                             }}
                           >
                             Save
@@ -860,7 +914,14 @@ export default function SoloClientsPage() {
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{note.category}</span>
                               <button
-                                onClick={() => setClientNotes((prev) => prev.filter((n) => n.id !== note.id))}
+                                onClick={async () => {
+                                  try {
+                                    await fetch(`/api/clients/notes?id=${note.id}`, { method: 'DELETE' });
+                                    setClientNotes((prev) => prev.filter((n) => n.id !== note.id));
+                                  } catch (err) {
+                                    console.error('Error deleting note:', err);
+                                  }
+                                }}
                                 className="opacity-50 hover:opacity-100"
                               >
                                 <X size={12} />

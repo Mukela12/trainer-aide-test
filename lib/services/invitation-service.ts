@@ -7,6 +7,7 @@
 
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { sendClientInvitationEmail } from '@/lib/notifications/email-service';
+import { generateAvatarUrl } from '@/lib/utils/avatar';
 import crypto from 'crypto';
 
 /**
@@ -263,16 +264,25 @@ export async function acceptInvitation(
       return { data: null, error: new Error('Invitation expired') };
     }
 
-    // Check if user already exists with this email
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(
-      (u: { email?: string }) => u.email?.toLowerCase() === invitation.email.toLowerCase()
-    );
-
+    // Check if user already exists with this email (efficient single-user lookup)
     let userId: string;
 
-    if (existingUser) {
-      userId = existingUser.id;
+    // First check profiles table for existing user with this email
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', invitation.email.toLowerCase())
+      .maybeSingle();
+
+    if (existingProfile) {
+      userId = existingProfile.id;
+      // Update password for existing user
+      const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+        password,
+      });
+      if (updateError) {
+        console.error('Error updating existing user password:', updateError);
+      }
     } else {
       const { data: newUser, error: signUpError } = await supabase.auth.admin.createUser({
         email: invitation.email,
@@ -286,7 +296,7 @@ export async function acceptInvitation(
 
       if (signUpError || !newUser.user) {
         console.error('Error creating user:', signUpError);
-        return { data: null, error: new Error('Failed to create account') };
+        return { data: null, error: new Error(signUpError?.message || 'Failed to create account') };
       }
 
       userId = newUser.user.id;
@@ -306,6 +316,7 @@ export async function acceptInvitation(
 
     if (profileError) {
       console.error('Error creating profile:', profileError);
+      return { data: null, error: new Error('Failed to create user profile: ' + profileError.message) };
     }
 
     // Create client record in fc_clients
@@ -324,10 +335,12 @@ export async function acceptInvitation(
         credits: 0,
         invited_by: invitation.invited_by,
         source: 'invitation',
+        avatar_url: generateAvatarUrl(clientName),
       }, { onConflict: 'id' });
 
     if (clientError) {
       console.error('Error creating client record:', clientError);
+      return { data: null, error: new Error('Failed to create client record: ' + clientError.message) };
     }
 
     // Mark invitation as accepted
