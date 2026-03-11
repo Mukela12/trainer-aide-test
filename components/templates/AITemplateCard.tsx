@@ -211,7 +211,7 @@ export function AITemplateCard({ template, onUpdate }: AITemplateCardProps) {
           onClose={() => setShowWorkoutSelector(false)}
           onSelectWorkout={(workout) => {
             setShowWorkoutSelector(false);
-            router.push(`/trainer/sessions/new?programId=${template.id}&workoutId=${workout.id}`);
+            router.push(`/trainer/sessions/new?programId=${template.id}&workoutId=${workout.id}&source=ai-template`);
           }}
         />
       )}

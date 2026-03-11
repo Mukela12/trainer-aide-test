@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getAIProgramTemplates } from '@/lib/services/ai-program-service';
 
 /**
@@ -7,6 +8,12 @@ import { getAIProgramTemplates } from '@/lib/services/ai-program-service';
  */
 export async function GET() {
   try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const templates = await getAIProgramTemplates();
 
     return NextResponse.json({ templates });

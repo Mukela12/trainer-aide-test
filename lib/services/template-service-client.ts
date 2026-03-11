@@ -42,8 +42,8 @@ interface DbTemplate {
   type: 'standard' | 'resistance_only';
   created_by: string;
   studio_id: string | null;
-  blocks: WorkoutBlock[];
-  default_sign_off_mode: 'full_session' | 'per_block' | 'per_exercise' | null;
+  json_definition: WorkoutBlock[] | null;
+  sign_off_mode: 'full_session' | 'per_block' | 'per_exercise' | null;
   alert_interval_minutes: number | null;
   is_default: boolean;
   created_at: string;
@@ -61,8 +61,8 @@ function dbToTemplate(db: DbTemplate): WorkoutTemplate {
     type: db.type,
     createdBy: db.created_by,
     assignedStudios: db.studio_id ? [db.studio_id] : [],
-    blocks: db.blocks || [],
-    defaultSignOffMode: db.default_sign_off_mode || undefined,
+    blocks: db.json_definition || [],
+    defaultSignOffMode: db.sign_off_mode || undefined,
     alertIntervalMinutes: db.alert_interval_minutes || undefined,
     isDefault: db.is_default,
     createdAt: db.created_at,

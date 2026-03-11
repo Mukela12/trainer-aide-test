@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,8 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/lib/hooks/use-toast';
-import { usePatchClient } from '@/lib/hooks/use-clients';
-import { Gift, AlertCircle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Gift, AlertCircle, Clock } from 'lucide-react';
 import type { ClientSummary } from './EditClientDialog';
 
 interface RewardCreditsDialogProps {
@@ -26,13 +26,33 @@ interface RewardCreditsDialogProps {
 
 export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: RewardCreditsDialogProps) {
   const { toast } = useToast();
-  const patchClient = usePatchClient();
+  const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cooldownMinutes, setCooldownMinutes] = useState<number | null>(null);
+  const [checkingCooldown, setCheckingCooldown] = useState(false);
 
-  const creditsToAdd = 1; // Fixed at 1 per award
   const currentCredits = client.credits || 0;
-  const newTotal = currentCredits + creditsToAdd;
+  const newTotal = currentCredits + 1;
+
+  // Check cooldown when dialog opens
+  useEffect(() => {
+    if (open && client.id) {
+      setCheckingCooldown(true);
+      fetch(`/api/clients/reward-credit?clientId=${client.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          setCooldownMinutes(data.canReward ? null : data.minutesLeft || 1);
+        })
+        .catch(() => setCooldownMinutes(null))
+        .finally(() => setCheckingCooldown(false));
+    } else {
+      setCooldownMinutes(null);
+      setReason('');
+      setReasonError(false);
+    }
+  }, [open, client.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,18 +67,38 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      await patchClient.mutateAsync({ clientId: client.id, updates: { credits: newTotal } });
+      const res = await fetch('/api/clients/reward-credit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: client.id, reason: reason.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast({
+          variant: 'destructive',
+          title: 'Cannot reward credit',
+          description: data.error || 'Failed to reward credit',
+        });
+        if (res.status === 429) {
+          setCooldownMinutes(data.minutesLeft || 1);
+        }
+        return;
+      }
 
       toast({
         title: 'Credit rewarded!',
-        description: `1 complimentary credit added to ${client.first_name} ${client.last_name}. New balance: ${newTotal}`,
+        description: `1 complimentary credit added to ${client.first_name} ${client.last_name}. New balance: ${data.newTotal}`,
       });
 
-      // Reset form
+      // Invalidate clients query to refresh data
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+
       setReason('');
       setReasonError(false);
-
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -67,6 +107,8 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to reward credit',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -96,13 +138,22 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
             </div>
           </div>
 
-          {/* Fixed credit amount notice */}
-          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-amber-700 dark:text-amber-300">
-              Max 1 free reward credit per customer per 30 days period.
-            </p>
-          </div>
+          {/* Cooldown warning or info */}
+          {cooldownMinutes !== null ? (
+            <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <Clock size={16} className="text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-red-700 dark:text-red-300">
+                This client was already rewarded recently. Please wait {cooldownMinutes} more minute{cooldownMinutes !== 1 ? 's' : ''} before rewarding again.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Max 1 free reward credit per customer per 30 minute period.
+              </p>
+            </div>
+          )}
 
           {/* Reason (required) */}
           <div className="space-y-2">
@@ -119,6 +170,7 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
               placeholder="e.g., Referral bonus, Birthday gift, Loyalty reward..."
               rows={2}
               className={reasonError ? 'border-red-500 focus:ring-red-500' : ''}
+              disabled={cooldownMinutes !== null}
             />
             {reasonError && (
               <p className="text-xs text-red-500">A reason is required for complimentary credits</p>
@@ -131,10 +183,10 @@ export function RewardCreditsDialog({ client, open, onOpenChange, onSuccess }: R
             </Button>
             <Button
               type="submit"
-              disabled={patchClient.isPending}
+              disabled={isSubmitting || checkingCooldown || cooldownMinutes !== null}
               className="bg-gradient-to-r from-[#12229D] via-[#6B21A8] to-[#A71075] hover:opacity-90"
             >
-              {patchClient.isPending ? 'Rewarding...' : 'Reward 1 Credit'}
+              {isSubmitting ? 'Rewarding...' : checkingCooldown ? 'Checking...' : 'Reward 1 Credit'}
             </Button>
           </DialogFooter>
         </form>

@@ -20,6 +20,19 @@ import ContentHeader from '@/components/shared/ContentHeader';
 import { useTrainers } from '@/lib/hooks/use-trainers';
 import { useTeamInvitations, useRevokeInvitation, type TeamInvitation } from '@/lib/hooks/use-invitations';
 
+const ROLE_DISPLAY_LABELS: Record<string, string> = {
+  trainer: 'Trainer',
+  instructor: 'Instructor',
+  manager: 'Manager',
+  studio_manager: 'Manager',
+  receptionist: 'Receptionist',
+  finance_manager: 'Finance Manager',
+  owner: 'Owner',
+  studio_owner: 'Owner',
+  admin: 'Admin',
+  solo_practitioner: 'Solo Practitioner',
+};
+
 export default function TeamPage() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
@@ -103,8 +116,8 @@ export default function TeamPage() {
                           ? `${invitation.firstName} ${invitation.lastName}`
                           : invitation.email}
                       </CardTitle>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                        {invitation.role}
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {ROLE_DISPLAY_LABELS[invitation.role] || invitation.role}
                       </p>
                     </div>
                     <Button
@@ -162,8 +175,8 @@ export default function TeamPage() {
                         <CardTitle className="text-base lg:text-lg dark:text-gray-100">
                           {member.first_name} {member.last_name}
                         </CardTitle>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                          {member.staff_type}
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {ROLE_DISPLAY_LABELS[member.staff_type] || member.staff_type}
                         </p>
                       </div>
                     </div>

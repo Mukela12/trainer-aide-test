@@ -127,8 +127,8 @@ export async function updateTemplate(
     if (input.name !== undefined) updateData.name = input.name;
     if (input.description !== undefined) updateData.description = input.description;
     if (input.type !== undefined) updateData.type = input.type;
-    if (input.blocks !== undefined) updateData.blocks = input.blocks;
-    if (input.defaultSignOffMode !== undefined) updateData.default_sign_off_mode = input.defaultSignOffMode;
+    if (input.blocks !== undefined) updateData.json_definition = input.blocks;
+    if (input.defaultSignOffMode !== undefined) updateData.sign_off_mode = input.defaultSignOffMode;
     if (input.alertIntervalMinutes !== undefined) updateData.alert_interval_minutes = input.alertIntervalMinutes;
     if (input.isDefault !== undefined) updateData.is_default = input.isDefault;
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useBookings } from '@/lib/hooks/use-bookings';
@@ -21,6 +22,7 @@ import { useToast } from '@/lib/hooks/use-toast';
 import type { SoloDashboardStats, UpcomingSession, RecentClient } from '@/lib/types/dashboard';
 
 export default function SoloPractitionerDashboard() {
+  const router = useRouter();
   const { toast } = useToast();
   const { currentUser, businessSlug, businessName } = useUserStore();
   const { sessions: calendarSessions } = useBookings(currentUser.id);
@@ -263,23 +265,24 @@ export default function SoloPractitionerDashboard() {
           </CardContent>
         </Card>
 
-        <Link href="/solo/requests">
-          <Card className={`dark:bg-gray-800 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow ${stats.pendingRequests > 0 ? 'border-red-400 dark:border-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : ''}`}>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${stats.pendingRequests > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
-                  <Clock className={stats.pendingRequests > 0 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'} size={20} />
-                </div>
-                <div>
-                  <p className={`text-2xl font-bold ${stats.pendingRequests > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                    {isLoading ? '...' : stats.pendingRequests}
-                  </p>
-                  <p className={`text-xs ${stats.pendingRequests > 0 ? 'text-red-500 dark:text-red-400 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>Pending</p>
-                </div>
+        <Card
+          className={`dark:bg-gray-800 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow ${stats.pendingRequests > 0 ? 'border-red-400 dark:border-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : ''}`}
+          onClick={() => router.push('/solo/requests')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${stats.pendingRequests > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
+                <Clock className={stats.pendingRequests > 0 ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'} size={20} />
               </div>
-            </CardContent>
-          </Card>
-        </Link>
+              <div>
+                <p className={`text-2xl font-bold ${stats.pendingRequests > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                  {isLoading ? '...' : stats.pendingRequests}
+                </p>
+                <p className={`text-xs ${stats.pendingRequests > 0 ? 'text-red-500 dark:text-red-400 font-semibold' : 'text-gray-500 dark:text-gray-400'}`}>Pending</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Two-column layout: Today's Sessions + Quick Actions */}

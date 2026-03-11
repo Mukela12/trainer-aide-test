@@ -51,6 +51,7 @@ import { SendEmailDialog } from '@/components/shared/SendEmailDialog';
 import { format, formatDistanceToNow } from 'date-fns';
 import ContentHeader from '@/components/shared/ContentHeader';
 import { cn } from '@/lib/utils/cn';
+import { useToast } from '@/lib/hooks/use-toast';
 
 interface Client {
   id: string;
@@ -80,6 +81,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function SoloClientsPage() {
+  const { toast } = useToast();
   const { currentUser } = useUserStore();
   const { data: clients = [], isLoading } = useClients(currentUser?.id);
   const patchClient = usePatchClient();
@@ -886,9 +888,14 @@ export default function SoloClientsPage() {
                                   }, ...prev]);
                                   setNewNoteContent('');
                                   setShowAddNote(false);
+                                  toast({ title: 'Note saved' });
+                                } else {
+                                  const errData = await res.json().catch(() => ({}));
+                                  toast({ variant: 'destructive', title: 'Failed to save note', description: errData.error || 'Please try again' });
                                 }
                               } catch (err) {
                                 console.error('Error saving note:', err);
+                                toast({ variant: 'destructive', title: 'Failed to save note', description: 'Network error' });
                               }
                             }}
                           >

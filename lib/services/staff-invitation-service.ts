@@ -488,8 +488,10 @@ export async function acceptStaffInvitation(
     const roleToStaffType: Record<string, string> = {
       trainer: 'trainer',
       instructor: 'instructor',
-      manager: 'manager',
+      manager: 'manager',              // backward compat
+      studio_manager: 'manager',       // RBAC role name
       receptionist: 'receptionist',
+      finance_manager: 'finance_manager',
       admin: 'admin',
     };
     const staffType =
@@ -559,8 +561,10 @@ export async function acceptStaffInvitation(
     const roleToProfileRole: Record<string, string> = {
       trainer: 'trainer',
       instructor: 'trainer',
-      manager: 'studio_manager',
+      manager: 'studio_manager',        // backward compat
+      studio_manager: 'studio_manager', // RBAC role name
       receptionist: 'receptionist',
+      finance_manager: 'finance_manager',
       admin: 'studio_owner',
     };
     const profileRole =
@@ -632,8 +636,10 @@ export async function acceptStaffInvitation(
       trainer: '/trainer',
       instructor: '/trainer',
       manager: '/studio-owner',
-      admin: '/studio-owner',
+      studio_manager: '/studio-owner',
       receptionist: '/studio-owner',
+      finance_manager: '/studio-owner',
+      admin: '/studio-owner',
     };
     const redirectUrl =
       roleToRedirect[invitation.role as string] || '/trainer';

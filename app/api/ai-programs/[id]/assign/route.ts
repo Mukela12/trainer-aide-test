@@ -15,6 +15,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { client_id, trainer_id } = body;
@@ -28,12 +35,6 @@ export async function POST(
 
     // Handle trainer assignment
     if (trainer_id) {
-      const supabase = await createServerSupabaseClient();
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-      if (authError || !user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
 
       const { data, error } = await assignProgramToTrainer(id, trainer_id, user.id);
 

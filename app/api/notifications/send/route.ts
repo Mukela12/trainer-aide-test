@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import {
   processNotificationQueue,
   getNotificationQueueStatus,
@@ -7,16 +8,25 @@ import {
 /**
  * POST /api/notifications/send
  * Process pending notifications from the queue
- * Can be called by a cron job or triggered manually
+ * Can be called by a cron job (with API key) or an authenticated user
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify API key for security (optional - can use a cron secret)
+    // Check API key first (for cron jobs)
     const authHeader = request.headers.get('Authorization');
     const apiKey = process.env.NOTIFICATION_API_KEY;
 
-    if (apiKey && authHeader !== `Bearer ${apiKey}`) {
-      if (apiKey) {
+    let authorized = false;
+
+    if (apiKey && authHeader === `Bearer ${apiKey}`) {
+      authorized = true;
+    }
+
+    // If no API key match, check user auth
+    if (!authorized) {
+      const supabase = await createServerSupabaseClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
@@ -51,6 +61,12 @@ export async function POST(request: NextRequest) {
  */
 export async function GET() {
   try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { data: counts, error } = await getNotificationQueueStatus();
 
     if (error) {

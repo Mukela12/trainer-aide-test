@@ -25,7 +25,9 @@ interface InviteTrainerDialogProps {
 const ROLES = [
   { value: 'trainer', label: 'Trainer' },
   { value: 'instructor', label: 'Instructor' },
-  { value: 'manager', label: 'Manager' },
+  { value: 'studio_manager', label: 'Manager' },
+  { value: 'receptionist', label: 'Receptionist' },
+  { value: 'finance_manager', label: 'Finance Manager' },
 ];
 
 export function InviteTrainerDialog({ open, onOpenChange, onSuccess }: InviteTrainerDialogProps) {

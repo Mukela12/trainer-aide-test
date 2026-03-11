@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Use service role for this operation
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/auth/link-guest
@@ -14,6 +8,15 @@ const supabase = createClient(
  */
 export async function POST(request: NextRequest) {
   try {
+    // Verify user is authenticated
+    const authClient = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const supabase = createServiceRoleClient();
+
     const body = await request.json();
     const { clientId, userId, email } = body;
 
@@ -21,6 +24,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'clientId, userId, and email are required' },
         { status: 400 }
+      );
+    }
+
+    // Verify the authenticated user matches the requested userId
+    if (user.id !== userId) {
+      return NextResponse.json(
+        { error: 'userId does not match authenticated user' },
+        { status: 403 }
       );
     }
 

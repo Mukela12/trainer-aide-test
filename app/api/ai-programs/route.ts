@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseServer } from '@/lib/supabase-server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/ai-programs
- * Fetch all AI programs for the current trainer
+ * Fetch all AI programs for the authenticated user
  */
 export async function GET(request: NextRequest) {
   try {
-    const { data: programs, error } = await supabaseServer
+    const supabase = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const serviceClient = createServiceRoleClient();
+    const { data: programs, error } = await serviceClient
       .from('ai_programs')
       .select('*')
+      .eq('trainer_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {

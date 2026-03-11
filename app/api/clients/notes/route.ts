@@ -112,6 +112,22 @@ export async function DELETE(request: NextRequest) {
     }
 
     const serviceClient = createServiceRoleClient();
+
+    // Verify the note belongs to this user before deleting
+    const { data: note, error: fetchError } = await serviceClient
+      .from('ta_client_notes')
+      .select('id, author_id')
+      .eq('id', noteId)
+      .single();
+
+    if (fetchError || !note) {
+      return NextResponse.json({ error: 'Note not found' }, { status: 404 });
+    }
+
+    if (note.author_id !== user.id) {
+      return NextResponse.json({ error: 'Not authorized to delete this note' }, { status: 403 });
+    }
+
     const { error } = await serviceClient
       .from('ta_client_notes')
       .delete()

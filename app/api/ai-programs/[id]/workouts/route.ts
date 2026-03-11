@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseServer } from '@/lib/supabase-server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { imagesSupabase } from '@/lib/supabase/images-client';
 import { getAIWorkoutsByProgram } from '@/lib/services/ai-program-service';
 
@@ -17,6 +17,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const serviceClient = createServiceRoleClient();
     const { id } = await params;
 
     // Fetch workouts for the program
@@ -26,7 +33,7 @@ export async function GET(
     const workoutsWithExercises = await Promise.all(
       workouts.map(async (workout) => {
         // Step 1: Get workout exercises from Wondrous database
-        const { data: exercises, error: exercisesError } = await supabaseServer
+        const { data: exercises, error: exercisesError } = await serviceClient
           .from('ai_workout_exercises')
           .select('*')
           .eq('workout_id', workout.id)

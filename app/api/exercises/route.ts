@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
+    const authClient = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Try the images database first (has full exercise library)
     const imagesUrl = process.env.NEXT_PUBLIC_IMAGES_SUPABASE_URL;
     const imagesKey = process.env.IMAGES_SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_IMAGES_SUPABASE_KEY;

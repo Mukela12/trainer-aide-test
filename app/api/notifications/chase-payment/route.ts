@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceRoleClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
+    const authClient = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { bookingId, clientName } = await req.json();
 
     if (!bookingId) {

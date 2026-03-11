@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,9 @@ import {
   MessageSquare,
   UserCheck,
   Gift,
+  Plus,
+  StickyNote,
+  Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -46,6 +49,7 @@ import ContentHeader from '@/components/shared/ContentHeader';
 import { cn } from '@/lib/utils/cn';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useClients, usePatchClient } from '@/lib/hooks/use-clients';
+import { useToast } from '@/lib/hooks/use-toast';
 
 interface Client {
   id: string;
@@ -92,6 +96,7 @@ type CreditFilter = 'all' | 'with-credits' | 'low-credits' | 'no-credits';
 type StatusFilter = 'all' | 'active' | 'pending' | 'archived';
 
 export default function ClientsPage() {
+  const { toast } = useToast();
   const { currentUser } = useUserStore();
   const { data: clients = [], isLoading } = useClients(currentUser?.id);
   const patchClient = usePatchClient();
@@ -109,6 +114,12 @@ export default function ClientsPage() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [isDrawerAnimating, setIsDrawerAnimating] = useState(false);
   const [clientDrawerTab, setClientDrawerTab] = useState<'overview' | 'sessions' | 'payments'>('overview');
+
+  // Client notes state
+  const [clientNotes, setClientNotes] = useState<Array<{ id: string; category: 'injury' | 'preference' | 'general'; content: string; createdAt: Date }>>([]);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [newNoteCategory, setNewNoteCategory] = useState<'injury' | 'preference' | 'general'>('general');
+  const [showAddNote, setShowAddNote] = useState(false);
 
   // Filter states
   const [creditFilter, setCreditFilter] = useState<CreditFilter>('all');
@@ -143,10 +154,31 @@ export default function ClientsPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Load notes when a client is selected
+  const loadClientNotes = useCallback(async (clientId: string) => {
+    try {
+      const res = await fetch(`/api/clients/notes?clientId=${clientId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setClientNotes((data.notes || []).map((n: { id: string; category: string; content: string; created_at: string }) => ({
+          id: n.id,
+          category: n.category as 'injury' | 'preference' | 'general',
+          content: n.content,
+          createdAt: new Date(n.created_at),
+        })));
+      }
+    } catch (err) {
+      console.error('Error loading notes:', err);
+    }
+  }, []);
+
   const openClientDrawer = (client: Client) => {
     setSelectedClient(client);
+    setClientNotes([]);
+    loadClientNotes(client.id);
     setShowDrawer(true);
     setClientDrawerTab('overview');
+    setShowAddNote(false);
     setTimeout(() => setIsDrawerAnimating(true), 10);
   };
 
@@ -756,6 +788,142 @@ export default function ClientsPage() {
                             <MessageSquare className="w-4 h-4 text-green-600" />
                             <span className="text-sm font-medium text-green-600">WhatsApp</span>
                           </button>
+                        )}
+                      </div>
+
+                      {/* Client Notes */}
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <StickyNote size={14} className="text-wondrous-magenta" />
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Notes</h4>
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">Always visible</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs gap-1"
+                            onClick={() => setShowAddNote(!showAddNote)}
+                          >
+                            <Plus size={14} />
+                            + Add
+                          </Button>
+                        </div>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 -mt-1 mb-2">Surfaced before every session — never miss a thing.</p>
+
+                        {/* Add Note Form */}
+                        {showAddNote && (
+                          <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 space-y-2 mb-3">
+                            <div className="flex gap-2">
+                              {(['general', 'injury', 'preference'] as const).map((cat) => (
+                                <button
+                                  key={cat}
+                                  onClick={() => setNewNoteCategory(cat)}
+                                  className={cn(
+                                    'text-[10px] font-medium px-2 py-1 rounded-full border transition-colors capitalize',
+                                    newNoteCategory === cat
+                                      ? cat === 'injury' ? 'bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-300'
+                                      : cat === 'preference' ? 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
+                                      : 'bg-gray-200 border-gray-300 text-gray-800 dark:bg-gray-600 dark:border-gray-500 dark:text-gray-200'
+                                      : 'border-gray-200 text-gray-500 dark:border-gray-600 dark:text-gray-400'
+                                  )}
+                                >
+                                  {cat}
+                                </button>
+                              ))}
+                            </div>
+                            <Input
+                              placeholder="Add a note..."
+                              value={newNoteContent}
+                              onChange={(e) => setNewNoteContent(e.target.value)}
+                              className="text-sm"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setShowAddNote(false); setNewNoteContent(''); }}>
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs bg-wondrous-magenta hover:bg-wondrous-magenta/90"
+                                disabled={!newNoteContent.trim()}
+                                onClick={async () => {
+                                  if (!selectedClient) return;
+                                  try {
+                                    const res = await fetch('/api/clients/notes', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        clientId: selectedClient.id,
+                                        category: newNoteCategory,
+                                        content: newNoteContent.trim(),
+                                      }),
+                                    });
+                                    if (res.ok) {
+                                      const { note } = await res.json();
+                                      setClientNotes((prev) => [{
+                                        id: note.id,
+                                        category: note.category,
+                                        content: note.content,
+                                        createdAt: new Date(note.created_at),
+                                      }, ...prev]);
+                                      setNewNoteContent('');
+                                      setShowAddNote(false);
+                                      toast({ title: 'Note saved' });
+                                    } else {
+                                      const errData = await res.json().catch(() => ({}));
+                                      toast({ variant: 'destructive', title: 'Failed to save note', description: errData.error || 'Please try again' });
+                                    }
+                                  } catch (err) {
+                                    console.error('Error saving note:', err);
+                                    toast({ variant: 'destructive', title: 'Failed to save note', description: 'Network error' });
+                                  }
+                                }}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Existing Notes */}
+                        {clientNotes.length > 0 ? (
+                          <div className="space-y-2">
+                            {clientNotes.map((note) => (
+                              <div
+                                key={note.id}
+                                className={cn(
+                                  'p-3 rounded-lg border text-sm',
+                                  note.category === 'injury' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+                                    : note.category === 'preference' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
+                                    : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1">
+                                    <span className="text-[10px] font-medium uppercase opacity-60">{note.category}</span>
+                                    <p className="text-sm mt-0.5">{note.content}</p>
+                                  </div>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch(`/api/clients/notes?id=${note.id}`, { method: 'DELETE' });
+                                        if (res.ok) {
+                                          setClientNotes((prev) => prev.filter((n) => n.id !== note.id));
+                                        }
+                                      } catch (err) {
+                                        console.error('Error deleting note:', err);
+                                      }
+                                    }}
+                                    className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-3">No notes yet</p>
                         )}
                       </div>
                     </>
