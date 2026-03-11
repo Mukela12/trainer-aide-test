@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { User, Building2, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useUserStore } from '@/lib/stores/user-store';
@@ -15,27 +13,23 @@ type RoleOption = 'solo_practitioner' | 'studio_owner';
 
 export default function OnboardingRolePage() {
   const router = useRouter();
-  const { currentUser, setRole, setUser } = useUserStore();
+  const { currentUser, setRole } = useUserStore();
   const [selectedRole, setSelectedRole] = useState<RoleOption | null>(null);
-  const [firstName, setFirstName] = useState(currentUser?.firstName || '');
-  const [lastName, setLastName] = useState(currentUser?.lastName || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleContinue = async () => {
-    if (!selectedRole || !firstName.trim()) return;
+    if (!selectedRole) return;
 
     setIsLoading(true);
     setError(null);
     try {
       const supabase = getSupabaseBrowserClient();
 
-      // Update profile with selected role and name
+      // Update profile with selected role
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
           role: selectedRole,
           onboarding_step: 1,
         })
@@ -43,12 +37,9 @@ export default function OnboardingRolePage() {
 
       if (profileError) throw profileError;
 
-      // Update user store with the name
-      setUser({ ...currentUser, firstName: firstName.trim(), lastName: lastName.trim(), role: selectedRole });
-
       // Create bs_studios record via server API to bypass RLS restrictions
       // This prevents FK constraint errors when seeding services and availability
-      const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || 'My Studio';
+      const displayName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ') || 'My Studio';
 
       const studioResponse = await fetch('/api/onboarding/studio', {
         method: 'POST',
@@ -132,33 +123,6 @@ export default function OnboardingRolePage() {
         </p>
       </div>
 
-      {/* Name Fields */}
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name *</Label>
-              <Input
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Your first name"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Your last name"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Role Selection */}
       <div className="grid gap-4 md:grid-cols-2">
         {roles.map((role) => {
@@ -240,7 +204,7 @@ export default function OnboardingRolePage() {
         <Button
           size="lg"
           onClick={handleContinue}
-          disabled={!selectedRole || !firstName.trim() || isLoading}
+          disabled={!selectedRole || isLoading}
           className="min-w-[140px]"
         >
           {isLoading ? 'Saving...' : 'Continue'}

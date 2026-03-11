@@ -13,18 +13,22 @@ import { OnboardingStepWrapper } from '@/components/onboarding/OnboardingStepWra
 
 export default function SoloBusinessPage() {
   const router = useRouter();
-  const { currentUser } = useUserStore();
+  const { currentUser, setUser } = useUserStore();
 
+  const [firstName, setFirstName] = useState(currentUser?.firstName || '');
+  const [lastName, setLastName] = useState(currentUser?.lastName || '');
   const [businessName, setBusinessName] = useState('');
   const [businessLogo, setBusinessLogo] = useState<string | null>(null);
   const [customSlug, setCustomSlug] = useState('');
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const finalSlug = getFinalSlug(businessName, currentUser.firstName, currentUser.lastName, customSlug);
+  const effectiveFirstName = firstName.trim() || currentUser.firstName;
+  const effectiveLastName = lastName.trim() || currentUser.lastName;
+  const finalSlug = getFinalSlug(businessName, effectiveFirstName, effectiveLastName, customSlug);
 
   const handleContinue = async () => {
-    if (!finalSlug || slugAvailable === false) return;
+    if (!firstName.trim() || !finalSlug || slugAvailable === false) return;
 
     setIsLoading(true);
     try {
@@ -33,6 +37,8 @@ export default function SoloBusinessPage() {
       const { error } = await supabase
         .from('profiles')
         .update({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
           business_name: businessName || null,
           business_slug: finalSlug,
           business_logo_url: businessLogo || null,
@@ -41,6 +47,9 @@ export default function SoloBusinessPage() {
         .eq('id', currentUser.id);
 
       if (error) throw error;
+
+      // Update user store with the name
+      setUser({ ...currentUser, firstName: firstName.trim(), lastName: lastName.trim() });
 
       router.push('/onboarding/solo/services');
     } catch (error) {
@@ -55,10 +64,43 @@ export default function SoloBusinessPage() {
       title="Your booking page"
       subtitle="Set up your booking link so clients can find and book with you."
       onNext={handleContinue}
-      nextDisabled={!finalSlug || slugAvailable === false}
+      nextDisabled={!firstName.trim() || !finalSlug || slugAvailable === false}
       isLoading={isLoading}
       tipText="You can change your booking link at any time in Settings."
     >
+      {/* Your Name */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Name</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name *</Label>
+              <Input
+                id="firstName"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Your first name"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Your last name"
+              />
+            </div>
+          </div>
+          <p className="text-sm text-gray-500">
+            This is how clients and invitees will see your name
+          </p>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Business Details</CardTitle>
@@ -94,8 +136,8 @@ export default function SoloBusinessPage() {
           <SlugInput
             userId={currentUser.id}
             businessName={businessName}
-            firstName={currentUser.firstName}
-            lastName={currentUser.lastName}
+            firstName={effectiveFirstName}
+            lastName={effectiveLastName}
             customSlug={customSlug}
             onCustomSlugChange={setCustomSlug}
             onSlugAvailableChange={setSlugAvailable}
