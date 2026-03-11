@@ -246,6 +246,41 @@ async function lookupUserProfile(
     .maybeSingle()
 
   if (profile) {
+    // Cross-reference bs_staff to get authoritative role/onboarding status
+    // Profile may have stale data if it was created before invitation was accepted
+    const { data: staffRecord } = await supabase
+      .from('bs_staff')
+      .select('staff_type, is_onboarded, studio_id, is_solo, first_name, last_name, email')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (staffRecord) {
+      const staffRoleMap: Record<string, string> = {
+        owner: 'studio_owner',
+        studio_owner: 'studio_owner',
+        manager: 'studio_manager',
+        instructor: 'trainer',
+        trainer: 'trainer',
+        receptionist: 'receptionist',
+        finance: 'finance_manager',
+        finance_manager: 'finance_manager',
+      }
+      const staffRole = staffRecord.is_solo
+        ? 'solo_practitioner'
+        : (staffRoleMap[staffRecord.staff_type] || 'trainer')
+      return {
+        id: profile.id,
+        email: profile.email || staffRecord.email || user.email || '',
+        firstName: profile.first_name || staffRecord.first_name || '',
+        lastName: profile.last_name || staffRecord.last_name || '',
+        role: staffRole,
+        studioId: staffRecord.studio_id,
+        isOnboarded: staffRecord.is_onboarded === true || profile.is_onboarded === true,
+        businessSlug: profile.business_slug || undefined,
+        businessName: profile.business_name || undefined,
+      }
+    }
+
     return {
       id: profile.id,
       email: profile.email || user.email || '',
