@@ -179,8 +179,10 @@ export function Sidebar() {
     router.push('/login');
   };
 
+  // Staff roles (studio_manager, receptionist, finance_manager) see the studio-owner nav
+  const isStudioStaff = ['studio_owner', 'studio_manager', 'receptionist', 'finance_manager'].includes(currentRole);
   const navGroups =
-    currentRole === 'studio_owner' ? studioOwnerGroups :
+    isStudioStaff ? studioOwnerGroups :
     currentRole === 'trainer' ? trainerGroups :
     currentRole === 'solo_practitioner' ? soloPractitionerGroups :
     clientGroups;
@@ -197,7 +199,7 @@ export function Sidebar() {
         {!collapsed && (
           <Link
             href={
-              currentRole === 'studio_owner' ? '/studio-owner' :
+              isStudioStaff ? '/studio-owner' :
               currentRole === 'trainer' ? '/trainer' :
               currentRole === 'solo_practitioner' ? '/solo' :
               '/client'
@@ -220,7 +222,7 @@ export function Sidebar() {
         {collapsed && (
           <Link
             href={
-              currentRole === 'studio_owner' ? '/studio-owner' :
+              isStudioStaff ? '/studio-owner' :
               currentRole === 'trainer' ? '/trainer' :
               currentRole === 'solo_practitioner' ? '/solo' :
               '/client'

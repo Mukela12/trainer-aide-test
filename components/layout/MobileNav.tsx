@@ -62,8 +62,9 @@ export function MobileNav() {
   const pathname = usePathname();
   const { currentRole, currentUser } = useUserStore();
 
+  const isStudioStaff = ['studio_owner', 'studio_manager', 'receptionist', 'finance_manager'].includes(currentRole);
   const links =
-    currentRole === 'studio_owner' ? studioOwnerLinks :
+    isStudioStaff ? studioOwnerLinks :
     currentRole === 'trainer' ? trainerLinks :
     currentRole === 'solo_practitioner' ? soloPractitionerLinks :
     clientLinks;
@@ -78,7 +79,7 @@ export function MobileNav() {
         <div className="flex items-center justify-between px-4 py-3">
           <Link
             href={
-              currentRole === 'studio_owner' ? '/studio-owner' :
+              isStudioStaff ? '/studio-owner' :
               currentRole === 'trainer' ? '/trainer' :
               currentRole === 'solo_practitioner' ? '/solo' :
               '/client'

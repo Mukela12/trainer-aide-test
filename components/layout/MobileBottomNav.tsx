@@ -132,9 +132,10 @@ export function MobileBottomNav() {
   const pathname = usePathname();
   const { currentRole } = useUserStore();
 
-  // Select navigation items based on current role
+  // Staff roles (studio_manager, receptionist, finance_manager) see studio-owner nav
+  const isStudioStaff = ['studio_owner', 'studio_manager', 'receptionist', 'finance_manager'].includes(currentRole);
   const navItems =
-    currentRole === 'studio_owner' ? studioOwnerNavItems :
+    isStudioStaff ? studioOwnerNavItems :
     currentRole === 'trainer' ? trainerNavItems :
     currentRole === 'solo_practitioner' ? soloPractitionerNavItems :
     clientNavItems;
@@ -143,8 +144,8 @@ export function MobileBottomNav() {
     // Settings route (common to all)
     if (pathname.startsWith("/settings")) return "settings";
 
-    // Studio Owner routes
-    if (currentRole === 'studio_owner') {
+    // Studio Owner / staff routes
+    if (isStudioStaff) {
       if (pathname.startsWith("/studio-owner/services")) return "services";
       if (pathname.startsWith("/studio-owner/templates")) return "templates";
       if (pathname.startsWith("/studio-owner/sessions")) return "sessions";

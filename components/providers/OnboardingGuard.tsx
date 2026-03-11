@@ -35,7 +35,10 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
           .eq('id', user.id)
           .maybeSingle();
 
-        if (profile && profile.is_onboarded === false) {
+        // Only solo_practitioner and studio_owner need onboarding
+        // Staff roles (trainer, receptionist, finance_manager, studio_manager) and clients skip it
+        const needsOnboardingFlow = profile?.role === 'solo_practitioner' || profile?.role === 'studio_owner';
+        if (profile && profile.is_onboarded === false && needsOnboardingFlow) {
           setNeedsOnboarding(true);
           if (!pathname?.startsWith('/onboarding')) {
             const redirect = getOnboardingRedirect(
