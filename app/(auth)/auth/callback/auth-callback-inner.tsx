@@ -87,10 +87,10 @@ export function AuthCallbackInner() {
         setUserFromProfile(profile)
 
         // Check if user needs onboarding
-        // IMPORTANT: Clients (role = 'client') NEVER need onboarding
-        // The onboarding flow is only for solo practitioners and studio owners
-        const isClient = profile.role === 'client'
-        if (!profile.isOnboarded && !isClient) {
+        // Only solo_practitioner and studio_owner need onboarding
+        // Staff roles (trainer, receptionist, finance_manager, studio_manager) and clients skip it
+        const needsOnboarding = profile.role === 'solo_practitioner' || profile.role === 'studio_owner'
+        if (!profile.isOnboarded && needsOnboarding) {
           router.push('/onboarding')
           return
         }
@@ -296,6 +296,7 @@ async function lookupUserProfile(
       trainer: 'trainer',
       receptionist: 'receptionist',
       finance: 'finance_manager',
+      finance_manager: 'finance_manager',
     }
     return {
       id: user.id,
@@ -325,6 +326,7 @@ async function lookupUserProfile(
         trainer: 'trainer',
         receptionist: 'receptionist',
         finance: 'finance_manager',
+        finance_manager: 'finance_manager',
       }
       return {
         id: user.id,
@@ -395,12 +397,30 @@ async function createUserProfile(
   const firstName = (metadata.given_name as string) || (metadata.first_name as string) || (metadata.full_name as string)?.split(' ')[0] || ''
   const lastName = (metadata.family_name as string) || (metadata.last_name as string) || (metadata.full_name as string)?.split(' ').slice(1).join(' ') || ''
 
-  // Use upsert with onConflict: 'id' to handle double-execution gracefully
-  // (e.g., if auth callback runs twice due to redirects or re-renders)
-  // If a DIFFERENT user ID tries to use the same email, we'll get a unique constraint error
+  // First check if profile already exists (e.g., created by invitation acceptance)
+  // to avoid overwriting role and onboarding status
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (existing) {
+    // Profile already exists — return it without overwriting
+    return {
+      id: existing.id,
+      email: existing.email || user.email || '',
+      firstName: existing.first_name || '',
+      lastName: existing.last_name || '',
+      role: mapRole(existing.role),
+      isOnboarded: existing.is_onboarded === true,
+    }
+  }
+
+  // New user — create profile with default solo_practitioner role
   const { data, error } = await supabase
     .from('profiles')
-    .upsert({
+    .insert({
       id: user.id,
       email: user.email,
       first_name: firstName,
@@ -410,7 +430,7 @@ async function createUserProfile(
       is_active: true,
       platform_version: 'v2',
       v2_active: true,
-    }, { onConflict: 'id' })
+    })
     .select()
     .single()
 
