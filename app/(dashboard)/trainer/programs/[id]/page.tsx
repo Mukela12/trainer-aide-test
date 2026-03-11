@@ -16,7 +16,7 @@ type TabType = 'overview' | 'workouts' | 'progress';
 export default function ProgramViewerPage() {
   const params = useParams();
   const router = useRouter();
-  const { canCreateAIPrograms } = useUserStore();
+  const { canCreateAIPrograms, currentRole } = useUserStore();
   const programId = params.id as string;
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -24,6 +24,13 @@ export default function ProgramViewerPage() {
 
   const { data: program, isLoading: loading, error: queryError } = useAIProgram(programId);
   const error = queryError?.message || null;
+
+  // Determine role-based templates path
+  const templatesPath =
+    currentRole === 'solo_practitioner' ? '/solo/templates' :
+    currentRole === 'studio_owner' || currentRole === 'studio_manager' ? '/studio-owner/templates' :
+    currentRole === 'trainer' ? '/trainer/templates' :
+    '/solo/templates';
 
   // Redirect trainers to solo route - AI Programs only for solo practitioners
   useEffect(() => {
@@ -33,7 +40,7 @@ export default function ProgramViewerPage() {
   }, [canCreateAIPrograms, router, programId]);
 
   const handleBack = () => {
-    router.push('/trainer/programs');
+    router.push(templatesPath);
   };
 
   if (loading) {
@@ -58,7 +65,7 @@ export default function ProgramViewerPage() {
               {error || 'Program not found'}
             </p>
             <Button onClick={handleBack} variant="outline" className="mt-4">
-              ← Back to Programs
+              ← Back to Templates
             </Button>
           </Card>
         </div>
@@ -93,7 +100,7 @@ export default function ProgramViewerPage() {
               className="flex items-center gap-2"
             >
               <ArrowLeft size={20} />
-              Back to Programs
+              Back to Templates
             </Button>
           </div>
 

@@ -448,7 +448,7 @@ export default function TemplateLibrary() {
               <button
                 onClick={() => {
                   setShowCreateModal(false);
-                  router.push('/trainer/programs/new');
+                  router.push('/trainer/programs/new?method=ai');
                 }}
                 className="w-full p-4 flex items-start gap-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl border-2 border-transparent hover:border-purple-300 dark:hover:border-purple-600 transition-all group"
               >

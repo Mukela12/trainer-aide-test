@@ -166,7 +166,7 @@ export async function createSession(input: CreateSessionInput) {
     trainer_id: input.trainerId,
     client_id: input.clientId || null,
     template_id: isAIWorkout ? null : (input.templateId || null),
-    workout_id: isAIWorkout ? null : (input.templateId || null),
+    workout_id: null,
     ai_workout_id: isAIWorkout ? input.workoutId : null,
     session_name: input.sessionName || 'Training Session',
     json_definition: {

@@ -121,6 +121,10 @@ function StartNewSessionContent() {
     const programId = searchParams?.get('programId');
     const workoutId = searchParams?.get('workoutId');
 
+    let clientPreFilled = false;
+    let templatePreFilled = false;
+    let signOffPreFilled = false;
+
     if (clientId && apiClients.length > 0) {
       const client = apiClients.find(c => c.id === clientId);
       if (client) {
@@ -131,6 +135,7 @@ function StartNewSessionContent() {
           email: client.email,
           joinedAt: new Date().toISOString(),
         });
+        clientPreFilled = true;
       }
     }
 
@@ -171,11 +176,25 @@ function StartNewSessionContent() {
       if (template) {
         setSelectedTemplate(template);
         setSourceType('manual');
+        templatePreFilled = true;
       }
     }
 
     if (signOffMode && (signOffMode === 'per_exercise' || signOffMode === 'per_block' || signOffMode === 'full_session')) {
       setSelectedSignOffMode(signOffMode);
+      signOffPreFilled = true;
+    }
+
+    // Auto-advance wizard step when pre-filled from calendar booking
+    if (clientPreFilled && templatePreFilled && signOffPreFilled) {
+      // Everything pre-selected → jump to sign-off/confirmation step
+      setStep(3);
+    } else if (clientPreFilled && templatePreFilled) {
+      // Client and template pre-selected → jump to sign-off step
+      setStep(3);
+    } else if (clientPreFilled) {
+      // Only client pre-selected → jump to template selection
+      setStep(2);
     }
   }, [searchParams, templates, toast, rawClients]);
 

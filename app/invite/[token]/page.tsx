@@ -95,12 +95,36 @@ export default function InvitationPage() {
         .eq('id', data.studio_id)
         .single();
 
-      // Fetch inviter name
+      // Fetch inviter name and role
       const { data: inviter } = await supabase
         .from('profiles')
-        .select('first_name, last_name')
+        .select('first_name, last_name, role')
         .eq('id', data.invited_by)
         .single();
+
+      // Build inviter display name:
+      // - Studio owners: use studio/org name (since they represent the business)
+      // - Solo practitioners: use their personal name
+      let inviterName = studio?.name || 'Your studio admin';
+      if (inviter) {
+        const isStudioOwner = inviter.role === 'studio_owner' || inviter.role === 'studio_manager';
+        if (isStudioOwner) {
+          // Use studio name for studio owners, fall back to personal name
+          inviterName = studio?.name || [inviter.first_name, inviter.last_name].filter(Boolean).join(' ') || 'Your studio';
+        } else {
+          // Solo practitioners use their personal name
+          const parts = [inviter.first_name, inviter.last_name].filter(Boolean);
+          if (parts.length > 0) {
+            inviterName = parts.join(' ');
+          }
+        }
+      }
+
+      // If the logged-in user's email doesn't match the invitation email,
+      // treat them as unauthenticated so they can create a new account
+      if (session && session.user?.email !== data.email) {
+        setIsActuallyAuthenticated(false);
+      }
 
       setInvitation({
         id: data.id,
@@ -109,7 +133,7 @@ export default function InvitationPage() {
         lastName: data.last_name,
         role: data.role,
         studioName: studio?.name || 'Unknown Studio',
-        inviterName: inviter ? `${inviter.first_name} ${inviter.last_name}` : 'Unknown',
+        inviterName,
         message: data.message,
         expiresAt: new Date(data.expires_at),
         isExpired: false,

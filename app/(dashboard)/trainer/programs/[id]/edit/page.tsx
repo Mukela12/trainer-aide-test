@@ -68,11 +68,11 @@ export default function ProgramEditPage() {
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
             <Button
-              onClick={() => router.push('/trainer/programs')}
+              onClick={() => router.push('/solo/templates')}
               className="bg-wondrous-primary hover:bg-purple-700 text-white"
             >
               <ArrowLeft size={16} className="mr-2" />
-              Back to Programs
+              Back to Templates
             </Button>
           </div>
         </div>

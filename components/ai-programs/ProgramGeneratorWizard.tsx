@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useUserStore } from '@/lib/stores/user-store';
 import { MethodSelection } from './MethodSelection';
 import { ClientSelection } from './ClientSelection';
@@ -50,11 +50,23 @@ export interface GenerationResult {
 
 export function ProgramGeneratorWizard() {
   const router = useRouter();
-  const { currentUser } = useUserStore();
+  const searchParams = useSearchParams();
+  const { currentUser, currentRole } = useUserStore();
 
-  // Wizard state
-  const [currentStep, setCurrentStep] = useState<WizardStep>('method');
-  const [method, setMethod] = useState<GenerationMethod>(null);
+  // Check if AI method was pre-selected via query param (from templates page)
+  const preSelectedAI = searchParams.get('method') === 'ai';
+
+  // Determine role-based templates path for navigation
+  const templatesPath =
+    currentRole === 'solo_practitioner' ? '/solo/templates' :
+    currentRole === 'studio_owner' ? '/studio-owner/templates' :
+    currentRole === 'studio_manager' ? '/studio-owner/templates' :
+    currentRole === 'trainer' ? '/trainer/templates' :
+    '/solo/templates';
+
+  // Wizard state — skip method step if AI was pre-selected
+  const [currentStep, setCurrentStep] = useState<WizardStep>(preSelectedAI ? 'client' : 'method');
+  const [method, setMethod] = useState<GenerationMethod>(preSelectedAI ? 'ai' : null);
   const [selectedClient, setSelectedClient] = useState<ClientProfile | null>(null);
   const [programConfig, setProgramConfig] = useState<ProgramConfig | null>(null);
   const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null);
@@ -360,9 +372,9 @@ export function ProgramGeneratorWizard() {
   };
 
   const handleCreateAnother = () => {
-    // Reset wizard
-    setCurrentStep('method');
-    setMethod(null);
+    // Reset wizard — keep AI pre-selection if it was set via query param
+    setCurrentStep(preSelectedAI ? 'client' : 'method');
+    setMethod(preSelectedAI ? 'ai' : null);
     setSelectedClient(null);
     setProgramConfig(null);
     setGenerationResult(null);
@@ -382,13 +394,18 @@ export function ProgramGeneratorWizard() {
   };
 
   const handleCancel = () => {
-    router.push('/trainer/programs');
+    router.push(templatesPath);
   };
 
   const handleBack = () => {
     switch (currentStep) {
       case 'client':
-        setCurrentStep('method');
+        // If AI was pre-selected from templates page, go back there instead of method step
+        if (preSelectedAI) {
+          router.push(templatesPath);
+        } else {
+          setCurrentStep('method');
+        }
         break;
       case 'configure':
         setCurrentStep('client');
