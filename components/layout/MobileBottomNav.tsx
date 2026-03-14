@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRouter, usePathname } from "next/navigation";
-import { Home, Calendar, Settings, FileText, Dumbbell, BookOpen, LayoutDashboard, Clock, Sparkles, Users, CreditCard, Zap } from "lucide-react";
+import { Home, Calendar, Settings, FileText, Dumbbell, BookOpen, LayoutDashboard, Clock, Sparkles, Users, CreditCard, Zap, DollarSign } from "lucide-react";
 import { useUserStore } from "@/lib/stores/user-store";
 
 interface NavItem {
@@ -37,6 +37,60 @@ const studioOwnerNavItems: NavItem[] = [
     label: "Settings",
     icon: Settings,
     route: "/settings",
+  },
+];
+
+const financeManagerNavItems: NavItem[] = [
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    route: "/studio-owner",
+  },
+  {
+    id: "revenue",
+    label: "Revenue",
+    icon: DollarSign,
+    route: "/studio-owner/revenue",
+  },
+  {
+    id: "clients",
+    label: "Clients",
+    icon: Users,
+    route: "/studio-owner/clients",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: Settings,
+    route: "/settings",
+  },
+];
+
+const receptionistNavItems: NavItem[] = [
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    route: "/studio-owner",
+  },
+  {
+    id: "calendar",
+    label: "Calendar",
+    icon: Calendar,
+    route: "/studio-owner/calendar",
+  },
+  {
+    id: "clients",
+    label: "Clients",
+    icon: Users,
+    route: "/studio-owner/clients",
+  },
+  {
+    id: "services",
+    label: "Services",
+    icon: Clock,
+    route: "/studio-owner/services",
   },
 ];
 
@@ -132,10 +186,11 @@ export function MobileBottomNav() {
   const pathname = usePathname();
   const { currentRole } = useUserStore();
 
-  // Staff roles (studio_manager, receptionist, finance_manager) see studio-owner nav
   const isStudioStaff = ['studio_owner', 'studio_manager', 'receptionist', 'finance_manager'].includes(currentRole);
   const navItems =
-    isStudioStaff ? studioOwnerNavItems :
+    currentRole === 'finance_manager' ? financeManagerNavItems :
+    currentRole === 'receptionist' ? receptionistNavItems :
+    currentRole === 'studio_owner' || currentRole === 'studio_manager' ? studioOwnerNavItems :
     currentRole === 'trainer' ? trainerNavItems :
     currentRole === 'solo_practitioner' ? soloPractitionerNavItems :
     clientNavItems;
@@ -144,8 +199,23 @@ export function MobileBottomNav() {
     // Settings route (common to all)
     if (pathname.startsWith("/settings")) return "settings";
 
-    // Studio Owner / staff routes
-    if (isStudioStaff) {
+    // Finance Manager routes
+    if (currentRole === 'finance_manager') {
+      if (pathname.startsWith("/studio-owner/revenue")) return "revenue";
+      if (pathname.startsWith("/studio-owner/clients")) return "clients";
+      if (pathname.startsWith("/studio-owner")) return "dashboard";
+    }
+
+    // Receptionist routes
+    if (currentRole === 'receptionist') {
+      if (pathname.startsWith("/studio-owner/calendar")) return "calendar";
+      if (pathname.startsWith("/studio-owner/clients")) return "clients";
+      if (pathname.startsWith("/studio-owner/services")) return "services";
+      if (pathname.startsWith("/studio-owner")) return "dashboard";
+    }
+
+    // Studio Owner / Studio Manager routes
+    if (currentRole === 'studio_owner' || currentRole === 'studio_manager') {
       if (pathname.startsWith("/studio-owner/services")) return "services";
       if (pathname.startsWith("/studio-owner/templates")) return "templates";
       if (pathname.startsWith("/studio-owner/sessions")) return "sessions";

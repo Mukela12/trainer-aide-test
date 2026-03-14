@@ -117,6 +117,55 @@ const studioOwnerGroups: NavGroup[] = [
   },
 ];
 
+// Navigation for finance managers (money-focused)
+const financeManagerGroups: NavGroup[] = [
+  {
+    title: 'MONEY',
+    links: [
+      { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+      { href: '/studio-owner/revenue', label: 'Revenue', icon: <DollarSign size={20} /> },
+    ],
+  },
+  {
+    title: 'MANAGE',
+    links: [
+      { href: '/studio-owner/clients', label: 'Clients', icon: <Users size={20} /> },
+    ],
+  },
+  {
+    title: 'SETTINGS',
+    links: [
+      { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+    ],
+  },
+];
+
+// Navigation for receptionists (operational focus)
+const receptionistGroups: NavGroup[] = [
+  {
+    title: 'OPERATE',
+    links: [
+      { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+      { href: '/studio-owner/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
+      { href: '/studio-owner/clients', label: 'Clients', icon: <Users size={20} /> },
+      { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
+    ],
+  },
+  {
+    title: 'BUSINESS',
+    links: [
+      { href: '/studio-owner/staff', label: 'Staff', icon: <UsersRound size={20} /> },
+      { href: '#', label: 'Campaigns', icon: <Megaphone size={20} />, badge: 'Soon' },
+    ],
+  },
+  {
+    title: 'SETTINGS',
+    links: [
+      { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+    ],
+  },
+];
+
 // Flat navigation for trainers (simpler structure)
 const trainerGroups: NavGroup[] = [
   {
@@ -179,10 +228,11 @@ export function Sidebar() {
     router.push('/login');
   };
 
-  // Staff roles (studio_manager, receptionist, finance_manager) see the studio-owner nav
   const isStudioStaff = ['studio_owner', 'studio_manager', 'receptionist', 'finance_manager'].includes(currentRole);
   const navGroups =
-    isStudioStaff ? studioOwnerGroups :
+    currentRole === 'finance_manager' ? financeManagerGroups :
+    currentRole === 'receptionist' ? receptionistGroups :
+    currentRole === 'studio_owner' || currentRole === 'studio_manager' ? studioOwnerGroups :
     currentRole === 'trainer' ? trainerGroups :
     currentRole === 'solo_practitioner' ? soloPractitionerGroups :
     clientGroups;

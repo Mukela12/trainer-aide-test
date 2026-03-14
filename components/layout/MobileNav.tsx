@@ -15,6 +15,9 @@ import {
   BookOpen,
   Clock,
   Users,
+  UsersRound,
+  DollarSign,
+  Megaphone,
 } from 'lucide-react';
 import { useUserStore } from '@/lib/stores/user-store';
 import { cn } from '@/lib/utils/cn';
@@ -31,6 +34,22 @@ const studioOwnerLinks: NavLink[] = [
   { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
   { href: '/studio-owner/templates', label: 'Templates', icon: <FileText size={20} /> },
   { href: '/studio-owner/sessions', label: 'All Sessions', icon: <Dumbbell size={20} /> },
+  { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+];
+
+const financeManagerLinks: NavLink[] = [
+  { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+  { href: '/studio-owner/revenue', label: 'Revenue', icon: <DollarSign size={20} /> },
+  { href: '/studio-owner/clients', label: 'Clients', icon: <Users size={20} /> },
+  { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
+];
+
+const receptionistLinks: NavLink[] = [
+  { href: '/studio-owner', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+  { href: '/studio-owner/calendar', label: 'Calendar', icon: <Calendar size={20} /> },
+  { href: '/studio-owner/clients', label: 'Clients', icon: <Users size={20} /> },
+  { href: '/studio-owner/services', label: 'Services', icon: <Clock size={20} /> },
+  { href: '/studio-owner/staff', label: 'Staff', icon: <UsersRound size={20} /> },
   { href: '/settings', label: 'Settings', icon: <Settings size={20} /> },
 ];
 
@@ -64,7 +83,9 @@ export function MobileNav() {
 
   const isStudioStaff = ['studio_owner', 'studio_manager', 'receptionist', 'finance_manager'].includes(currentRole);
   const links =
-    isStudioStaff ? studioOwnerLinks :
+    currentRole === 'finance_manager' ? financeManagerLinks :
+    currentRole === 'receptionist' ? receptionistLinks :
+    currentRole === 'studio_owner' || currentRole === 'studio_manager' ? studioOwnerLinks :
     currentRole === 'trainer' ? trainerLinks :
     currentRole === 'solo_practitioner' ? soloPractitionerLinks :
     clientLinks;

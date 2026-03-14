@@ -35,9 +35,11 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
           .eq('id', user.id)
           .maybeSingle();
 
-        // Only solo_practitioner and studio_owner need onboarding
-        // Staff roles (trainer, receptionist, finance_manager, studio_manager) and clients skip it
-        const needsOnboardingFlow = profile?.role === 'solo_practitioner' || profile?.role === 'studio_owner';
+        // Only solo_practitioner, studio_owner, and trigger-stub client profiles need onboarding
+        // Staff roles (trainer, receptionist, finance_manager, studio_manager) and real clients skip it
+        // Trigger-stub: role='client' + is_onboarded=false (auto-created by DB trigger on signup)
+        const isTriggerStub = profile?.role === 'client' && profile?.is_onboarded === false;
+        const needsOnboardingFlow = profile?.role === 'solo_practitioner' || profile?.role === 'studio_owner' || isTriggerStub;
         if (profile && profile.is_onboarded === false && needsOnboardingFlow) {
           setNeedsOnboarding(true);
           if (!pathname?.startsWith('/onboarding')) {

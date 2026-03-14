@@ -83,6 +83,17 @@ export function AuthCallbackInner() {
       const profile = await lookupUserProfile(supabase, user)
 
       if (profile) {
+        // Detect trigger-created stub profiles (role='client', is_onboarded=false)
+        // These are auto-created by a database trigger when auth users are created.
+        // New signups should go to onboarding, not the client dashboard.
+        const isTriggerStub = profile.role === 'client' && !profile.isOnboarded
+        if (isTriggerStub) {
+          // Treat as new user — send to onboarding
+          setUserFromProfile({ ...profile, role: 'solo_practitioner' })
+          router.push('/onboarding')
+          return
+        }
+
         // Update Zustand store with profile data
         setUserFromProfile(profile)
 
