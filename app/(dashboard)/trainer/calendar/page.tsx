@@ -156,6 +156,24 @@ export default function TrainerCalendar() {
     });
   };
 
+  // Get available hours range for a given date (for display)
+  const getAvailableHoursForDate = (date: Date): { start: string; end: string } | null => {
+    if (!trainerAvailability) return null;
+    const dayOfWeek = date.getDay();
+    const availableBlocks = trainerAvailability.blocks.filter(
+      (block) => block.blockType === 'available' && block.dayOfWeek === dayOfWeek
+    );
+    if (availableBlocks.length === 0) return null;
+    const earliest = Math.min(...availableBlocks.map((b) => b.startHour * 60 + b.startMinute));
+    const latest = Math.max(...availableBlocks.map((b) => b.endHour * 60 + b.endMinute));
+    const fmt = (mins: number) => {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h}:${m.toString().padStart(2, '0')}`;
+    };
+    return { start: fmt(earliest), end: fmt(latest) };
+  };
+
   // Client-side only flag to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false);
 
@@ -1725,6 +1743,26 @@ export default function TrainerCalendar() {
               )}
             </div>
 
+            {/* Available Hours Banner */}
+            {(() => {
+              const availHours = getAvailableHoursForDate(currentDate);
+              return availHours ? (
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl px-4 py-2.5 border border-blue-200 dark:border-blue-800 flex items-center gap-2">
+                  <Clock size={14} className="text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                    Available today: {availHours.start} – {availHours.end}
+                  </span>
+                </div>
+              ) : (
+                <div className="bg-gray-100 dark:bg-gray-700 rounded-xl px-4 py-2.5 border border-gray-200 dark:border-gray-600 flex items-center gap-2">
+                  <XCircle size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    No availability set for today
+                  </span>
+                </div>
+              );
+            })()}
+
             {/* Quick Time Selector - INLINE (NO MODAL) */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-md border-2 border-wondrous-grey-light dark:border-gray-700">
               <div className="text-xs font-semibold mb-2 text-wondrous-grey-dark dark:text-gray-100">
@@ -1865,8 +1903,8 @@ export default function TrainerCalendar() {
                               : isBlocked
                               ? "bg-red-100 dark:bg-red-900/20 border-red-300 dark:border-red-800 cursor-pointer bg-[repeating-linear-gradient(45deg,_transparent,_transparent_10px,_rgba(239,68,68,0.1)_10px,_rgba(239,68,68,0.1)_20px)]"
                               : isAvailable
-                              ? "bg-gray-50 dark:bg-gray-700 border-wondrous-grey-light dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-gray-600 cursor-pointer"
-                              : "bg-gray-200 dark:bg-gray-600 border-gray-300 dark:border-gray-500 cursor-not-allowed opacity-40"
+                              ? "bg-white dark:bg-gray-700 border-blue-200 dark:border-blue-800 border-l-[3px] border-l-blue-400 dark:border-l-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer"
+                              : "bg-gray-200/60 dark:bg-gray-600 border-gray-300 dark:border-gray-500 cursor-not-allowed opacity-50 bg-[repeating-linear-gradient(45deg,_transparent,_transparent_8px,_rgba(156,163,175,0.15)_8px,_rgba(156,163,175,0.15)_16px)]"
                           )}
                           onDragOver={(e) => handleDragOver(e, dayIndex, hour)}
                           onDragLeave={handleDragLeave}
