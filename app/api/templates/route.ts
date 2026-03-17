@@ -50,7 +50,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ templates: data || [] });
+    // Also include templates assigned to this user via ta_trainer_template_assignments
+    let allTemplates = data || [];
+    if (!studioId) {
+      const { data: assignments } = await serviceClient
+        .from('ta_trainer_template_assignments')
+        .select('template_id')
+        .eq('trainer_id', user.id);
+
+      if (assignments && assignments.length > 0) {
+        const assignedIds = assignments.map((a: { template_id: string }) => a.template_id);
+        const existingIds = new Set(allTemplates.map((t: { id: string }) => t.id));
+        const missingIds = assignedIds.filter((id: string) => !existingIds.has(id));
+
+        if (missingIds.length > 0) {
+          const { data: assignedTemplates } = await serviceClient
+            .from('ta_workout_templates')
+            .select('*')
+            .in('id', missingIds)
+            .order('created_at', { ascending: false });
+
+          if (assignedTemplates) {
+            allTemplates = [...allTemplates, ...assignedTemplates];
+          }
+        }
+      }
+    }
+
+    return NextResponse.json({ templates: allTemplates });
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json(

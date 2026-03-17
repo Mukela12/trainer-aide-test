@@ -7,6 +7,7 @@ import {
   updateAvailabilityBlock,
   deleteAvailabilityBlock,
 } from '@/lib/services/availability-service';
+import { getStudioConfig } from '@/lib/services/studio-service';
 
 /**
  * GET /api/availability
@@ -38,7 +39,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ availability: data || [] });
+    // Also return studio opening hours so the calendar can filter availability
+    let openingHours = {};
+    const { data: studioConfig } = await getStudioConfig(studioId);
+    if (studioConfig?.opening_hours) {
+      openingHours = studioConfig.opening_hours;
+    }
+
+    return NextResponse.json({ availability: data || [], openingHours });
   } catch (error) {
     console.error('Unexpected error:', error);
     return NextResponse.json(

@@ -64,9 +64,9 @@ export function useAvailability(trainerId: string | undefined) {
   return useQuery({
     queryKey: availabilityKeys.byTrainer(trainerId),
     queryFn: async (): Promise<TrainerAvailability> => {
-      const apiBlocks = await getAvailabilityClient(trainerId);
-      const blocks = apiBlocks.map(apiToStoreBlock);
-      return { trainerId: trainerId || "", blocks };
+      const result = await getAvailabilityClient(trainerId);
+      const blocks = result.blocks.map(apiToStoreBlock);
+      return { trainerId: trainerId || "", blocks, openingHours: result.openingHours };
     },
     enabled: !!trainerId,
   });

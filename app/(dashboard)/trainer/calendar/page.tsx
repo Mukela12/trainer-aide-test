@@ -97,6 +97,20 @@ export default function TrainerCalendar() {
     const minute = datetime.getMinutes();
     const timeInMinutes = hour * 60 + minute;
 
+    // Check studio opening hours first (if configured)
+    const openingHours = availability.openingHours;
+    if (openingHours && Object.keys(openingHours).length > 0) {
+      const dayConfig = openingHours[String(dayOfWeek)];
+      if (!dayConfig || !dayConfig.enabled) return false;
+
+      const withinStudioSlot = dayConfig.slots.some((slot) => {
+        const [startH, startM] = slot.start.split(':').map(Number);
+        const [endH, endM] = slot.end.split(':').map(Number);
+        return timeInMinutes >= startH * 60 + startM && timeInMinutes < endH * 60 + endM;
+      });
+      if (!withinStudioSlot) return false;
+    }
+
     // Check if time is within available blocks
     const isAvailable = availability.blocks.some((block) => {
       if (block.blockType !== 'available') return false;
@@ -156,7 +170,7 @@ export default function TrainerCalendar() {
     });
   };
 
-  // Get available hours range for a given date (for display)
+  // Get available hours range for a given date (for display), constrained by studio opening hours
   const getAvailableHoursForDate = (date: Date): { start: string; end: string } | null => {
     if (!trainerAvailability) return null;
     const dayOfWeek = date.getDay();
@@ -164,8 +178,31 @@ export default function TrainerCalendar() {
       (block) => block.blockType === 'available' && block.dayOfWeek === dayOfWeek
     );
     if (availableBlocks.length === 0) return null;
-    const earliest = Math.min(...availableBlocks.map((b) => b.startHour * 60 + b.startMinute));
-    const latest = Math.max(...availableBlocks.map((b) => b.endHour * 60 + b.endMinute));
+
+    let earliest = Math.min(...availableBlocks.map((b) => b.startHour * 60 + b.startMinute));
+    let latest = Math.max(...availableBlocks.map((b) => b.endHour * 60 + b.endMinute));
+
+    // Constrain by studio opening hours if configured
+    const openingHours = trainerAvailability.openingHours;
+    if (openingHours && Object.keys(openingHours).length > 0) {
+      const dayConfig = openingHours[String(dayOfWeek)];
+      if (!dayConfig || !dayConfig.enabled) return null;
+
+      const studioEarliest = Math.min(...dayConfig.slots.map((s) => {
+        const [h, m] = s.start.split(':').map(Number);
+        return h * 60 + m;
+      }));
+      const studioLatest = Math.max(...dayConfig.slots.map((s) => {
+        const [h, m] = s.end.split(':').map(Number);
+        return h * 60 + m;
+      }));
+
+      earliest = Math.max(earliest, studioEarliest);
+      latest = Math.min(latest, studioLatest);
+
+      if (earliest >= latest) return null;
+    }
+
     const fmt = (mins: number) => {
       const h = Math.floor(mins / 60);
       const m = mins % 60;

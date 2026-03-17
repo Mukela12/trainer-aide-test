@@ -48,7 +48,14 @@ interface DbSession {
   template_id: string;
   session_name: string;
   sign_off_mode: 'full_session' | 'per_block' | 'per_exercise';
-  blocks: SessionBlock[];
+  json_definition: {
+    blocks?: SessionBlock[];
+    sign_off_mode?: string;
+    planned_duration_minutes?: number | null;
+    private_notes?: string | null;
+    public_notes?: string | null;
+    recommendations?: string | null;
+  } | null;
   started_at: string;
   completed_at: string | null;
   duration: number | null;
@@ -68,6 +75,7 @@ interface DbSession {
  * Convert database session to frontend format
  */
 function dbToSession(db: DbSession, client?: Client | null): Session {
+  const jsonDef = db.json_definition;
   return {
     id: db.id,
     trainerId: db.trainer_id,
@@ -75,16 +83,16 @@ function dbToSession(db: DbSession, client?: Client | null): Session {
     client: client || undefined,
     templateId: db.template_id,
     sessionName: db.session_name,
-    signOffMode: db.sign_off_mode,
-    blocks: db.blocks || [],
+    signOffMode: (jsonDef?.sign_off_mode as Session['signOffMode']) || db.sign_off_mode,
+    blocks: jsonDef?.blocks || [],
     startedAt: db.started_at,
     completedAt: db.completed_at || undefined,
     duration: db.duration || undefined,
-    plannedDurationMinutes: db.planned_duration_minutes || undefined,
+    plannedDurationMinutes: db.planned_duration_minutes || jsonDef?.planned_duration_minutes || undefined,
     overallRpe: db.overall_rpe || undefined,
-    privateNotes: db.private_notes || undefined,
-    publicNotes: db.public_notes || undefined,
-    recommendations: db.recommendations || undefined,
+    privateNotes: db.private_notes || jsonDef?.private_notes || undefined,
+    publicNotes: db.public_notes || jsonDef?.public_notes || undefined,
+    recommendations: db.recommendations || jsonDef?.recommendations || undefined,
     trainerDeclaration: db.trainer_declaration,
     completed: db.completed,
   };
