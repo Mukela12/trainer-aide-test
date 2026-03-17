@@ -23,6 +23,14 @@ export async function checkBookingConflicts(
 ): Promise<{ hasConflict: boolean; error: Error | null }> {
   try {
     const supabase = createServiceRoleClient();
+
+    // Clean up expired soft-holds before checking conflicts
+    await supabase
+      .from('ta_bookings')
+      .update({ status: 'cancelled' })
+      .eq('status', 'soft-hold')
+      .lt('hold_expiry', new Date().toISOString());
+
     const scheduledDate = new Date(scheduledAt);
     const endTime = new Date(scheduledDate.getTime() + durationMinutes * 60 * 1000);
 
@@ -548,20 +556,22 @@ export async function createPublicBooking(params: {
         return { data: null, error: requestError || new Error('Failed to create booking request') };
       }
 
-      // Create terms snapshot for the booking request
+      // Create terms snapshot for the booking request — mandatory if terms were accepted
       if (params.termsContent && studioId) {
-        try {
-          const termsHash = createHash('sha256').update(params.termsContent).digest('hex');
-          await supabase.from('ta_booking_terms_snapshots').insert({
-            booking_request_id: request.id,
-            studio_id: studioId,
-            terms_content: params.termsContent,
-            terms_version: params.termsVersion || 1,
-            terms_hash: termsHash,
-            client_email: params.email.toLowerCase(),
-          });
-        } catch (termsErr) {
-          console.error('Error creating terms snapshot:', termsErr);
+        const termsHash = createHash('sha256').update(params.termsContent).digest('hex');
+        const { error: termsError } = await supabase.from('ta_booking_terms_snapshots').insert({
+          booking_request_id: request.id,
+          studio_id: studioId,
+          terms_content: params.termsContent,
+          terms_version: params.termsVersion || 1,
+          terms_hash: termsHash,
+          client_email: params.email.toLowerCase(),
+        });
+
+        if (termsError) {
+          console.error('Failed to save terms snapshot, rolling back request:', termsError);
+          await supabase.from('ta_booking_requests').delete().eq('id', request.id);
+          return { data: null, error: new Error('Failed to record terms acceptance') };
         }
       }
 
@@ -619,20 +629,22 @@ export async function createPublicBooking(params: {
       return { data: null, error: new Error('Failed to create booking') };
     }
 
-    // Create terms snapshot for the booking
+    // Create terms snapshot for the booking — mandatory if terms were accepted
     if (params.termsContent && studioId) {
-      try {
-        const termsHash = createHash('sha256').update(params.termsContent).digest('hex');
-        await supabase.from('ta_booking_terms_snapshots').insert({
-          booking_id: booking.id,
-          studio_id: studioId,
-          terms_content: params.termsContent,
-          terms_version: params.termsVersion || 1,
-          terms_hash: termsHash,
-          client_email: params.email.toLowerCase(),
-        });
-      } catch (termsErr) {
-        console.error('Error creating terms snapshot:', termsErr);
+      const termsHash = createHash('sha256').update(params.termsContent).digest('hex');
+      const { error: termsError } = await supabase.from('ta_booking_terms_snapshots').insert({
+        booking_id: booking.id,
+        studio_id: studioId,
+        terms_content: params.termsContent,
+        terms_version: params.termsVersion || 1,
+        terms_hash: termsHash,
+        client_email: params.email.toLowerCase(),
+      });
+
+      if (termsError) {
+        console.error('Failed to save terms snapshot, rolling back booking:', termsError);
+        await supabase.from('ta_bookings').delete().eq('id', booking.id);
+        return { data: null, error: new Error('Failed to record terms acceptance') };
       }
     }
 

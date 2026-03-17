@@ -92,9 +92,10 @@ export async function getClientCredits(
       ta_packages: { name?: string; price_cents?: number } | null;
     }>;
 
-    // Calculate totals from active packages
+    // Calculate totals from active, non-expired packages
+    const now = new Date().toISOString();
     const activePackages = rows.filter(
-      (p: { status: string }) => p.status === 'active'
+      (p: { status: string; expires_at: string }) => p.status === 'active' && p.expires_at > now
     );
     const totalCredits = activePackages.reduce(
       (sum: number, p: { sessions_remaining: number }) =>
