@@ -108,13 +108,36 @@ function dbToAvailability(db: DbAvailability): AvailabilityBlock {
 }
 
 /**
+ * Opening hours types (matches studio-service OpeningHours)
+ */
+export interface OpeningHoursSlot {
+  start: string; // "HH:MM"
+  end: string;   // "HH:MM"
+}
+
+export interface OpeningHoursDay {
+  enabled: boolean;
+  slots: OpeningHoursSlot[];
+}
+
+export type OpeningHours = Record<string, OpeningHoursDay>;
+
+/**
+ * Result from getAvailabilityClient including opening hours
+ */
+export interface AvailabilityResult {
+  blocks: AvailabilityBlock[];
+  openingHours: OpeningHours;
+}
+
+/**
  * Get availability blocks for a trainer (client-side)
  * Uses API route to bypass RLS
  */
 export async function getAvailabilityClient(
   trainerId?: string,
   blockType?: 'available' | 'blocked'
-): Promise<AvailabilityBlock[]> {
+): Promise<AvailabilityResult> {
   try {
     const params = new URLSearchParams();
     if (trainerId) {
@@ -129,14 +152,17 @@ export async function getAvailabilityClient(
     if (!response.ok) {
       const error = await response.json();
       console.error('Error fetching availability:', error);
-      return [];
+      return { blocks: [], openingHours: {} };
     }
 
-    const { availability } = await response.json();
-    return (availability as DbAvailability[]).map(dbToAvailability);
+    const { availability, openingHours } = await response.json();
+    return {
+      blocks: (availability as DbAvailability[]).map(dbToAvailability),
+      openingHours: (openingHours || {}) as OpeningHours,
+    };
   } catch (error) {
     console.error('Error fetching availability:', error);
-    return [];
+    return { blocks: [], openingHours: {} };
   }
 }
 
@@ -242,14 +268,16 @@ export async function deleteBlockClient(blockId: string): Promise<boolean> {
  * Get available blocks only
  */
 export async function getAvailableBlocksClient(trainerId?: string): Promise<AvailabilityBlock[]> {
-  return getAvailabilityClient(trainerId, 'available');
+  const result = await getAvailabilityClient(trainerId, 'available');
+  return result.blocks;
 }
 
 /**
  * Get blocked time blocks only
  */
 export async function getBlockedBlocksClient(trainerId?: string): Promise<AvailabilityBlock[]> {
-  return getAvailabilityClient(trainerId, 'blocked');
+  const result = await getAvailabilityClient(trainerId, 'blocked');
+  return result.blocks;
 }
 
 /**

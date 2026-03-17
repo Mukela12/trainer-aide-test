@@ -20,7 +20,20 @@ export interface AvailabilityBlock {
   isRecurring?: boolean; // DEPRECATED: Use recurrence instead (kept for backwards compatibility)
 }
 
+export interface OpeningHoursSlot {
+  start: string; // "HH:MM"
+  end: string;   // "HH:MM"
+}
+
+export interface OpeningHoursDay {
+  enabled: boolean;
+  slots: OpeningHoursSlot[];
+}
+
+export type OpeningHours = Record<string, OpeningHoursDay>;
+
 export interface TrainerAvailability {
   trainerId: string;
   blocks: AvailabilityBlock[];
+  openingHours: OpeningHours;
 }
