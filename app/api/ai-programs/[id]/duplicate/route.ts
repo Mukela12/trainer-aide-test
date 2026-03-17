@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { duplicateAIProgram } from '@/lib/services/ai-program-service';
 
 /**
@@ -18,6 +18,40 @@ export async function POST(
     }
 
     const { id } = await params;
+
+    // Verify ownership before allowing duplication
+    const svc = createServiceRoleClient();
+    const { data: existing } = await svc
+      .from('ta_ai_programs')
+      .select('trainer_id')
+      .eq('id', id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Program not found' }, { status: 404 });
+    }
+
+    if (user.id !== existing.trainer_id) {
+      const { data: userStaff } = await svc
+        .from('bs_staff')
+        .select('studio_id')
+        .eq('id', user.id)
+        .single();
+
+      const sameStudio = userStaff?.studio_id
+        ? await svc
+            .from('bs_staff')
+            .select('id')
+            .eq('id', existing.trainer_id)
+            .eq('studio_id', userStaff.studio_id)
+            .single()
+            .then(({ data }: { data: unknown }) => !!data)
+        : false;
+
+      if (!sameStudio) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
 
     const { data: program, error } = await duplicateAIProgram(id);
 

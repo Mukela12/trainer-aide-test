@@ -34,6 +34,30 @@ export async function POST(
       );
     }
 
+    // Verify ownership: user must be the trainer or in the same studio
+    const trainerId = existingBooking.trainer_id as string;
+    if (user.id !== trainerId) {
+      const { data: userStaff } = await serviceClient
+        .from('bs_staff')
+        .select('studio_id')
+        .eq('id', user.id)
+        .single();
+
+      const sameStudio = userStaff?.studio_id
+        ? await serviceClient
+            .from('bs_staff')
+            .select('id')
+            .eq('id', trainerId)
+            .eq('studio_id', userStaff.studio_id)
+            .single()
+            .then(({ data }: { data: unknown }) => !!data)
+        : false;
+
+      if (!sameStudio) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
     // Only confirmed or soft-hold bookings can be checked in
     const validStatuses = ['confirmed', 'soft-hold'];
     if (!validStatuses.includes(existingBooking.status)) {

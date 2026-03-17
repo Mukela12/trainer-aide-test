@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import {
   assignProgramToClient,
   assignProgramToTrainer,
@@ -23,6 +23,41 @@ export async function POST(
     }
 
     const { id } = await params;
+
+    // Verify the user owns this program or is in the same studio as the owner
+    const svc = createServiceRoleClient();
+    const { data: program } = await svc
+      .from('ta_ai_programs')
+      .select('trainer_id')
+      .eq('id', id)
+      .single();
+
+    if (!program) {
+      return NextResponse.json({ error: 'Program not found' }, { status: 404 });
+    }
+
+    if (user.id !== program.trainer_id) {
+      const { data: userStaff } = await svc
+        .from('bs_staff')
+        .select('studio_id')
+        .eq('id', user.id)
+        .single();
+
+      const sameStudio = userStaff?.studio_id
+        ? await svc
+            .from('bs_staff')
+            .select('id')
+            .eq('id', program.trainer_id)
+            .eq('studio_id', userStaff.studio_id)
+            .single()
+            .then(({ data }: { data: unknown }) => !!data)
+        : false;
+
+      if (!sameStudio) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
     const body = await request.json();
     const { client_id, trainer_id } = body;
 
@@ -103,6 +138,40 @@ export async function DELETE(
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Verify ownership before unassigning
+    const svc = createServiceRoleClient();
+    const { data: program } = await svc
+      .from('ta_ai_programs')
+      .select('trainer_id')
+      .eq('id', id)
+      .single();
+
+    if (!program) {
+      return NextResponse.json({ error: 'Program not found' }, { status: 404 });
+    }
+
+    if (user.id !== program.trainer_id) {
+      const { data: userStaff } = await svc
+        .from('bs_staff')
+        .select('studio_id')
+        .eq('id', user.id)
+        .single();
+
+      const sameStudio = userStaff?.studio_id
+        ? await svc
+            .from('bs_staff')
+            .select('id')
+            .eq('id', program.trainer_id)
+            .eq('studio_id', userStaff.studio_id)
+            .single()
+            .then(({ data }: { data: unknown }) => !!data)
+        : false;
+
+      if (!sameStudio) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     const { data, error } = await unassignProgramFromTrainer(id, trainer_id);
