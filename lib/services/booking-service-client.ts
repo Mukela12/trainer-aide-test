@@ -221,16 +221,15 @@ export async function createBookingClient(input: CreateBookingInput): Promise<Bo
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('Error creating booking:', error);
-      return null;
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create booking');
     }
 
     const { booking } = await response.json();
     return booking ? dbToBooking(booking as DbBooking) : null;
   } catch (error) {
-    console.error('Error creating booking:', error);
-    return null;
+    if (error instanceof Error) throw error;
+    throw new Error('Failed to create booking');
   }
 }
 

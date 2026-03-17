@@ -9,6 +9,7 @@ const PUBLIC_ROUTES = [
   '/forgot-password',
   '/reset-password',
   '/auth/callback',
+  '/auth/confirm',
   '/book',
 ]
 

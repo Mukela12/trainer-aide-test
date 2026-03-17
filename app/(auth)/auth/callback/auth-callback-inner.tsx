@@ -55,6 +55,30 @@ export function AuthCallbackInner() {
               return
             }
           }
+
+          // Fallback: handle token_hash flow (Supabase email templates may use this)
+          const tokenHash = searchParams.get('token_hash')
+          if (tokenHash && type) {
+            const { error: verifyError } = await supabase.auth.verifyOtp({
+              type: type as 'recovery' | 'signup' | 'email',
+              token_hash: tokenHash,
+            })
+            if (verifyError) {
+              setError(verifyError.message)
+              return
+            }
+            if (type === 'recovery') {
+              router.push('/reset-password')
+              return
+            }
+            // Re-check session after OTP verification
+            const { data: { session: newSession } } = await supabase.auth.getSession()
+            if (newSession) {
+              await processUser(supabase, newSession.user)
+              return
+            }
+          }
+
           setError('No session found')
           return
         }

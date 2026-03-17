@@ -464,6 +464,22 @@ export default function TrainerCalendar() {
       });
       return;
     }
+    if (!isWithinAvailability(datetime, trainerAvailability)) {
+      toast({
+        variant: "destructive",
+        title: "Outside Available Hours",
+        description: "This time is outside your operating hours",
+      });
+      return;
+    }
+    if (!isTimeAvailable(datetime, 30, sessions)) {
+      toast({
+        variant: "destructive",
+        title: "Time Conflict",
+        description: "This time slot is already booked",
+      });
+      return;
+    }
     setSelectedSlot(datetime);
     setSelectedServiceType(services[0]?.id || null);
     setSelectedBookingClient(null);
@@ -653,19 +669,23 @@ export default function TrainerCalendar() {
     };
 
     // Update sessions
-    addSessionMutation.mutate(newSession);
-
-    // Refresh clients to reflect updated credits
-    queryClient.invalidateQueries({ queryKey: ['clients'] });
-
-    // Success notification
-    toast({
-      title: "Booking Confirmed",
-      description: `${client.name} booked for ${formatTime(datetime)} • ${serviceType.name}`,
+    addSessionMutation.mutate(newSession, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['clients'] });
+        toast({
+          title: "Booking Confirmed",
+          description: `${client.name} booked for ${formatTime(datetime)} • ${serviceType.name}`,
+        });
+        closeBookingPanel();
+      },
+      onError: (error: Error) => {
+        toast({
+          variant: "destructive",
+          title: "Booking Failed",
+          description: error.message || "Could not create booking. Please try again.",
+        });
+      },
     });
-
-    // Close panel
-    closeBookingPanel();
   };
 
   // Check in client for group class
@@ -963,29 +983,36 @@ export default function TrainerCalendar() {
       workoutId: null,
     };
 
-    addSessionMutation.mutate(newSession);
+    addSessionMutation.mutate(newSession, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['clients'] });
 
-    // Refresh clients to reflect updated credits
-    queryClient.invalidateQueries({ queryKey: ['clients'] });
+        acceptRequestMutation.mutate({
+          requestId,
+          acceptedTime: selectedTime.toISOString(),
+          ...(isSoftHold && { bookingStatus: 'soft-hold' as const }),
+        });
 
-    // Mark request as accepted via API (with soft-hold status if insufficient credits)
-    acceptRequestMutation.mutate({
-      requestId,
-      acceptedTime: selectedTime.toISOString(),
-      ...(isSoftHold && { bookingStatus: 'soft-hold' as const }),
+        if (isSoftHold) {
+          toast({
+            title: "Soft Hold — Top-Up Email Sent",
+            description: `${request.clientName ?? "Client"} needs ${serviceType.creditsRequired - client.credits} more credit${serviceType.creditsRequired - client.credits !== 1 ? 's' : ''}. Holding spot for 24h.`,
+          });
+        } else {
+          toast({
+            title: "Request Accepted",
+            description: `${request.clientName ?? "Client"} booked for ${formatTime(selectedTime)}`,
+          });
+        }
+      },
+      onError: (error: Error) => {
+        toast({
+          variant: "destructive",
+          title: "Booking Failed",
+          description: error.message || "Could not create booking. Please try again.",
+        });
+      },
     });
-
-    if (isSoftHold) {
-      toast({
-        title: "Soft Hold — Top-Up Email Sent",
-        description: `${request.clientName ?? "Client"} needs ${serviceType.creditsRequired - client.credits} more credit${serviceType.creditsRequired - client.credits !== 1 ? 's' : ''}. Holding spot for 24h.`,
-      });
-    } else {
-      toast({
-        title: "Request Accepted",
-        description: `${request.clientName ?? "Client"} booked for ${formatTime(selectedTime)}`,
-      });
-    }
   };
 
   // Decline booking request
@@ -2458,27 +2485,36 @@ export default function TrainerCalendar() {
                       workoutId: null,
                       holdExpiry: holdExpiry,
                     };
-                    addSessionMutation.mutate(newSession);
+                    addSessionMutation.mutate(newSession, {
+                      onSuccess: () => {
+                        // Auto-send soft hold email
+                        fetch('/api/email/soft-hold', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            clientId: client.id,
+                            clientName: client.name,
+                            sessionDatetime: selectedSlot.toISOString(),
+                            serviceTypeName: serviceType?.name,
+                            creditsRequired: serviceType?.creditsRequired,
+                            holdExpiry: holdExpiry.toISOString(),
+                          }),
+                        }).catch(() => {});
 
-                    // Auto-send soft hold email
-                    fetch('/api/email/soft-hold', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        clientId: client.id,
-                        clientName: client.name,
-                        sessionDatetime: selectedSlot.toISOString(),
-                        serviceTypeName: serviceType?.name,
-                        creditsRequired: serviceType?.creditsRequired,
-                        holdExpiry: holdExpiry.toISOString(),
-                      }),
-                    }).catch(() => {});
-
-                    toast({
-                      title: "Soft Hold + Top-Up Email Sent",
-                      description: `Hold expires in 24h • Top-up email sent to ${client.name}`,
+                        toast({
+                          title: "Soft Hold + Top-Up Email Sent",
+                          description: `Hold expires in 24h • Top-up email sent to ${client.name}`,
+                        });
+                        closeBookingPanel();
+                      },
+                      onError: (error: Error) => {
+                        toast({
+                          variant: "destructive",
+                          title: "Booking Failed",
+                          description: error.message || "Could not create booking. Please try again.",
+                        });
+                      },
                     });
-                    closeBookingPanel();
                   }
                 }}
               >
