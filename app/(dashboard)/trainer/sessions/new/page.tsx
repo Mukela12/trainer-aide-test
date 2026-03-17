@@ -8,6 +8,7 @@ import { useStartSession } from '@/lib/hooks/use-sessions';
 import { useUserStore } from '@/lib/stores/user-store';
 import { useExerciseLookup } from '@/lib/hooks/use-exercise';
 import { generateId } from '@/lib/utils/generators';
+import { getTemplateByIdClient } from '@/lib/services/template-service-client';
 import { convertAIWorkoutToSessionBlocks, getAIWorkoutSessionName } from '@/lib/utils/ai-workout-converter';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -290,6 +291,65 @@ function StartNewSessionContent() {
 
       // Start manual template session
       try {
+        const created = await startSessionMutation.mutateAsync({
+          trainerId: currentUser.id,
+          clientId: selectedClient?.id,
+          client: selectedClient || undefined,
+          templateId,
+          template,
+          sessionName,
+          signOffMode: selectedSignOffMode,
+          blocks: sessionBlocks,
+        });
+
+        router.push(`/trainer/sessions/${created.id}`);
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Cannot Start Session",
+          description: error instanceof Error ? error.message : "An error occurred while starting the session.",
+        });
+      }
+    } else if (sourceType === 'manual' && selectedAvailableTemplate) {
+      // Fetch the full template data for an available template not in local array
+      try {
+        const fetchedTemplate = await getTemplateByIdClient(selectedAvailableTemplate.template_id);
+        if (!fetchedTemplate) {
+          toast({
+            variant: "destructive",
+            title: "Template Not Found",
+            description: "Could not load the selected template. It may have been deleted.",
+          });
+          return;
+        }
+
+        sessionBlocks = fetchedTemplate.blocks.map((block) => ({
+          id: generateId('session-block'),
+          blockNumber: block.blockNumber,
+          name: block.name,
+          completed: false,
+          exercises: block.exercises.map((templateExercise) => ({
+            id: generateId('session-exercise'),
+            exerciseId: templateExercise.exerciseId,
+            position: templateExercise.position,
+            muscleGroup: templateExercise.muscleGroup,
+            resistanceType: templateExercise.resistanceType,
+            resistanceValue: templateExercise.resistanceValue,
+            repsMin: templateExercise.repsMin,
+            repsMax: templateExercise.repsMax,
+            sets: templateExercise.sets,
+            cardioDuration: templateExercise.cardioDuration,
+            cardioIntensity: templateExercise.cardioIntensity,
+            actualReps: undefined,
+            actualResistance: undefined,
+            rpe: undefined,
+            completed: false,
+          })),
+        }));
+        sessionName = `${fetchedTemplate.name} - ${selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : 'Walk-in'}`;
+        templateId = fetchedTemplate.id;
+        template = fetchedTemplate;
+
         const created = await startSessionMutation.mutateAsync({
           trainerId: currentUser.id,
           clientId: selectedClient?.id,
