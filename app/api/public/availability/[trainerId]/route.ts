@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Use service role for public availability (bypasses RLS for read-only public data)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { createServiceRoleClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
@@ -13,6 +7,7 @@ export async function GET(
 ) {
   try {
     const { trainerId } = await params;
+    const supabase = createServiceRoleClient();
 
     // Get weekly availability
     const { data: availability, error: availError } = await supabase
@@ -51,14 +46,14 @@ export async function GET(
     }
 
     return NextResponse.json({
-      availability: availability?.map((a) => ({
+      availability: availability?.map((a: { day_of_week: number; start_hour: number; start_minute: number; end_hour: number; end_minute: number }) => ({
         dayOfWeek: a.day_of_week,
         startHour: a.start_hour,
         startMinute: a.start_minute || 0,
         endHour: a.end_hour,
         endMinute: a.end_minute || 0,
       })) || [],
-      bookings: bookings?.map((b) => ({
+      bookings: bookings?.map((b: { scheduled_at: string; duration: number }) => ({
         scheduledAt: b.scheduled_at,
         duration: b.duration,
       })) || [],
