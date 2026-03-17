@@ -580,8 +580,10 @@ export async function acceptStaffInvitation(
       const { error: updateProfileError } = await serviceClient
         .from('profiles')
         .update({
+          email: invitation.email,
+          first_name: invitation.first_name,
+          last_name: invitation.last_name,
           role: profileRole,
-          studio_id: invitation.studio_id,
           is_onboarded: true,
           updated_at: new Date().toISOString(),
         })
@@ -589,7 +591,6 @@ export async function acceptStaffInvitation(
 
       if (updateProfileError) {
         console.error('Error updating profile:', updateProfileError);
-        // Non-fatal: staff record is more important
       }
     } else {
       const { error: createProfileError } = await serviceClient
@@ -600,13 +601,11 @@ export async function acceptStaffInvitation(
           first_name: invitation.first_name,
           last_name: invitation.last_name,
           role: profileRole,
-          studio_id: invitation.studio_id,
           is_onboarded: true,
         });
 
       if (createProfileError) {
         console.error('Error creating profile:', createProfileError);
-        // Non-fatal: staff record is more important
       }
     }
 
