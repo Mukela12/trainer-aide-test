@@ -1401,7 +1401,7 @@ export default function TrainerCalendar() {
                             transition={{ duration: 0.2 }}
                             className="border-t border-wondrous-grey-light dark:border-gray-700 bg-gray-50 dark:bg-gray-700"
                           >
-                            <div className="p-4 space-y-3">
+                            <div className="p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
                               {/* Reschedule Form - INLINE */}
                               {reschedulingSessionId === session.id ? (
                                 <div className="space-y-3">
