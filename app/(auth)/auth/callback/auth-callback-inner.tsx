@@ -117,12 +117,48 @@ export function AuthCallbackInner() {
         const dashboard = ROLE_DASHBOARDS[profile.role as UserRole] || '/solo'
         router.push(dashboard)
       } else {
+        // Before checking fc_clients, retry profile lookup once (trigger may have raced)
+        const retryProfile = await lookupUserProfile(supabase, user)
+        if (retryProfile) {
+          const isStub = retryProfile.role === 'client' && !retryProfile.isOnboarded
+          if (isStub) {
+            setUserFromProfile({ ...retryProfile, role: 'solo_practitioner' })
+            router.push('/onboarding')
+            return
+          }
+          setUserFromProfile(retryProfile)
+          const dashboard = ROLE_DASHBOARDS[retryProfile.role as UserRole] || '/solo'
+          router.push(dashboard)
+          return
+        }
+
         // Check if user might be a client (via server API to bypass RLS)
         const clientCheck = await fetch(`/api/auth/check-client?email=${encodeURIComponent(user.email || '')}`)
         if (clientCheck.ok) {
           const clientData = await clientCheck.json()
           if (clientData.isClient) {
-            // User is a client - create profile and redirect to client dashboard
+            // Check if a trigger-created stub profile exists (new signup that also has a client record)
+            const { data: existingProfile } = await supabase
+              .from('profiles')
+              .select('is_onboarded')
+              .eq('id', user.id)
+              .maybeSingle()
+
+            if (existingProfile && !existingProfile.is_onboarded) {
+              // New signup with a pre-existing client record — send to onboarding
+              setUserFromProfile({
+                id: user.id,
+                email: user.email || '',
+                firstName: clientData.firstName || '',
+                lastName: clientData.lastName || '',
+                role: 'solo_practitioner',
+                isOnboarded: false,
+              })
+              router.push('/onboarding')
+              return
+            }
+
+            // User is a known client — create/update profile and redirect to client dashboard
             const clientProfile = {
               id: user.id,
               email: user.email || '',

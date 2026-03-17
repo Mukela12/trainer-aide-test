@@ -68,7 +68,19 @@ export async function getClientsForUser(
       .order('last_name', { ascending: true });
 
     if (role === 'solo_practitioner') {
-      query = query.eq('studio_id', userId);
+      // Solo practitioners may have clients stored with studio_id = userId (legacy)
+      // or studio_id = actual bs_studios UUID (from getOrCreateStudio)
+      const { data: ownedStudio } = await supabase
+        .from('bs_studios')
+        .select('id')
+        .eq('owner_id', userId)
+        .maybeSingle();
+
+      if (ownedStudio) {
+        query = query.in('studio_id', [userId, ownedStudio.id]);
+      } else {
+        query = query.eq('studio_id', userId);
+      }
     } else if (role === 'studio_owner' || role === 'studio_manager' || role === 'super_admin') {
       if (studioId) {
         query = query.eq('studio_id', studioId);
@@ -114,13 +126,27 @@ export async function getClientsForUser(
     }));
 
     // Also fetch pending invitations
-    const effectiveStudioId = role === 'solo_practitioner' ? userId : studioId;
+    // For solo_practitioner, check both userId and actual studio UUID
+    const invitationStudioIds: string[] = [];
+    if (role === 'solo_practitioner') {
+      invitationStudioIds.push(userId);
+      const { data: ownedStudioInv } = await supabase
+        .from('bs_studios')
+        .select('id')
+        .eq('owner_id', userId)
+        .maybeSingle();
+      if (ownedStudioInv && ownedStudioInv.id !== userId) {
+        invitationStudioIds.push(ownedStudioInv.id);
+      }
+    } else if (studioId) {
+      invitationStudioIds.push(studioId);
+    }
 
-    if (effectiveStudioId) {
+    if (invitationStudioIds.length > 0) {
       const { data: pendingInvitations } = await supabase
         .from('ta_client_invitations')
         .select('*')
-        .eq('studio_id', effectiveStudioId)
+        .in('studio_id', invitationStudioIds)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
