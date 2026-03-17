@@ -131,13 +131,20 @@ async function validateTrainer(
   return false;
 }
 
-/** Check for booking time conflicts. */
+/** Check for booking time conflicts. Cleans expired soft-holds first. */
 async function checkBookingConflicts(
   supabase: ReturnType<typeof createServiceRoleClient>,
   trainerId: string,
   scheduledAt: string,
   durationMinutes: number
 ): Promise<boolean> {
+  // Clean up expired soft-holds before checking conflicts
+  await supabase
+    .from('ta_bookings')
+    .update({ status: 'cancelled' })
+    .eq('status', 'soft-hold')
+    .lt('hold_expiry', new Date().toISOString());
+
   const scheduledDate = new Date(scheduledAt);
   const endTime = new Date(scheduledDate.getTime() + durationMinutes * 60 * 1000);
 
@@ -346,13 +353,14 @@ export async function createClientBooking(
     };
   }
 
-  // Check credits
+  // Check credits (filter out expired packages)
   const { data: packages } = await supabase
     .from('ta_client_packages')
     .select('id, sessions_remaining')
     .eq('client_id', client.id as string)
     .eq('status', 'active')
     .gt('sessions_remaining', 0)
+    .gt('expires_at', new Date().toISOString())
     .order('expires_at', { ascending: true });
 
   const packageCredits = (packages || []).reduce((sum: number, p: Record<string, unknown>) => sum + (p.sessions_remaining as number), 0);
@@ -464,18 +472,21 @@ export async function createClientBooking(
 
     remainingCredits = (updatedPackages || []).reduce((sum: number, p: Record<string, unknown>) => sum + (p.sessions_remaining as number), 0);
   } else {
-    const newCredits = simpleCredits - creditsRequired;
-    const { error: updateError } = await supabase
-      .from('fc_clients')
-      .update({ credits: newCredits })
-      .eq('id', client.id as string);
+    // Use atomic RPC to prevent race condition (two concurrent bookings reading same balance)
+    const { data: newBalance, error: updateError } = await supabase.rpc('deduct_simple_credits', {
+      p_client_id: client.id,
+      p_amount: creditsRequired,
+    });
 
     if (updateError) {
       await supabase.from('ta_bookings').delete().eq('id', (booking as Record<string, unknown>).id as string);
-      return { data: null, error: new Error('Failed to process credits'), status: 500 };
+      const msg = updateError.message?.includes('Insufficient')
+        ? `Insufficient credits. You have ${simpleCredits} credits but need ${creditsRequired}.`
+        : 'Failed to process credits';
+      return { data: null, error: new Error(msg), status: updateError.message?.includes('Insufficient') ? 400 : 500 };
     }
 
-    remainingCredits = newCredits;
+    remainingCredits = newBalance as number;
   }
 
   return {
